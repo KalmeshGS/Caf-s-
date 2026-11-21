@@ -160,6 +160,25 @@ Views.login = () => {
     <p class="fine center version">Cafe Journal v${APP_VERSION}</p></main>`;
 };
 
+/* ---------------- Lock screen (only the password is asked) ---------------- */
+Views.lockScreen = () => {
+  const u = Session.account();
+  const st = S.settings || {};
+  return `<main class="center-screen login-bg">
+    <form class="card login-card" data-form="unlock" autocomplete="off">
+      <div class="lock-avatar">${avatarHtml(u, 'xl')}<span class="lock-badge">${icon('lock')}</span></div>
+      <h1>${esc(u.name)}</h1>
+      <p class="muted center">${esc(ROLES[u.role].label)} · ${esc(st.name || '')}</p>
+      <p class="eyebrow center">Screen locked</p>
+      <p class="muted center sm">Locked after ${IDLE_LOCK_MIN} minutes without use. Enter your password to continue.</p>
+      <input type="text" name="username" value="${esc(empIdOf(u) || u.name)}" autocomplete="username" hidden>
+      ${pwField('pw', 'Password', 'autofocus')}
+      <p class="neg sm" id="form-err" role="alert"></p>
+      <button class="btn primary block" type="submit">${icon('lock')}<span>Unlock</span></button>
+      <button class="btn ghost block" type="button" data-act="logout">Not ${esc(u.name.split(' ')[0])}? Log out</button>
+    </form></main>`;
+};
+
 function changePwSheet(u, mode) {
   const title = mode === 'self' ? 'Change my password' : 'Set your own password';
   const note = mode === 'self' ? 'Choose a new password only you know.'
@@ -331,7 +350,7 @@ function setPwSheet(u) {
 function formError(msg) { const e = ($('#sheet').hidden ? null : $('#sheet #form-err')) || $('#form-err'); if (e) e.textContent = msg; else toast(msg); }
 function busy(form, on) { const b = form && form.querySelector('button[type=submit]'); if (b) { b.disabled = on; b.classList.toggle('loading', on); } }
 function loginAs(u) {
-  Session.set(u.id);
+  Session.set(u.id); App.kotSeen = null;
   u.lastLogin = Date.now(); u.failed = 0; persist();
   App.loginWho = '';
   closeSheet();
@@ -435,6 +454,17 @@ Changes.accessStaff = (el) => { const m = el.form.querySelector('.manual-fields'
 
 /* ---------------- forms ---------------- */
 Object.assign(Forms, {
+  async unlock(fd, form) {
+    const u = Session.account(); if (!u) return render();
+    busy(form, true);
+    const ok = await checkPassword(u, String(fd.get('pw') || ''));
+    busy(form, false); form.pw.value = '';
+    if (ok) { u.failed = 0; persist(); Session.unlock(); return render(); }
+    u.failed = (u.failed || 0) + 1;
+    if (u.failed >= LOCK_AFTER) { u.locked = true; u.lockedAt = Date.now(); persist(); Session.set(null); render(); return openSheet(lockedSheet(u)); }
+    persist();
+    formError(`Wrong password — ${LOCK_AFTER - u.failed} ${LOCK_AFTER - u.failed === 1 ? 'try' : 'tries'} left before the account locks.`);
+  },
   async login(fd, form) {
     const who = String(fd.get('who') || '').trim(), pw = String(fd.get('pw') || '');
     App.loginWho = who;
