@@ -29,41 +29,18 @@ Views.setup = () => {
         <label class="field"><span>Currency</span><select name="currency">${curs}</select></label>
         <label class="field"><span>Number of tables</span><input name="tables" type="number" min="0" max="99" value="8" required></label>
       </div>
+      <label class="field"><span>Tax on bills (%)</span><input name="tax" type="number" min="0" max="40" step="0.5" value="5"></label>
       <div class="row-2">
-        <label class="field"><span>Tax on bills (%)</span><input name="tax" type="number" min="0" max="40" step="0.5" value="5"></label>
-        <label class="field"><span>Owner PIN (4 digits)</span><input name="pin" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" value="1234" required></label>
+        <label class="field"><span>Your name (owner)</span><input name="owner" required maxlength="40" placeholder="e.g. Anita"></label>
+        <label class="field"><span>Your phone</span><input name="phone" type="tel" maxlength="20" placeholder="98765 43210"></label>
       </div>
       <label class="check"><input type="checkbox" name="demo" checked><span>Fill with sample data so I can explore first</span></label>
       <button class="btn primary block" type="submit">Start my journal</button>
-      <p class="fine">Your data stays on this device. Use Settings → Data to back it up.</p>
+      <p class="fine">You'll choose your own owner PIN next. Your data stays on this device — use Settings → Data to back it up.</p>
     </form></main>`;
 };
 
-/* ---------------- Login ---------------- */
-Views.login = () => {
-  const st = S.settings;
-  const cards = Object.entries(ROLES).map(([k, r]) => `
-    <button class="role-card card" data-act="pickRole" data-role="${k}">
-      <span class="avatar" style="background:${r.color}">${esc(r.label[0])}</span>
-      <strong>${esc(r.label)}</strong><small>${esc(r.desc)}</small>
-      <span class="role-lock">${icon('lock')} Own login</span>
-    </button>`).join('');
-  return `<main class="center-screen">
-    <div class="login">
-      <div class="brand-mark lg">${esc(initials(st.name))}</div>
-      <h1>${esc(st.name)}</h1>
-      ${st.tagline ? `<p class="muted">${esc(st.tagline)}</p>` : ''}
-      <p class="eyebrow center">Who's working?</p>
-      <div class="role-grid">${cards}</div>
-      ${defaultPinHint()}
-    </div></main>`;
-};
-
-function defaultPinHint() {
-  const d = emptyState().pins;
-  const still = Object.keys(ROLES).filter((k) => S.pins[k] === d[k]);
-  return still.length ? `<p class="fine">Tip for the owner: some logins still use their starting PIN. Change them in Settings → Logins.</p>` : '';
-}
+/* Login, people & access screens live in auth.js */
 
 /* ---------------- 01 Dashboard ---------------- */
 Views.dashboard = () => {
@@ -83,7 +60,8 @@ Views.dashboard = () => {
   const yday = sum(paidOn(shiftDay(today, -1)), (o) => o.total);
   const diff = yday ? Math.round(((sales - yday) / yday) * 100) : null;
 
-  return `${pageHead('Owner dashboard', `Today · ${fmtDate(new Date(), { weekday: 'short', day: 'numeric', month: 'short' })}`, live())}
+  return `${pageHead(Session.role() === 'owner' ? 'Owner dashboard' : 'Dashboard', `Today · ${fmtDate(new Date(), { weekday: 'short', day: 'numeric', month: 'short' })}`, live())}
+  ${otpRequestsCard()}
   <div class="kpis">
     ${kpi("Today's sales", money(sales), `${paid.length} bills${diff !== null && sales ? ` · ${diff >= 0 ? '+' : ''}${diff}% vs yesterday` : ''}`)}
     ${kpi("Today's expenses", money(exp), `${expensesOn(today).length} ${expensesOn(today).length === 1 ? 'entry' : 'entries'}`, 'neg')}
@@ -508,8 +486,9 @@ Views.journal = () => {
 
 /* ---------------- Settings ---------------- */
 Views.settings = () => {
+  const tabs = { business: 'Business', menu: 'Menu', data: 'Data' };
+  if (!tabs[App.ui.settingsTab]) App.ui.settingsTab = 'business';
   const tab = App.ui.settingsTab;
-  const tabs = { business: 'Business', menu: 'Menu', team: 'Logins', data: 'Data' };
   const st = S.settings;
   let body = '';
   if (tab === 'business') {
@@ -538,11 +517,6 @@ Views.settings = () => {
         <span>${esc(m.name)}</span><b>${money(m.price)}</b>
         <label class="switch" title="Available"><input type="checkbox" data-act="menuToggle" data-id="${m.id}" ${m.available !== false ? 'checked' : ''}><i></i></label>
         <button class="icon-btn sm" data-act="menuEdit" data-id="${m.id}" aria-label="Edit">${icon('edit')}</button></div>`).join('')}</section>`).join('') || empty('No menu yet.', btn('Add first item', 'menuAdd', { cls: 'ghost', ic: 'plus' }))}`;
-  } else if (tab === 'team') {
-    body = `<section class="card">${eyebrow('Everyone gets their own login')}
-      ${Object.entries(ROLES).map(([k, r]) => `<div class="staff-row"><span class="with-av"><span class="avatar sm" style="background:${r.color}">${r.label[0]}</span><span><strong>${esc(r.label)}</strong><small>${esc(r.views.map((v) => VIEWS[v].label).join(' · '))}</small>${S.pins[k] === emptyState().pins[k] ? `<small class="neg">Still using starting PIN ${esc(S.pins[k])} — please change</small>` : ''}</span></span>
-        ${btn('Change PIN', 'pinChange', { cls: 'ghost sm', ic: 'lock', data: `data-role="${k}"` })}</div>`).join('')}
-    </section><p class="fine">PINs keep screens separate on a shared device — e.g. the kitchen tablet only sees the kitchen screen.</p>`;
   } else {
     const size = (JSON.stringify(S).length / 1024).toFixed(0);
     body = `<section class="card">${eyebrow('Backup')}<p class="muted">All data lives in this browser (${size} KB). Download a backup regularly, and restore it on any device.</p>

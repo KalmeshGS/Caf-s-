@@ -464,3 +464,20 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); box-sha
   .receipt hr { border: 0; border-top: 1px dashed #000; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+/* ---------- people, PINs & reset codes ---------- */
+.pin-msg { text-align: center; font-size: 13.5px; margin: -8px 0 14px; min-height: 20px; }
+.banner.info { background: var(--accent-soft); color: var(--ink); }
+.banner.info .ic { color: var(--accent); margin-top: 1px; }
+.btn-row.tight { margin-top: 0; gap: 6px; flex-wrap: nowrap; }
+.warn-t { color: var(--amber); font-weight: 600; }
+.staff-row.off { opacity: .6; }
+button.role-pill { border: 0; cursor: pointer; max-width: 46vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.otp-card { border-color: color-mix(in srgb, var(--amber) 45%, var(--line)); }
+.otp-row { display: flex; align-items: center; gap: 14px; padding: 12px 0; flex-wrap: wrap; }
+.otp-row + .otp-row { border-top: 1px dashed var(--line); }
+.otp-row .with-av { flex: 1; min-width: 200px; }
+.otp-code { font: 700 24px/1 ui-monospace, Menlo, Consolas, monospace; letter-spacing: .18em; padding: 8px 12px; border-radius: 10px; background: var(--surface-2); }
+.otp-input { font: 700 22px ui-monospace, Menlo, Consolas, monospace !important; letter-spacing: .3em; text-align: center; }
+.recovery-code { font: 700 30px/1 ui-monospace, Menlo, Consolas, monospace; letter-spacing: .12em; text-align: center; padding: 22px; border-radius: 14px; background: var(--surface-2); border: 1px dashed var(--line); user-select: all; }
+.with-av strong small { display: inline; font-weight: 500; }
