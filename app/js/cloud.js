@@ -41,9 +41,10 @@ const SPEC = [
   { key: 'journal', kind: 'map', coll: 'journal', read: ['owner', 'manager', 'cashier'], write: ['owner', 'manager', 'cashier'], days: WINDOW_DAYS },
   { key: 'requests', kind: 'items', coll: 'requests', read: ['owner'], write: ['owner'], where: ['status', '==', 'open'] },
   { key: 'tableState', kind: 'map', coll: 'tables', read: ALL_ROLES, write: ['owner', 'manager', 'cashier', 'waiter'] },
+  { key: 'notices', kind: 'items', coll: 'notices', read: ALL_ROLES, write: ['owner', 'manager'], since: { field: 'at', days: 30, num: true } },
   { key: 'reservations', kind: 'items', coll: 'reservations', read: ['owner', 'manager', 'cashier', 'waiter'], write: ['owner', 'manager', 'cashier', 'waiter'], since: { field: 'date', days: 7 } },
 ];
-const NEW_RULE_KEYS = ['tableState', 'reservations']; // need the v3.3 security rules
+const NEW_RULE_KEYS = ['tableState', 'reservations', 'notices']; // need the v3.3 security rules
 
 /* ---------------- small helpers ---------------- */
 function canon(v) { // JSON with sorted keys, so the same data always gives the same text
@@ -257,7 +258,7 @@ function rebuildUsers() {
 }
 Cloud.changed = () => {
   if (!Cloud.attached) return;
-  if (Session.user()) checkReady();
+  if (Session.user()) { checkReady(); checkNotices(); }
   const busyTyping = document.activeElement && document.activeElement.matches('input, textarea, select');
   if (!$('#sheet').hidden || busyTyping) { Cloud.pending = true; return; }
   render();
