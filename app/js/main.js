@@ -268,8 +268,8 @@ const Actions = {
 
   /* settings */
   settingsTab(el) { App.ui.settingsTab = el.dataset.tab; render(); },
-  menuAdd() { openSheet(menuForm()); },
-  menuEdit(el) { const m = byId(S.menu, el.dataset.id); m && openSheet(menuForm(m)); },
+  menuAdd() { openSheet(menuForm(), { wide: true }); },
+  menuEdit(el) { const m = byId(S.menu, el.dataset.id); m && openSheet(menuForm(m), { wide: true }); },
   menuDel(el) { if (confirm('Delete this menu item?')) { S.menu = S.menu.filter((x) => x.id !== el.dataset.id); closeSheet(); save(); } },
   menuToggle(el) { const m = byId(S.menu, el.dataset.id); if (m) { m.available = el.checked; save(); } },
   loadDemo() {
