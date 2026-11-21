@@ -114,10 +114,18 @@ function orderEditor(p) {
       ${eyebrow(o ? `Order #${o.no} · ${fmtTime(o.createdAt)}` : 'New order')}
       <h2>${esc(o && o.table === 'Takeaway' ? `Takeaway #${o.no}` : /^T\d+$/.test(label) ? 'Table ' + label.slice(1) : label)}</h2>
       <div class="ticket-lines">
-      ${lines.length ? lines.map((l) => `<div class="tline">
-          <div><strong>${esc(l.name)}</strong><small>${money(l.price)} × ${l.qty}${l.qty > l.sent ? ` <em class="new">+${l.qty - l.sent} new</em>` : ''}</small></div>
-          <div class="qty"><button class="icon-btn sm" data-act="decLine" data-id="${l.id}" aria-label="Less">${icon('minus')}</button><b>${l.qty}</b><button class="icon-btn sm" data-act="incLine" data-id="${l.id}" aria-label="More">${icon('plus')}</button></div>
-        </div>`).join('') : `<p class="muted">Tap items on the menu to add them.</p>`}
+      ${lines.length ? lines.map((l) => {
+        const st = lineState(o, l);
+        return `<div class="tline ${st.locked >= l.qty ? 'locked' : ''}">
+          <div class="tl-main"><strong>${esc(l.name)}</strong>
+            <small>${money(l.price)} × ${l.qty}${st.unsent ? ` <em class="new">+${st.unsent} not sent</em>` : ''}${st.queued ? ` <em class="queued">${st.queued} in kitchen queue · can change</em>` : ''}${st.locked ? ` <em class="lockd">${icon('lock')} ${st.locked} cooking</em>` : ''}</small>
+            ${l.note ? `<span class="tnote">${esc(l.note)}</span>` : ''}
+            ${st.locked ? '' : `<button class="link-btn" data-act="lineNote" data-id="${l.id}">${l.note ? 'Edit instructions' : '+ Cooking instructions'}</button>`}
+          </div>
+          <div class="qty"><button class="icon-btn sm" data-act="decLine" data-id="${l.id}" aria-label="Less" ${l.qty <= st.locked ? 'disabled' : ''}>${icon('minus')}</button><b>${l.qty}</b><button class="icon-btn sm" data-act="incLine" data-id="${l.id}" aria-label="More">${icon('plus')}</button>
+            ${l.qty > st.locked ? `<button class="icon-btn sm ghosty" data-act="removeLine" data-id="${l.id}" aria-label="Remove ${esc(l.name)}">${icon('trash')}</button>` : ''}</div>
+        </div>`;
+      }).join('') : `<p class="muted">Tap items on the menu to add them.</p>`}
       </div>
       <div class="line-row total"><span>Subtotal</span><b>${money(sub)}</b></div>
       <div class="ticket-actions">
@@ -137,8 +145,8 @@ Views.kitchen = () => {
     const list = active.filter((k) => k.status === status);
     return `<section class="k-col"><div class="k-col-h"><span>${esc(title)}</span><b>${list.length}</b></div>
       ${list.length ? list.map((k) => `<article class="kot card ${status}">
-        <div class="kot-h"><strong>${esc(k.table === 'Takeaway' ? 'TA #' + k.no : k.table)}</strong>${status === 'new' ? '<span class="badge warm">New</span>' : `<small class="muted">#${k.no}</small>`}</div>
-        <ul>${k.items.map((i) => `<li><b>${i.qty}×</b> ${esc(i.name)}</li>`).join('')}</ul>
+        <div class="kot-h"><strong>${esc(k.table === 'Takeaway' ? 'TA #' + k.no : k.table)}</strong>${status === 'new' ? (k.changedAt ? '<span class="badge changed">Changed</span>' : '<span class="badge warm">New</span>') : `<small class="muted">#${k.no}</small>`}</div>
+        <ul>${k.items.map((i) => `<li><b>${i.qty}×</b> ${esc(i.name)}${i.note ? `<span class="knote">${esc(i.note)}</span>` : ''}</li>`).join('')}</ul>
         <div class="kot-f"><span class="timer" data-since="${k.createdAt}">${icon('clock')}<span>${elapsed(k.createdAt)}</span></span>
         <button class="btn ${status === 'ready' ? 'ghost' : 'primary'} sm" data-act="kotNext" data-id="${k.id}">${esc(next)}</button></div>
       </article>`).join('') : `<p class="muted k-empty">—</p>`}</section>`;
