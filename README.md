@@ -103,9 +103,12 @@ Settings → Data → **Erase café data** (keeps your settings and logins), the
 2. GitHub repo → **Settings → Secrets and variables → Actions → New repository secret** → Name `FIREBASE_SERVICE_ACCOUNT`, Value: paste the whole content of that file → **Add secret**.
 3. Delete the downloaded file from your computer. Never share it or paste it anywhere else.
 
+### Fresh start (erase everything)
+GitHub → **Actions → "Reset database (deletes everything)" → Run workflow**, type `DELETE EVERYTHING` → Run.
+This deletes **all** café data and **all** login accounts in Firebase (rules stay). It cannot be undone.
+
 ### How it works once connected
 - **Sign up** (6 steps, no sample data): place → how you work → **menu → stock → staff & their logins** (each optional) → owner account. The owner creates the café with name, mobile, **email** and password. The app shows a **café code** (e.g. `KK-7F3Q2`).
-  If the device had data from the offline version, it offers to **move it online** and then deletes it from the device.
 - **Owner login**: email + password, on any device. Forgot it → *Forgot password* emails a reset link.
 - **Staff login**: café code (asked once per device) + **Employee ID** + password. The owner types each person's first password; they must change it at first login.
 - 3 wrong passwords → *Ask owner to reset*; 4 → **locked** (stored online, enforced by the rules). The owner unlocks it / sets a temporary password from the dashboard.
