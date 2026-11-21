@@ -11,36 +11,7 @@ const App = {
 const can = (view) => { const r = Session.role(); return !!r && ROLES[r].views.includes(view); };
 const Views = {};
 
-/* ---------------- Setup (first run) ---------------- */
-Views.setup = () => {
-  const types = Object.entries(BUSINESS_TYPES).map(([k, v], i) => `
-    <label class="chip-radio"><input type="radio" name="type" value="${k}" ${i === 0 ? 'checked' : ''}><span>${esc(v)}</span></label>`).join('');
-  const curs = CURRENCIES.map((c) => `<option value="${c.code}">${esc(c.code)} · ${esc(c.symbol.trim())}</option>`).join('');
-  return `<main class="center-screen">
-    <form class="card setup" data-form="setup" autocomplete="off">
-      <div class="brand-mark lg">${icon('cup')}</div>
-      ${eyebrow('Welcome')}
-      <h1>Set up your journal</h1>
-      <p class="muted">One minute. You can change everything later in Settings.</p>
-      <label class="field"><span>Name of your place</span><input name="name" required maxlength="40" placeholder="e.g. Corner Café" autofocus></label>
-      <label class="field"><span>Short tagline <em>(optional)</em></span><input name="tagline" maxlength="60" placeholder="e.g. Chai · Coffee · Sandwiches"></label>
-      <div class="field"><span>What kind of place is it?</span><div class="chip-row">${types}</div></div>
-      <div class="row-2">
-        <label class="field"><span>Currency</span><select name="currency">${curs}</select></label>
-        <label class="field"><span>Number of tables</span><input name="tables" type="number" min="0" max="99" value="8" required></label>
-      </div>
-      <label class="field"><span>Tax on bills (%)</span><input name="tax" type="number" min="0" max="40" step="0.5" value="5"></label>
-      <div class="row-2">
-        <label class="field"><span>Your name (owner)</span><input name="owner" required maxlength="40" placeholder="e.g. Anita"></label>
-        <label class="field"><span>Your phone</span><input name="phone" type="tel" maxlength="20" placeholder="98765 43210"></label>
-      </div>
-      <label class="check"><input type="checkbox" name="demo" checked><span>Fill with sample data so I can explore first</span></label>
-      <button class="btn primary block" type="submit">Start my journal</button>
-      <p class="fine">You'll choose your own owner PIN next. Your data stays on this device — use Settings → Data to back it up.</p>
-    </form></main>`;
-};
-
-/* Login, people & access screens live in auth.js */
+/* Setup wizard: onboarding.js · Login & Team: auth.js · Staff & ID cards: staff.js */
 
 /* ---------------- 01 Dashboard ---------------- */
 Views.dashboard = () => {
@@ -61,7 +32,7 @@ Views.dashboard = () => {
   const diff = yday ? Math.round(((sales - yday) / yday) * 100) : null;
 
   return `${pageHead(Session.role() === 'owner' ? 'Owner dashboard' : 'Dashboard', `Today · ${fmtDate(new Date(), { weekday: 'short', day: 'numeric', month: 'short' })}`, live())}
-  ${otpRequestsCard()}
+  ${requestsCard()}
   <div class="kpis">
     ${kpi("Today's sales", money(sales), `${paid.length} bills${diff !== null && sales ? ` · ${diff >= 0 ? '+' : ''}${diff}% vs yesterday` : ''}`)}
     ${kpi("Today's expenses", money(exp), `${expensesOn(today).length} ${expensesOn(today).length === 1 ? 'entry' : 'entries'}`, 'neg')}
@@ -356,54 +327,6 @@ const vendorForm = () => `${sheetHead('Vendors', 'Add vendor')}
     <div class="form-actions"><span></span><button class="btn primary" type="submit">Save vendor</button></div>
   </form>`;
 
-/* ---------------- 07 Staff ---------------- */
-Views.staff = () => {
-  const dk = dayKey();
-  const att = S.attendance[dk] || {};
-  const present = S.staff.filter((p) => att[p.id] === 'present' || att[p.id] === 'late').length;
-  const mk = monthKey();
-  const payroll = sum(S.staff, (p) => p.salary);
-  return `${pageHead('Staff · today', 'Attendance', btn('Staff', 'staffAdd', { cls: 'primary', ic: 'plus' }))}
-  <div class="kpis two">${kpi('Present today', `${present} / ${S.staff.length}`, fmtDate(new Date(), { weekday: 'long', day: 'numeric', month: 'short' }), 'pos')}${kpi('Monthly salaries', money(payroll), `${S.staff.length} people`)}</div>
-  <section class="card">
-    ${S.staff.length ? S.staff.map((p) => {
-      const s = att[p.id] || '';
-      const paidThisMonth = S.expenses.some((e) => e.staffId === p.id && e.forMonth === mk);
-      return `<div class="staff-row">
-        <button class="with-av plain" data-act="staffOpen" data-id="${p.id}"><span class="avatar sm soft">${esc(initials(p.name))}</span>
-          <span><strong>${esc(p.name)} <small class="muted">· ${esc(p.role)}</small></strong><small>Shift ${esc(p.shift || '—')} · ${money(p.salary)}/mo${paidThisMonth ? ' · paid' : ''}</small></span></button>
-        <div class="att" role="group" aria-label="Attendance for ${esc(p.name)}">${Object.entries(ATT).map(([k, a]) => `<button class="att-b ${k} ${s === k ? 'on' : ''}" data-act="att" data-id="${p.id}" data-s="${k}" title="${a.label}">${a.short}</button>`).join('')}</div>
-      </div>`;
-    }).join('') : empty('Add your team to track shifts, attendance and salary.', btn('Add staff', 'staffAdd', { cls: 'ghost', ic: 'plus' }))}
-  </section>
-  <p class="fine">P = Present · L = Late · Lv = Leave · A = Absent. Tap a name for monthly summary and to pay salary.</p>`;
-};
-function staffForm(p = {}) {
-  return `${sheetHead('Staff', p.id ? 'Edit details' : 'Add staff')}
-  <form data-form="staff" class="form">
-    <input type="hidden" name="id" value="${esc(p.id || '')}">
-    <div class="row-2"><label class="field"><span>Name</span><input name="name" required maxlength="40" value="${esc(p.name || '')}"></label>
-    <label class="field"><span>Role</span><input name="role" maxlength="30" value="${esc(p.role || '')}" placeholder="e.g. Chef"></label></div>
-    <div class="row-2"><label class="field"><span>Shift</span><input name="shift" maxlength="30" value="${esc(p.shift || '')}" placeholder="09:00 – 18:00"></label>
-    <label class="field"><span>Salary / month</span><input name="salary" type="number" min="0" step="any" value="${esc(p.salary ?? '')}" required></label></div>
-    <label class="field"><span>Phone <em>(optional)</em></span><input name="phone" type="tel" maxlength="20" value="${esc(p.phone || '')}"></label>
-    <div class="form-actions">${p.id ? btn('Remove', 'staffDel', { cls: 'danger-ghost', ic: 'trash', data: `data-id="${p.id}"` }) : '<span></span>'}<button class="btn primary" type="submit">Save</button></div>
-  </form>`;
-}
-function staffSheet(p) {
-  const mk = monthKey();
-  const days = Object.entries(S.attendance).filter(([k]) => k.startsWith(mk)).map(([, v]) => v[p.id]).filter(Boolean);
-  const count = (s) => days.filter((d) => d === s).length;
-  const paid = S.expenses.find((e) => e.staffId === p.id && e.forMonth === mk);
-  return `${sheetHead(`${p.role || 'Staff'} · ${p.shift || ''}`, p.name)}
-  <div class="kpis four">${Object.entries(ATT).map(([k, a]) => kpi(a.label, String(count(k)))).join('')}</div>
-  <div class="card line-row"><span>Salary for ${esc(monthLabel(mk))}</span><b>${money(p.salary)}</b></div>
-  <div class="form-actions">
-    ${btn('Edit', 'staffEdit', { cls: 'ghost', ic: 'edit', data: `data-id="${p.id}"` })}
-    ${paid ? `<span class="badge ok">${icon('check')} Paid on ${fmtDate(keyToDate(paid.date))}</span>` : btn('Pay salary', 'staffPay', { cls: 'primary', ic: 'wallet', data: `data-id="${p.id}"` })}
-  </div>`;
-}
-
 /* ---------------- 08 Reports ---------------- */
 Views.reports = () => {
   const mk = App.ui.month;
@@ -493,7 +416,8 @@ Views.settings = () => {
   let body = '';
   if (tab === 'business') {
     body = `<form class="card form" data-form="business">
-      <div class="row-2"><label class="field"><span>Name</span><input name="name" required maxlength="40" value="${esc(st.name)}"></label>
+      <div class="row-3"><label class="field"><span>Name</span><input name="name" required maxlength="40" value="${esc(st.name)}"></label>
+      <label class="field"><span>Short code <em>(employee IDs)</em></span><input name="short" maxlength="4" value="${esc(st.short || shortCode(st.name))}" style="text-transform:uppercase"></label>
       <label class="field"><span>Tagline</span><input name="tagline" maxlength="60" value="${esc(st.tagline || '')}"></label></div>
       <div class="row-3">
         <label class="field"><span>Type</span><select name="type">${Object.entries(BUSINESS_TYPES).map(([k, v]) => `<option value="${k}" ${k === st.type ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select></label>
@@ -519,7 +443,7 @@ Views.settings = () => {
         <button class="icon-btn sm" data-act="menuEdit" data-id="${m.id}" aria-label="Edit">${icon('edit')}</button></div>`).join('')}</section>`).join('') || empty('No menu yet.', btn('Add first item', 'menuAdd', { cls: 'ghost', ic: 'plus' }))}`;
   } else {
     const size = (JSON.stringify(S).length / 1024).toFixed(0);
-    body = `<section class="card">${eyebrow('Backup')}<p class="muted">All data lives in this browser (${size} KB). Download a backup regularly, and restore it on any device.</p>
+    body = `<section class="card">${eyebrow('Backup')}<p class="muted">All data lives in this browser (${size} KB). Download an <b>encrypted backup</b> regularly — it is locked with a passphrase you choose — and restore it on any other phone or computer.</p>
       <div class="btn-row">${btn('Download backup', 'exportData', { cls: 'primary', ic: 'download' })}${btn('Restore backup', 'importData', { cls: 'ghost', ic: 'upload' })}</div>
       <input type="file" id="import-file" accept="application/json,.json" hidden></section>
     <section class="card">${eyebrow('Sample data')}<p class="muted">Replace everything with ~5 weeks of realistic sample data to explore the app.</p>${btn('Load sample data', 'loadDemo', { cls: 'ghost' })}</section>

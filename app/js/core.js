@@ -103,6 +103,10 @@ const ICONS = {
   alert: '<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/>',
   lock: '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+  eye: '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+  eyeOff: '<path d="M3 3l18 18M10.6 10.6a3 3 0 0 0 4.2 4.2M9.9 5.2A10.6 10.6 0 0 1 12 5c6.4 0 10 7 10 7a17.6 17.6 0 0 1-3.2 4.1M6.6 6.6C3.8 8.4 2 12 2 12s3.6 7 10 7a10 10 0 0 0 5.4-1.6"/>',
+  camera: '<path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/>',
+  idcard: '<rect x="2.5" y="5" width="19" height="14" rx="2"/><circle cx="8.5" cy="11" r="2.2"/><path d="M5.5 16a3 3 0 0 1 6 0M14 10h4.5M14 13.5h3"/>',
   moon: '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>',
 };
 const icon = (name, cls = '') => `<svg class="ic ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name] || ''}</svg>`;
@@ -117,11 +121,28 @@ function emptyState() {
     settings: null,
     menu: [], orders: [], kots: [], stock: [], expenses: [],
     vendors: [], vendorTx: [], staff: [], attendance: {}, journal: {},
-    users: [], otps: [], recovery: null,
-    seq: { day: '', n: 0 },
+    users: [], requests: [], recovery: null,
+    seq: { day: '', n: 0, emp: 0 },
   };
 }
-const DEFAULT_PIN = '1234';
+const APP_VERSION = '2.0';
+const DEFAULT_PIN = '1234'; // only for accounts created by older versions; they must set a password
+
+/** Short code for employee IDs: "Kalmesh Kitchen" -> "KK", "KK" -> "KK", "Brewhouse" -> "BR" */
+function shortCode(name) {
+  const clean = String(name || '').toUpperCase().replace(/[^A-Z0-9 ]/g, ' ').trim();
+  const words = clean.split(/\s+/).filter(Boolean);
+  if (!words.length) return 'EMP';
+  if (words.length > 1) return words.map((w) => w[0]).join('').slice(0, 4);
+  return words[0].length <= 4 ? words[0] : words[0].slice(0, 2);
+}
+/** Next employee ID: SHORT + YY (joining year) + running 3-digit serial, e.g. KK26001 */
+function nextEmpId(st, joinDate) {
+  const short = (st.settings.short || shortCode(st.settings.name)).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4) || 'EMP';
+  const yy = String((joinDate ? keyToDate(joinDate) : new Date()).getFullYear()).slice(-2);
+  const n = (Number(st.seq.emp) || 0) + 1;
+  return { empId: `${short}${yy}${String(n).padStart(3, '0')}`, n };
+}
 function loadState() {
   try { const raw = localStorage.getItem(DB_KEY); if (raw) return migrate(Object.assign(emptyState(), JSON.parse(raw))); } catch (e) { /* ignore */ }
   return emptyState();
@@ -134,6 +155,14 @@ function migrate(st) {
     }));
     delete st.pins;
   }
+  st.requests = Array.isArray(st.requests) ? st.requests : [];
+  delete st.otps;
+  st.seq = Object.assign({ day: '', n: 0, emp: 0 }, st.seq);
+  if (st.settings && !st.settings.short) st.settings.short = shortCode(st.settings.name);
+  if (st.settings) (st.staff || []).forEach((p) => {
+    if (!p.joinDate) p.joinDate = dayKey();
+    if (!p.empId) { const { empId, n } = nextEmpId(st, p.joinDate); p.empId = empId; st.seq.emp = n; }
+  });
   return st;
 }
 let S = loadState();
@@ -156,7 +185,7 @@ const Session = {
   user() {
     if (this._id && Date.now() - this._last > LOCK_AFTER_MIN * 60000) this._id = null;
     const u = this._id && (S.users || []).find((x) => x.id === this._id);
-    return u && u.active !== false && !u.mustChange && ROLES[u.role] ? u : null;
+    return u && u.active !== false && !u.mustChange && !u.locked && u.hash && ROLES[u.role] ? u : null;
   },
   role() { const u = this.user(); return u ? u.role : null; },
   set(id) { this._id = id || null; this._last = Date.now(); },

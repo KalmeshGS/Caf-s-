@@ -61,21 +61,29 @@ It has **no build step and no dependencies**: plain HTML, CSS and JavaScript.
 
 The installed app opens full-screen and works offline.
 
-## Logins, PINs & forgot-PIN
+## Staff records & ID cards
 
-- **Team & access** (owner only): add as many people as you need — several managers, cashiers, waiters, kitchen staff — each with **name, phone and role**.
-- **Everyone starts with PIN `1234`** and must choose their own PIN the **first time they log in** (1234 or four of the same digit is not allowed).
-- The PIN is asked **every time** the app is opened or refreshed, and the app **locks after 15 minutes** of no use. 5 wrong PINs → wait 30 seconds.
-- **Forgot PIN?** (staff): a 6-digit code (valid 15 min) appears on the **Owner dashboard** and in Team & access. The owner checks it's really them and taps **SMS** or **WhatsApp** to send it to that person's phone (or tells them). They enter the code + a new PIN.
-- **Forgot PIN?** (owner): use the **owner recovery code** shown when the owner PIN was first set (a new one is issued after each use). Another owner can also reset it.
-- The owner can **Reset PIN** for anyone (back to 1234), edit, disable or remove people. Anyone can change their own PIN with the 🔒 button.
+- **Staff → Add staff** (owner): photo, name, designation, mobile, email, joining date, shift, salary, date of birth, gender, **blood group**, address, emergency contact, and **KYC** (ID proof type + number such as Aadhaar, plus PAN).
+- **Employee ID is automatic**: café short code + joining year + running serial, e.g. **KK26001**, KK26002… The serial never restarts or repeats. Set the short code in Settings → Business.
+- Open a profile → **ID card** → **Print ID card**: real card size (85.6 × 54 mm), front and back.
+- KYC numbers are masked (•••• 9012) and visible to **owners only**; managers only see name, ID, shift and attendance.
 
-> Codes are delivered inside the app; the SMS/WhatsApp button opens the owner's messaging app with the code ready to send. Fully automatic SMS (no tap) would need an SMS service such as MSG91, Twilio or Fast2SMS plus a small server.
+## Logins & security
+
+- **Login page**: Employee ID, phone or name + password. Nobody's name is shown on the page.
+- **Team & access → Give login access**: pick the employee from the staff list, choose a role, and **type their first password yourself** (min 6 characters). They must change it at first login.
+- **3 wrong passwords** → a pop-up offers *Ask owner to reset*. **4 wrong passwords** → the account is **locked**; even the right password won't open it until the owner unlocks it.
+- Requests appear on the **Owner dashboard** and in Team & access: **Unlock & set password** (temporary password, must be changed) or **Unlock only**.
+- **Owner** forgot/locked: use the **owner recovery code** (shown once at setup, a new one after each use).
+- Passwords and the recovery code are stored only as **salted PBKDF2-SHA256 hashes** (150,000 rounds). Common passwords are refused.
+- The app asks for the password every time it opens and **locks after 15 minutes** idle.
+- **Backups are encrypted** (AES-256-GCM) with a passphrase you choose.
+- A strict Content-Security-Policy blocks outside scripts.
 
 ## About your data
 
 All data is stored **in the browser on that device** (localStorage), and nothing is sent to any server. This means:
 
-- Back up regularly with **Settings → Data → Download backup**. You can restore the backup on any device.
+- Back up regularly with **Settings → Data → Download backup** (encrypted). On another phone or computer choose **I already use Cafe Journal → Restore** on the welcome screen.
 - Several screens on the **same device** stay in sync. For example, the kitchen screen can be open in another window.
 - Syncing *across* devices (for example, the waiter's phone sending orders to a kitchen tablet) needs a backend. Firebase or Supabase would be a natural next step.

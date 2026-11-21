@@ -1,6 +1,6 @@
 /* Cafe Journal service worker — makes the app work offline */
-const CACHE = 'cafe-journal-v4';
-const ASSETS = ['./', 'index.html', 'app.css', 'js/core.js', 'js/data.js', 'js/views.js', 'js/main.js', 'js/auth.js',
+const CACHE = 'cafe-journal-v5';
+const ASSETS = ['./', 'index.html', 'app.css', 'js/core.js', 'js/data.js', 'js/views.js', 'js/main.js', 'js/staff.js', 'js/onboarding.js', 'js/auth.js',
   'manifest.webmanifest', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/maskable-512.png'];
 
 self.addEventListener('install', (e) => {
@@ -13,7 +13,7 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET' || new URL(e.request.url).origin !== location.origin) return;
   e.respondWith(
-    fetch(e.request).then((res) => {
+    fetch(e.request, { cache: 'no-cache' }).then((res) => { // always check for a newer version
       const copy = res.clone();
       caches.open(CACHE).then((c) => c.put(e.request, copy));
       return res;
