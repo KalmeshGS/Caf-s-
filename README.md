@@ -61,13 +61,16 @@ It has **no build step and no dependencies**: plain HTML, CSS and JavaScript.
 
 The installed app opens full-screen and works offline.
 
-## Default PINs
+## Logins, PINs & forgot-PIN
 
-| Owner | Manager | Cashier | Waiter | Kitchen |
-|------|---------|---------|--------|---------|
-| set during setup (default 1234) | 2222 | 3333 | 4444 | 5555 |
+- **Team & access** (owner only): add as many people as you need — several managers, cashiers, waiters, kitchen staff — each with **name, phone and role**.
+- **Everyone starts with PIN `1234`** and must choose their own PIN the **first time they log in** (1234 or four of the same digit is not allowed).
+- The PIN is asked **every time** the app is opened or refreshed, and the app **locks after 15 minutes** of no use. 5 wrong PINs → wait 30 seconds.
+- **Forgot PIN?** (staff): a 6-digit code (valid 15 min) appears on the **Owner dashboard** and in Team & access. The owner checks it's really them and taps **SMS** or **WhatsApp** to send it to that person's phone (or tells them). They enter the code + a new PIN.
+- **Forgot PIN?** (owner): use the **owner recovery code** shown when the owner PIN was first set (a new one is issued after each use). Another owner can also reset it.
+- The owner can **Reset PIN** for anyone (back to 1234), edit, disable or remove people. Anyone can change their own PIN with the 🔒 button.
 
-Change them in **Settings → Logins**.
+> Codes are delivered inside the app; the SMS/WhatsApp button opens the owner's messaging app with the code ready to send. Fully automatic SMS (no tap) would need an SMS service such as MSG91, Twilio or Fast2SMS plus a small server.
 
 ## About your data
 

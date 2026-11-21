@@ -48,7 +48,7 @@ const BUSINESS_TYPES = { cafe: 'Café', restaurant: 'Restaurant', hotel: 'Hotel 
 const ATT = { present: { label: 'Present', short: 'P' }, late: { label: 'Late', short: 'L' }, leave: { label: 'Leave', short: 'Lv' }, absent: { label: 'Absent', short: 'A' } };
 
 const ROLES = {
-  owner:   { label: 'Owner',   desc: 'Everything',            color: '#1f7a4d', views: ['dashboard', 'orders', 'kitchen', 'billing', 'stock', 'expenses', 'vendors', 'staff', 'reports', 'journal', 'settings'] },
+  owner:   { label: 'Owner',   desc: 'Everything',            color: '#1f7a4d', views: ['dashboard', 'orders', 'kitchen', 'billing', 'stock', 'expenses', 'vendors', 'staff', 'reports', 'journal', 'team', 'settings'] },
   manager: { label: 'Manager', desc: 'Orders · stock · staff', color: '#4f46e5', views: ['dashboard', 'orders', 'kitchen', 'billing', 'stock', 'expenses', 'vendors', 'staff', 'journal'] },
   cashier: { label: 'Cashier', desc: 'Billing · closing',     color: '#c2783c', views: ['billing', 'orders', 'journal'] },
   waiter:  { label: 'Waiter',  desc: 'Take table orders',     color: '#0f766e', views: ['orders'] },
@@ -66,6 +66,7 @@ const VIEWS = {
   staff:     { label: 'Staff',     icon: 'users' },
   reports:   { label: 'Reports',   icon: 'chart' },
   journal:   { label: 'Journal',   icon: 'book' },
+  team:      { label: 'Team & access', icon: 'lock' },
   settings:  { label: 'Settings',  icon: 'gear' },
 };
 
@@ -116,13 +117,24 @@ function emptyState() {
     settings: null,
     menu: [], orders: [], kots: [], stock: [], expenses: [],
     vendors: [], vendorTx: [], staff: [], attendance: {}, journal: {},
-    pins: { owner: '1234', manager: '2222', cashier: '3333', waiter: '4444', kitchen: '5555' },
+    users: [], otps: [], recovery: null,
     seq: { day: '', n: 0 },
   };
 }
+const DEFAULT_PIN = '1234';
 function loadState() {
-  try { const raw = localStorage.getItem(DB_KEY); if (raw) return Object.assign(emptyState(), JSON.parse(raw)); } catch (e) { /* ignore */ }
+  try { const raw = localStorage.getItem(DB_KEY); if (raw) return migrate(Object.assign(emptyState(), JSON.parse(raw))); } catch (e) { /* ignore */ }
   return emptyState();
+}
+/** Older versions had one shared PIN per role. Turn each role into a person with PIN 1234 who must set their own. */
+function migrate(st) {
+  if (st.pins || (st.settings && !st.users.length)) {
+    st.users = ['owner', 'manager', 'cashier', 'waiter', 'kitchen'].map((role) => ({
+      id: uid('u'), name: ROLES[role].label, role, phone: '', pin: DEFAULT_PIN, mustChange: true, active: true, createdAt: Date.now(),
+    }));
+    delete st.pins;
+  }
+  return st;
 }
 let S = loadState();
 
@@ -139,14 +151,16 @@ function commit(fn) { fn(S); save(); }
    the app is opened or refreshed. It also locks itself after inactivity. */
 const LOCK_AFTER_MIN = 15;
 const Session = {
-  _role: null,
+  _id: null,
   _last: Date.now(),
-  role() {
-    if (this._role && Date.now() - this._last > LOCK_AFTER_MIN * 60000) this._role = null;
-    return ROLES[this._role] ? this._role : null;
+  user() {
+    if (this._id && Date.now() - this._last > LOCK_AFTER_MIN * 60000) this._id = null;
+    const u = this._id && (S.users || []).find((x) => x.id === this._id);
+    return u && u.active !== false && !u.mustChange && ROLES[u.role] ? u : null;
   },
-  set(r) { this._role = ROLES[r] ? r : null; this._last = Date.now(); },
-  touch() { if (this._role) this._last = Date.now(); },
+  role() { const u = this.user(); return u ? u.role : null; },
+  set(id) { this._id = id || null; this._last = Date.now(); },
+  touch() { if (this._id) this._last = Date.now(); },
 };
 try { localStorage.removeItem(SESSION_KEY); } catch (e) { /* remove sign-in saved by older versions */ }
 

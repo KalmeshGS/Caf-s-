@@ -16,6 +16,7 @@ function applyTheme() {
 function shell(view, content) {
   const role = Session.role();
   const r = ROLES[role];
+  const me = Session.user();
   const st = S.settings;
   const navItem = (v, cls = '') => `<a href="#/${v}" class="nav-i ${cls} ${v === view ? 'on' : ''}" ${v === view ? 'aria-current="page"' : ''}>${icon(VIEWS[v].icon)}<span>${VIEWS[v].label}</span>${badgeFor(v)}</a>`;
   const tabs = r.views.length > MOBILE_TABS + 1 ? r.views.slice(0, MOBILE_TABS) : r.views;
@@ -24,12 +25,13 @@ function shell(view, content) {
     <aside class="sidebar">
       <div class="brand"><span class="brand-mark">${esc(initials(st.name))}</span><span><strong>${esc(st.name)}</strong><small>${esc(st.tagline || BUSINESS_TYPES[st.type] || '')}</small></span></div>
       <nav class="nav">${r.views.map((v) => navItem(v)).join('')}</nav>
-      <div class="me"><span class="avatar sm" style="background:${r.color}">${r.label[0]}</span><span><strong>${esc(r.label)}</strong><small>Signed in</small></span>
-        <button class="icon-btn" data-act="logout" title="Switch user" aria-label="Switch user">${icon('logout')}</button></div>
+      <div class="me"><span class="avatar sm" style="background:${r.color}">${esc(initials(me.name))}</span><span><strong>${esc(me.name)}</strong><small>${esc(r.label)}</small></span>
+        <button class="icon-btn" data-act="myPin" title="Change my PIN" aria-label="Change my PIN">${icon('lock')}</button>
+        <button class="icon-btn" data-act="logout" title="Log out" aria-label="Log out">${icon('logout')}</button></div>
     </aside>
     <div class="topbar"><span class="brand-mark sm">${esc(initials(st.name))}</span><strong>${esc(st.name)}</strong>
-      <span class="role-pill" style="--c:${r.color}">${esc(r.label)}</span>
-      <button class="icon-btn" data-act="logout" aria-label="Switch user">${icon('logout')}</button></div>
+      <button class="role-pill" style="--c:${r.color}" data-act="myPin" title="Change my PIN">${esc(me.name.split(' ')[0])} · ${esc(r.label)}</button>
+      <button class="icon-btn" data-act="logout" aria-label="Log out">${icon('logout')}</button></div>
     <main class="main" id="main">${content}</main>
     ${r.views.length > 1 ? `<nav class="tabbar">${tabs.map((v) => navItem(v)).join('')}
       ${r.views.length > MOBILE_TABS + 1 ? `<button class="nav-i ${moreActive ? 'on' : ''}" data-act="moreNav">${icon('more')}<span>More</span></button>` : ''}</nav>` : ''}
@@ -40,6 +42,7 @@ function badgeFor(v) {
   if (v === 'kitchen') n = S.kots.filter((k) => k.status === 'new').length;
   else if (v === 'billing') n = openOrders().filter((o) => o.items.length).length;
   else if (v === 'stock') n = S.stock.filter(isLow).length;
+  else if (v === 'team') n = pendingOtps().length;
   return n ? `<i class="nbadge">${n}</i>` : '';
 }
 
@@ -78,35 +81,12 @@ const Actions = {
     openSheet(`${sheetHead(r.label, 'More')}<div class="more-grid">${r.views.slice(MOBILE_TABS).map((v) => `<a class="card more-i" href="#/${v}" data-act="closeSheet">${icon(VIEWS[v].icon)}<span>${VIEWS[v].label}</span>${badgeFor(v)}</a>`).join('')}</div>`);
   },
 
-  /* login */
-  pickRole(el) {
-    const role = el.dataset.role, r = ROLES[role];
-    App.pin = ''; App.pinRole = role;
-    openSheet(`${sheetHead('Enter PIN', r.label)}
-      <div class="pin-dots" id="pin-dots">${'<i></i>'.repeat(4)}</div>
-      <div class="keypad">${[1, 2, 3, 4, 5, 6, 7, 8, 9, '', 0, '⌫'].map((k) => k === '' ? '<span></span>' : `<button class="key" data-act="pinKey" data-k="${k}">${k}</button>`).join('')}</div>`);
-  },
-  pinKey(el) {
-    const k = el.dataset.k;
-    App.pin = k === '⌫' ? App.pin.slice(0, -1) : (App.pin + k).slice(0, 4);
-    $$('#pin-dots i').forEach((d, i) => d.classList.toggle('on', i < App.pin.length));
-    if (App.pin.length === 4) {
-      if (App.pin === S.pins[App.pinRole]) {
-        Session.set(App.pinRole); closeSheet();
-        history.replaceState(null, '', `#/${ROLES[App.pinRole].views[0]}`); render();
-      } else {
-        const dots = $('#pin-dots'); dots.classList.add('shake');
-        setTimeout(() => { dots.classList.remove('shake'); App.pin = ''; $$('#pin-dots i').forEach((d) => d.classList.remove('on')); }, 450);
-      }
-    }
-  },
-
   /* orders */
   openTable(el) { go('orders', { t: el.dataset.t }); },
   openOrder(el) { go('orders', { o: el.dataset.id }); },
   toTables() { go('orders'); },
   newTakeaway() {
-    const o = { id: uid('o'), no: nextBillNo(), table: 'Takeaway', items: [], status: 'open', createdAt: Date.now(), by: Session.role() };
+    const o = { id: uid('o'), no: nextBillNo(), table: 'Takeaway', items: [], status: 'open', createdAt: Date.now(), by: Session.user()?.name || Session.role() };
     S.orders.push(o); persist(); go('orders', { o: o.id });
   },
   setCat(el) { App.ui.cat = el.dataset.cat; render(); },
@@ -114,7 +94,7 @@ const Actions = {
     const m = byId(S.menu, el.dataset.id); if (!m) return;
     let o = currentOrder(App.params);
     if (!o) {
-      o = { id: uid('o'), no: nextBillNo(), table: App.params.t || 'Takeaway', items: [], status: 'open', createdAt: Date.now(), by: Session.role() };
+      o = { id: uid('o'), no: nextBillNo(), table: App.params.t || 'Takeaway', items: [], status: 'open', createdAt: Date.now(), by: Session.user()?.name || Session.role() };
       S.orders.push(o);
     }
     if (o.status !== 'open') return toast('This bill is already paid');
@@ -233,13 +213,6 @@ const Actions = {
   menuEdit(el) { const m = byId(S.menu, el.dataset.id); m && openSheet(menuForm(m)); },
   menuDel(el) { if (confirm('Delete this menu item?')) { S.menu = S.menu.filter((x) => x.id !== el.dataset.id); closeSheet(); save(); } },
   menuToggle(el) { const m = byId(S.menu, el.dataset.id); if (m) { m.available = el.checked; save(); } },
-  pinChange(el) {
-    const role = el.dataset.role;
-    openSheet(`${sheetHead('Logins', `${ROLES[role].label} PIN`)}
-      <form data-form="pin" class="form"><input type="hidden" name="role" value="${role}">
-      <label class="field"><span>New 4-digit PIN</span><input name="pin" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" required autocomplete="off"></label>
-      <div class="form-actions"><span></span><button class="btn primary" type="submit">Save PIN</button></div></form>`);
-  },
   exportData() { download(`${slug(S.settings.name)}-backup-${dayKey()}.json`, JSON.stringify(S, null, 1), 'application/json'); toast('Backup downloaded'); },
   importData() { $('#import-file').click(); },
   loadDemo() {
@@ -261,11 +234,14 @@ const Forms = {
       currency: fd.get('currency'), tables: clamp(num(fd.get('tables')), 0, 99), tax: num(fd.get('tax')),
       openHour: 8, closeHour: 22, accent: 'green', theme: 'auto', footer: 'Thank you, visit again!',
     };
-    S = emptyState(); S.settings = st; S.pins.owner = fd.get('pin');
+    S = emptyState(); S.settings = st;
+    const owner = makeUser(fd.get('owner').trim() || 'Owner', 'owner', fd.get('phone').trim());
+    S.users = [owner, ...['manager', 'cashier', 'waiter', 'kitchen'].map((r) => makeUser(ROLES[r].label, r))];
     if (fd.get('demo')) makeDemo(S);
     else { S.menu = starterMenu(st.type, st.currency); S.stock = starterStock(st.type); }
-    Session.set('owner'); persist(); history.replaceState(null, '', '#/dashboard'); render();
-    toast(`Welcome to ${st.name}`);
+    persist(); history.replaceState(null, '', location.pathname); render();
+    // Owner chooses their own PIN straight away
+    App.pinUser = owner.id; openSheet(changePinSheet(owner, 'first'));
   },
   pay(fd) {
     const o = byId(S.orders, App.params.o); if (!o || o.status !== 'open') return;
@@ -325,7 +301,6 @@ const Forms = {
     if (m) Object.assign(m, d); else S.menu.push({ id: uid('m'), available: true, ...d });
     closeSheet(); save();
   },
-  pin(fd) { S.pins[fd.get('role')] = fd.get('pin'); closeSheet(); save(); toast('PIN updated'); },
 };
 
 /* ---------------- live inputs (data-input) ---------------- */
@@ -366,7 +341,7 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && !$('#sheet').hidden) closeSheet();
   const el = e.target.closest?.('[role="button"][data-act]');
   if (el && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); Actions[el.dataset.act]?.(el, e); }
-  if (App.pinRole && !$('#sheet').hidden && /^[0-9]$|^Backspace$/.test(e.key) && $('#pin-dots')) {
+  if (App.pinUser && !$('#sheet').hidden && /^[0-9]$|^Backspace$/.test(e.key) && $('#pin-dots')) {
     Actions.pinKey({ dataset: { k: e.key === 'Backspace' ? '⌫' : e.key } });
   }
 });
@@ -382,7 +357,7 @@ document.addEventListener('change', (e) => {
     const data = JSON.parse(txt);
     if (!data || !data.settings || !Array.isArray(data.orders)) throw new Error('bad');
     if (!confirm(`Restore backup of "${data.settings.name}"? This replaces current data.`)) return;
-    S = Object.assign(emptyState(), data); save(); toast('Backup restored');
+    S = migrate(Object.assign(emptyState(), data)); Session.set(null); save(); toast('Backup restored — please log in');
   }).catch(() => toast('That file is not a valid backup'));
 });
 window.addEventListener('hashchange', () => { closeSheet(); render(); });
@@ -407,11 +382,11 @@ setInterval(() => { if ($('#sheet').hidden && ['orders', 'billing', 'dashboard']
 // Auto-lock: any tap or key keeps the session alive; after LOCK_AFTER_MIN idle minutes, back to the PIN screen
 ['pointerdown', 'keydown'].forEach((ev) => document.addEventListener(ev, () => Session.touch(), { capture: true, passive: true }));
 setInterval(() => {
-  if (Session._role && !Session.role()) { closeSheet(); history.replaceState(null, '', location.pathname); render(); toast('Locked — enter your PIN'); }
+  if (Session._id && !Session.user()) { closeSheet(); history.replaceState(null, '', location.pathname); render(); toast('Locked — enter your PIN'); }
 }, 30000);
 
-/* ---------------- boot ---------------- */
-render();
+/* ---------------- boot (after every script, incl. auth.js, has loaded) ---------------- */
+document.addEventListener('DOMContentLoaded', render);
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
 }
