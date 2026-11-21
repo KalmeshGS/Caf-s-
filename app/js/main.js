@@ -23,19 +23,23 @@ function shell(view, content) {
   const moreActive = r.views.length > MOBILE_TABS + 1 && !tabs.includes(view);
   return `<div class="layout">
     <aside class="sidebar">
-      <div class="brand"><span class="brand-mark">${esc(initials(st.name))}</span><span><strong>${esc(st.name)}</strong><small>${esc(st.tagline || BUSINESS_TYPES[st.type] || '')}</small></span></div>
+      <div class="brand"><span class="brand-mark">${esc(initials(st.name))}</span><span><strong>${esc(st.name)}</strong><small>${esc(st.tagline || BUSINESS_TYPES[st.type] || '')}</small></span>${bellBtn(view)}</div>
       <nav class="nav">${r.views.map((v) => navItem(v)).join('')}</nav>
       <div class="me"><span class="avatar sm" style="background:${r.color}">${esc(initials(me.name))}</span><span><strong>${esc(me.name)}</strong><small>${esc(r.label)}</small></span>
         <button class="icon-btn" data-act="myPin" title="Change my password" aria-label="Change my password">${icon('lock')}</button>
         <button class="icon-btn" data-act="logout" title="Log out" aria-label="Log out">${icon('logout')}</button></div>
     </aside>
-    <div class="topbar"><span class="brand-mark sm">${esc(initials(st.name))}</span><strong>${esc(st.name)}</strong>
+    <div class="topbar"><span class="brand-mark sm">${esc(initials(st.name))}</span><strong>${esc(st.name)}</strong>${bellBtn(view)}
       <button class="role-pill" style="--c:${r.color}" data-act="myPin" title="Change my password">${esc(me.name.split(' ')[0])} · ${esc(r.label)}</button>
       <button class="icon-btn" data-act="logout" aria-label="Log out">${icon('logout')}</button></div>
     <main class="main" id="main">${content}</main>
     ${r.views.length > 1 ? `<nav class="tabbar">${tabs.map((v) => navItem(v)).join('')}
       ${r.views.length > MOBILE_TABS + 1 ? `<button class="nav-i ${moreActive ? 'on' : ''}" data-act="moreNav">${icon('more')}<span>More</span></button>` : ''}</nav>` : ''}
   </div>`;
+}
+function bellBtn(view) {
+  const n = unreadCount();
+  return `<a href="#/inbox" class="icon-btn bell ${view === 'inbox' ? 'on' : ''}" aria-label="Notifications${n ? ` (${n} unread)` : ''}" title="Notifications">${icon('bell')}${n ? `<i class="nbadge">${n > 99 ? '99+' : n}</i>` : ''}</a>`;
 }
 function badgeFor(v) {
   let n = 0;
@@ -60,10 +64,10 @@ function render() {
   }
   const role = Session.role();
   if (!role) { root.innerHTML = Session.locked && Session.account() ? Views.lockScreen() : Views.login(); return; }
-  checkReady();
+  checkReady(); checkNotices();
   if (App.setup.mode === 'later' && App.setup.step > 0 && role === 'owner') { root.innerHTML = Views.setup(); return; }
   let { view, params } = parseHash();
-  const allowed = ROLES[role].views;
+  const allowed = ROLES[role].views.concat('inbox'); // everyone has the notifications inbox
   if (!allowed.includes(view)) {
     view = allowed[0]; params = {};
     history.replaceState(null, '', `#/${view}`);

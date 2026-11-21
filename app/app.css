@@ -705,3 +705,27 @@ a.tab { text-decoration: none; }
 .rec-row select, .rec-row input { min-height: 38px !important; padding: 6px 10px !important; font-size: 14px !important; }
 .rec-unit { font-size: 12.5px; color: var(--muted); font-weight: 600; }
 .rec-sum { display: block; font-size: 11.5px; margin-top: 2px; }
+
+/* ===== v3.8: notifications inbox ===== */
+.icon-btn.bell { position: relative; text-decoration: none; }
+.icon-btn.bell .nbadge { position: absolute; top: -6px; right: -6px; margin: 0; }
+.icon-btn.bell.on { color: var(--accent); border-color: var(--accent); }
+.brand .icon-btn.bell { margin-left: auto; flex: none; }
+.topbar .icon-btn.bell { order: 0; }
+.note-list { display: grid; gap: 2px; }
+.note-card { display: grid; grid-template-columns: 36px 1fr auto; gap: 12px; align-items: start; padding: 12px 10px; margin: 0 -10px; border-radius: 12px; cursor: default; }
+.note-card[role=button] { cursor: pointer; }
+.note-card[role=button]:hover { background: var(--surface-2); }
+.note-card + .note-card { border-top: 1px dashed var(--line); border-radius: 0; }
+.note-card.unread strong { font-weight: 700; }
+.note-card:not(.unread) { opacity: .72; }
+.note-ic { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; background: var(--surface-2); color: var(--ink-2); }
+.note-card.ready .note-ic { background: color-mix(in srgb, var(--ok) 14%, transparent); color: var(--ok); }
+.note-card.kitchen .note-ic { background: color-mix(in srgb, var(--amber) 16%, transparent); color: var(--amber); }
+.note-card.stock .note-ic, .note-card.req .note-ic { background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--danger); }
+.note-card.res .note-ic { background: color-mix(in srgb, #6366f1 14%, transparent); color: #6366f1; }
+.note-card.notice .note-ic { background: var(--accent-soft); color: var(--accent); }
+.note-body strong { display: block; font-size: 14.5px; font-weight: 600; }
+.note-body p { font-size: 13.5px; color: var(--ink-2); margin-top: 2px; white-space: pre-line; word-break: break-word; }
+.note-body small { color: var(--muted); font-size: 12px; }
+.unread-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); margin-top: 6px; }

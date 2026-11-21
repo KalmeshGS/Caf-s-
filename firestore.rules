@@ -106,6 +106,7 @@ service cloud.firestore {
       match /attendance/{day} { allow read: if can(cid, ['owner', 'manager', 'cashier']); allow write: if can(cid, ['owner', 'manager']); }
       match /journal/{day}   { allow read, write: if can(cid, ['owner', 'manager', 'cashier']); }
       match /tables/{table}  { allow read: if ok(cid); allow write: if can(cid, ['owner', 'manager', 'cashier', 'waiter']); }
+      match /notices/{id}    { allow read: if ok(cid); allow write: if can(cid, ['owner', 'manager']); }
       match /reservations/{id} { allow read, write: if can(cid, ['owner', 'manager', 'cashier', 'waiter']); }
     }
 

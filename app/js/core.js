@@ -140,12 +140,12 @@ function emptyState() {
     v: 1,
     settings: null,
     menu: [], orders: [], kots: [], stock: [], expenses: [],
-    vendors: [], vendorTx: [], staff: [], attendance: {}, journal: {}, tableState: {}, reservations: [],
+    vendors: [], vendorTx: [], staff: [], attendance: {}, journal: {}, tableState: {}, reservations: [], notices: [],
     users: [], requests: [], recovery: null,
     seq: { day: '', n: 0, emp: 0 },
   };
 }
-const APP_VERSION = '3.7';
+const APP_VERSION = '3.8';
 const DEFAULT_PIN = '1234'; // only for accounts created by older versions; they must set a password
 
 /** Short code for employee IDs: "Kalmesh Kitchen" -> "KK", "KK" -> "KK", "Brewhouse" -> "BR" */

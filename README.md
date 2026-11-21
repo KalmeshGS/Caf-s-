@@ -117,6 +117,7 @@ This deletes **all** café data and **all** login accounts in Firebase (rules st
 - **Food ready alerts**: when the kitchen marks an order *Ready*, the person who took it gets a sound, vibration and (if allowed) a phone notification, plus a *Ready to serve* list on Orders.
 - **Tables**: Free / Running is automatic from orders; staff can also mark a table *Needs cleaning*, *Reserved* or *Out of service* (⋯ on the table). **Reservations** tab: guest, phone, date, time, guests, table; *Arrived* opens that table for ordering.
 - **Recipes → automatic stock**: each menu item has *Ingredients per serving* (e.g. Tea: Milk 0.1 L, Sugar 0.01 kg, Tea 0.005 kg). Typical amounts are filled in automatically from your stock names. When a ticket is marked **Served** (or its bill is paid) the stock goes down by recipe × quantity.
+- **Notifications (🔔)**: an inbox for everyone with an unread count — food ready (waiters: their own orders), new/changed kitchen tickets (kitchen), upcoming reservations, low stock and login-help requests (owner/manager), and **notices** the owner or a manager posts to everyone or one role.
 - **Billing**: *Print bill* before payment, or *Paid & print* to print the receipt.
 
 ## About your data
