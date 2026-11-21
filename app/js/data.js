@@ -74,6 +74,7 @@ function makeDemo(state) {
   state.stock = starterStock(st.type).map((s, i) => ({ ...s, qty: i % 3 === 1 ? snap(s.low * 0.8, s.step) : snap(s.max * R(0.35, 0.9), s.step) }));
   state.orders = []; state.kots = []; state.expenses = []; state.vendorTx = []; state.attendance = {}; state.journal = {};
 
+  if (typeof suggestRecipe === 'function') state.menu.forEach((m) => { m.recipe = suggestRecipe(m.name, state.stock); });
   const tables = Array.from({ length: Number(st.tables) || 8 }, (_, i) => `T${i + 1}`);
   const weights = { 8: 1, 9: 3, 10: 3, 11: 4, 12: 6, 13: 8, 14: 6, 15: 4, 16: 5, 17: 7, 18: 9, 19: 10, 20: 8, 21: 5, 22: 2 };
   const hours = Object.entries(weights).flatMap(([h, w]) => Array(w).fill(+h));
