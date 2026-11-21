@@ -27,7 +27,7 @@ const ordersTabs = (tab) => {
   return `<div class="tabs"><a class="tab ${tab === 'tables' ? 'on' : ''}" href="#/orders">Tables</a><a class="tab ${tab === 'res' ? 'on' : ''}" href="#/orders?tab=res">Reservations${n ? ` <i class="nbadge inline">${n}</i>` : ''}</a></div>`;
 };
 const rulesNotice = () => (typeof Cloud !== 'undefined' && Cloud.on && Cloud.rulesOutdated
-  ? `<div class="banner warn">${icon('alert')}<span>Table status and reservations need the <b>updated database rules</b>. ${Session.role() === 'owner' ? 'Go to Settings → Data → Update database rules.' : 'Please ask the owner to update them.'}</span></div>` : '');
+  ? `<div class="banner warn">${icon('alert')}<span>Table status and reservations are being switched on for your café. Please refresh in a minute.</span></div>` : '');
 
 /* ---------------- Tables screen ---------------- */
 function tablesView() {

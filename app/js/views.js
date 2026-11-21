@@ -443,10 +443,7 @@ Views.settings = () => {
     if (typeof Cloud !== 'undefined' && Cloud.on) {
       body = `<section class="card">${eyebrow('Online database')}<p>${icon('check')} Connected. All data is stored securely online and synced live to every device. Nothing is kept on this device.</p>
         <div class="line-row"><span>Café code (for staff logins)</span><b class="emp-id lg">${esc(Cloud.cid.toUpperCase())}</b></div></section>
-      <section class="card ${Cloud.rulesOutdated ? 'req-card' : ''}">${eyebrow('Database rules')}
-        <p>${Cloud.rulesOutdated ? `${icon('alert')} <b>Update needed</b> — table status and reservations are switched off until the new rules are published.` : `${icon('check')} Up to date.`}</p>
-        <p class="muted sm">When the app gets new features, the security rules in Firebase sometimes need updating. Tap the button: the new rules are copied and the Firebase Rules page opens. There, select everything, paste, and click <b>Publish</b>.</p>
-        <div class="btn-row">${btn('Update database rules', 'copyRules', { cls: Cloud.rulesOutdated ? 'primary' : 'ghost', ic: 'lock' })}</div></section>
+
       <section class="card">${eyebrow('Backup')}<p class="muted">Download an encrypted copy of everything, to keep for your records.</p><div class="btn-row">${btn('Download backup', 'exportData', { cls: 'primary', ic: 'download' })}</div></section>
       ${setupCards()}`;
     } else

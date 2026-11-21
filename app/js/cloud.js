@@ -582,15 +582,6 @@ function installOverrides() {
     },
     async recoveryNew() { toast('Online accounts use email password reset — no recovery code needed.'); },
     exportData() { openSheet(backupSheet()); },
-    async copyRules() {
-      try {
-        const txt = await (await fetch('../firestore.rules', { cache: 'no-store' })).text();
-        if (!txt.includes('service cloud.firestore')) throw new Error('not found');
-        await navigator.clipboard.writeText(txt);
-        toast('New rules copied');
-      } catch (e) { return toast('Could not copy automatically — open firestore.rules in the GitHub repo and copy it.'); }
-      window.open(`https://console.firebase.google.com/project/${encodeURIComponent(window.FIREBASE_CONFIG.projectId)}/firestore/rules`, '_blank', 'noopener');
-    },
   });
 
   Object.assign(Forms, {
