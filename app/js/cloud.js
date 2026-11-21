@@ -29,14 +29,14 @@ const WINDOW_DAYS = 62;
 const SPEC = [
   { key: 'settings', kind: 'doc', path: ['meta', 'settings'], read: ALL_ROLES, write: ['owner'] },
   { key: 'seq', kind: 'doc', path: ['meta', 'seq'], read: ALL_ROLES, write: ['owner', 'manager', 'cashier', 'waiter'] },
-  { key: 'menu', kind: 'items', coll: 'menu', read: ALL_ROLES, write: ['owner'] },
+  { key: 'menu', kind: 'items', coll: 'menu', read: ALL_ROLES, write: ['owner', 'manager', 'kitchen'] },
   { key: 'orders', kind: 'items', coll: 'orders', read: ALL_ROLES, write: ['owner', 'manager', 'cashier', 'waiter'], since: { field: 'createdAt', days: WINDOW_DAYS, num: true } },
   { key: 'kots', kind: 'items', coll: 'kots', read: ALL_ROLES, write: ALL_ROLES, since: { field: 'updatedAt', days: 2, num: true } }, // finer limits in firestore.rules
-  { key: 'stock', kind: 'items', coll: 'stock', read: ['owner', 'manager'], write: ['owner', 'manager'] },
+  { key: 'stock', kind: 'items', coll: 'stock', read: ['owner', 'manager', 'kitchen'], write: ['owner', 'manager'] },
   { key: 'expenses', kind: 'items', coll: 'expenses', read: ['owner', 'manager', 'cashier'], write: ['owner', 'manager'], since: { field: 'date', days: WINDOW_DAYS } },
   { key: 'vendors', kind: 'items', coll: 'vendors', read: ['owner', 'manager'], write: ['owner', 'manager'] },
   { key: 'vendorTx', kind: 'items', coll: 'vendorTx', read: ['owner', 'manager'], write: ['owner', 'manager'], since: { field: 'date', days: 120 } },
-  { key: 'staff', kind: 'items', coll: 'staff', read: ['owner', 'manager', 'cashier'], write: ['owner'], private: { coll: 'staffPrivate', fields: PRIVATE_STAFF, roles: ['owner'] } },
+  { key: 'staff', kind: 'items', coll: 'staff', read: ['owner', 'manager', 'cashier'], write: ['owner', 'manager'], private: { coll: 'staffPrivate', fields: PRIVATE_STAFF, roles: ['owner'] } },
   { key: 'attendance', kind: 'map', coll: 'attendance', read: ['owner', 'manager', 'cashier'], write: ['owner', 'manager'], days: WINDOW_DAYS },
   { key: 'journal', kind: 'map', coll: 'journal', read: ['owner', 'manager', 'cashier'], write: ['owner', 'manager', 'cashier'], days: WINDOW_DAYS },
   { key: 'requests', kind: 'items', coll: 'requests', read: ['owner'], write: ['owner'], where: ['status', '==', 'open'] },
@@ -148,14 +148,14 @@ async function pushNow() {
       if (spec.private) {
         const priv = {}; spec.private.fields.forEach((f) => { if (f in data) { priv[f] = data[f]; delete data[f]; } });
         ops.push(['set', cref(spec.coll, id), data]);
-        ops.push(['set', cref(spec.private.coll, id), priv]);
+        if (spec.private.roles.includes(Cloud.me.role)) ops.push(['set', cref(spec.private.coll, id), priv]); // e.g. managers never write salary / KYC
       } else ops.push(['set', cref(spec.coll, id), data]);
     }
     for (const id of [...m.keys()]) {
       if (seen.has(id)) continue;
       m.delete(id);
       ops.push(['delete', cref(spec.coll, id)]);
-      if (spec.private) ops.push(['delete', cref(spec.private.coll, id)]);
+      if (spec.private && spec.private.roles.includes(Cloud.me.role)) ops.push(['delete', cref(spec.private.coll, id)]);
     }
   }
   for (let i = 0; i < ops.length; i += 400) {

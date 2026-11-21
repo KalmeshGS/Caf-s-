@@ -414,7 +414,7 @@ Views.journal = () => {
 
 /* ---------------- Settings ---------------- */
 Views.settings = () => {
-  const tabs = { business: 'Business', menu: 'Menu', data: 'Data' };
+  const tabs = { business: 'Business', data: 'Data' };
   if (!tabs[App.ui.settingsTab]) App.ui.settingsTab = 'business';
   const tab = App.ui.settingsTab;
   const st = S.settings;
@@ -439,15 +439,6 @@ Views.settings = () => {
       <div class="field"><span>Appearance</span><div class="seg">${['auto', 'light', 'dark'].map((t) => `<label><input type="radio" name="theme" value="${t}" ${t === (st.theme || 'auto') ? 'checked' : ''}><span>${t[0].toUpperCase() + t.slice(1)}</span></label>`).join('')}</div></div>
       <div class="form-actions"><span></span><button class="btn primary" type="submit">Save changes</button></div>
     </form>`;
-  } else if (tab === 'menu') {
-    const cats = [...new Set(S.menu.map((m) => m.cat))];
-    const noRecipe = S.menu.filter((m) => !(m.recipe && m.recipe.length)).length;
-    body = `<div class="card-head">${eyebrow(`${pl(S.menu.length, 'item')} · ${pl(cats.length, 'category', 'categories')}`)}<div class="btn-row tight">${noRecipe && S.stock.length ? btn('Fill typical recipes', 'fillRecipes', { cls: 'ghost sm' }) : ''}${btn('Menu item', 'menuAdd', { cls: 'primary', ic: 'plus' })}</div></div>
-      ${noRecipe && S.stock.length ? `<div class="banner info">${icon('box')}<span>${pl(noRecipe, 'item')} ${noRecipe === 1 ? 'has' : 'have'} no ingredients yet, so stock won't reduce when ${noRecipe === 1 ? 'it is' : 'they are'} served. Tap an item to add them, or "Fill typical recipes".</span></div>` : ''}
-      ${cats.map((c) => `<section class="card">${eyebrow(c)}${S.menu.filter((m) => m.cat === c).map((m) => `<div class="menu-row ${m.available === false ? 'off' : ''}">
-        <span>${esc(m.name)}${m.recipe && m.recipe.length ? `<small class="muted rec-sum">${esc(m.recipe.map((r) => `${stockName(r.stockId)} ${r.qty}${byId(S.stock, r.stockId)?.unit || ''}`).join(' · '))}</small>` : ''}</span><b>${money(m.price)}</b>
-        <label class="switch" title="Available"><input type="checkbox" data-act="menuToggle" data-id="${m.id}" ${m.available !== false ? 'checked' : ''}><i></i></label>
-        <button class="icon-btn sm" data-act="menuEdit" data-id="${m.id}" aria-label="Edit">${icon('edit')}</button></div>`).join('')}</section>`).join('') || empty('No menu yet.', btn('Add first item', 'menuAdd', { cls: 'ghost', ic: 'plus' }))}`;
   } else {
     const size = (JSON.stringify(S).length / 1024).toFixed(0);
     if (typeof Cloud !== 'undefined' && Cloud.on) {
@@ -474,6 +465,20 @@ function setupCards() {
     <section class="card danger-zone">${eyebrow('Start clean')}<p class="muted">Remove all menu items, stock, staff records, bills, expenses, vendors, attendance and journal — for example to clear sample data. Your café settings and login accounts stay.</p>
       ${btn('Erase café data', 'eraseCafeData', { cls: 'danger-ghost', ic: 'trash' })}</section>`;
 }
+/* ---------------- Menu & recipes (owner, manager, kitchen) ---------------- */
+Views.menu = () => {
+  const cats = [...new Set(S.menu.map((m) => m.cat))];
+  const noRecipe = S.menu.filter((m) => !(m.recipe && m.recipe.length)).length;
+  return `${pageHead('Menu & recipes', 'Menu', `<div class="btn-row tight">${noRecipe && S.stock.length ? btn('Fill typical recipes', 'fillRecipes', { cls: 'ghost sm' }) : ''}${btn('Menu item', 'menuAdd', { cls: 'primary', ic: 'plus' })}</div>`)}
+    <p class="muted sm">${pl(S.menu.length, 'item')} · ${pl(cats.length, 'category', 'categories')}. Set the ingredients of each dish once — stock then goes down automatically every time it is served.</p>
+    ${!S.stock.length ? `<div class="banner info">${icon('box')}<span>Add your stock items first (milk, sugar, tea powder…) so dishes can use them.</span>${can('stock') ? `<a class="btn primary sm" href="#/stock">Go to Stock</a>` : ''}</div>` : ''}
+    ${noRecipe && S.stock.length ? `<div class="banner info">${icon('box')}<span>${pl(noRecipe, 'item')} ${noRecipe === 1 ? 'has' : 'have'} no ingredients yet, so stock won't reduce when ${noRecipe === 1 ? 'it is' : 'they are'} served. Tap an item to add them, or "Fill typical recipes".</span></div>` : ''}
+    ${cats.map((c) => `<section class="card">${eyebrow(c)}${S.menu.filter((m) => m.cat === c).map((m) => `<div class="menu-row ${m.available === false ? 'off' : ''}">
+        <span>${esc(m.name)}${m.recipe && m.recipe.length ? `<small class="muted rec-sum">${esc(recipeText(m.recipe))}</small>` : `<small class="neg rec-sum">No ingredients set</small>`}</span><b>${money(m.price)}</b>
+        <label class="switch" title="Available today"><input type="checkbox" data-act="menuToggle" data-id="${m.id}" ${m.available !== false ? 'checked' : ''}><i></i></label>
+        <button class="icon-btn sm" data-act="menuEdit" data-id="${m.id}" aria-label="Edit ${esc(m.name)}">${icon('edit')}</button></div>`).join('')}</section>`).join('') || empty('No menu yet.', btn('Add first item', 'menuAdd', { cls: 'ghost', ic: 'plus' }))}
+    <p class="fine">The switch marks an item available / not available today (e.g. sold out).</p>`;
+};
 function menuForm(m = {}) {
   const cats = [...new Set(S.menu.map((x) => x.cat))];
   return `${sheetHead('Menu', m.id ? 'Edit item' : 'Add item')}
