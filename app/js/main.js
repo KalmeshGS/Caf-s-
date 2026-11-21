@@ -160,11 +160,11 @@ const Actions = {
       lines.forEach((l) => {
         const add = l.qty - l.sent;
         const it = waiting.items.find((i) => i.lineId === l.id);
-        if (it) { it.qty += add; it.note = l.note || ''; } else waiting.items.push({ lineId: l.id, name: l.name, qty: add, note: l.note || '' });
+        if (it) { it.qty += add; it.note = l.note || ''; } else waiting.items.push({ lineId: l.id, menuId: l.menuId, name: l.name, qty: add, note: l.note || '' });
       });
       kotTouch(waiting);
     } else {
-      S.kots.push({ id: uid('k'), orderId: o.id, table: o.table, no: o.no, items: lines.map((l) => ({ lineId: l.id, name: l.name, qty: l.qty - l.sent, note: l.note || '' })), status: 'new', createdAt: Date.now(), updatedAt: Date.now(), byId: me?.id || o.byId || null, by: me?.name || '' });
+      S.kots.push({ id: uid('k'), orderId: o.id, table: o.table, no: o.no, items: lines.map((l) => ({ lineId: l.id, menuId: l.menuId, name: l.name, qty: l.qty - l.sent, note: l.note || '' })), status: 'new', createdAt: Date.now(), updatedAt: Date.now(), byId: me?.id || o.byId || null, by: me?.name || '' });
     }
     o.items.forEach((l) => { l.sent = l.qty; });
     persist(); toast(`${waiting ? 'Kitchen ticket updated' : 'Sent to kitchen'} ✓ ${orderLabel(o)}`);
@@ -180,6 +180,7 @@ const Actions = {
     if (k.status !== 'ready' && !KITCHEN_ROLES.includes(role)) return toast('Only the kitchen can change cooking status.');
     k.status = { new: 'cooking', cooking: 'ready', ready: 'served' }[k.status] || 'served';
     k.updatedAt = Date.now();
+    if (k.status === 'served') useStockFor(k); // ingredients come off the stock
     if (KITCHEN_ROLES.includes(role)) S.kots = S.kots.filter((x) => x.status !== 'served' || Date.now() - x.updatedAt < 864e5); // keep one day
     save();
   },
@@ -332,7 +333,7 @@ const Forms = {
     const o = byId(S.orders, App.params.o); if (!o || o.status !== 'open') return;
     const t = orderTotals(o, num(fd.get('discount')));
     Object.assign(o, { status: 'paid', paidAt: Date.now(), method: fd.get('method') || 'cash', subtotal: t.sub, discount: t.discount, tax: t.tax, total: t.total });
-    S.kots.forEach((k) => { if (k.orderId === o.id && k.status === 'ready') { k.status = 'served'; k.updatedAt = Date.now(); } });
+    S.kots.forEach((k) => { if (k.orderId === o.id && k.status === 'ready') { k.status = 'served'; k.updatedAt = Date.now(); useStockFor(k); } });
     save(); toast(`Paid ${money(t.total)} ✓`);
     if (App.printAfterPay) { App.printAfterPay = false; $('#print').innerHTML = receiptHtml(o); setTimeout(() => window.print(), 50); }
   },

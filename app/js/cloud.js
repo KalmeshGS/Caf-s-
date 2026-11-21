@@ -534,6 +534,12 @@ async function cloudSignup(fd, form) {
 
 /* ---------------- overrides (only in online mode) ---------------- */
 function installOverrides() {
+  // Stock goes down on the server with an atomic decrement (works for every role, never overwrites)
+  applyStockUse = (use) => {
+    Object.entries(use).forEach(([id, q]) => {
+      FB.updateDoc(cref('stock', id), { qty: FB.increment(-q) }).catch((e) => console.warn('stock update', e));
+    });
+  };
   // Never write café data to the device
   persist = function () { if (Cloud.attached || Cloud.me) Cloud.push(); return true; };
   loadState = function () { return S; };

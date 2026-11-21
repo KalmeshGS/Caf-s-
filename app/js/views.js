@@ -231,7 +231,7 @@ Views.stock = () => {
         <div class="stock-main" data-act="stockEdit" data-id="${s.id}" role="button" tabindex="0">
           <div class="line-row"><strong>${esc(s.name)}</strong><b class="${lo ? 'neg' : ''}">${esc(+Number(s.qty).toFixed(2))} ${esc(s.unit)}</b></div>
           ${meter(pct, lo ? 'var(--danger)' : 'var(--accent)')}
-          <small class="muted">Alert at ${esc(s.low)} ${esc(s.unit)} · full ${esc(s.max)} ${esc(s.unit)}</small>
+          <small class="muted">Alert at ${esc(s.low)} ${esc(s.unit)} · full ${esc(s.max)} ${esc(s.unit)}${usedBy(s.id).length ? ` · reduces automatically with: ${esc(usedBy(s.id).join(', '))}` : ''}</small>
         </div>
         <div class="qty"><button class="icon-btn sm" data-act="stockAdj" data-id="${s.id}" data-d="-1" aria-label="Use">${icon('minus')}</button><button class="icon-btn sm" data-act="stockAdj" data-id="${s.id}" data-d="1" aria-label="Add">${icon('plus')}</button></div>
       </div>`;
@@ -441,9 +441,11 @@ Views.settings = () => {
     </form>`;
   } else if (tab === 'menu') {
     const cats = [...new Set(S.menu.map((m) => m.cat))];
-    body = `<div class="card-head">${eyebrow(`${pl(S.menu.length, 'item')} · ${pl(cats.length, 'category', 'categories')}`)}${btn('Menu item', 'menuAdd', { cls: 'primary', ic: 'plus' })}</div>
+    const noRecipe = S.menu.filter((m) => !(m.recipe && m.recipe.length)).length;
+    body = `<div class="card-head">${eyebrow(`${pl(S.menu.length, 'item')} · ${pl(cats.length, 'category', 'categories')}`)}<div class="btn-row tight">${noRecipe && S.stock.length ? btn('Fill typical recipes', 'fillRecipes', { cls: 'ghost sm' }) : ''}${btn('Menu item', 'menuAdd', { cls: 'primary', ic: 'plus' })}</div></div>
+      ${noRecipe && S.stock.length ? `<div class="banner info">${icon('box')}<span>${pl(noRecipe, 'item')} ${noRecipe === 1 ? 'has' : 'have'} no ingredients yet, so stock won't reduce when ${noRecipe === 1 ? 'it is' : 'they are'} served. Tap an item to add them, or "Fill typical recipes".</span></div>` : ''}
       ${cats.map((c) => `<section class="card">${eyebrow(c)}${S.menu.filter((m) => m.cat === c).map((m) => `<div class="menu-row ${m.available === false ? 'off' : ''}">
-        <span>${esc(m.name)}</span><b>${money(m.price)}</b>
+        <span>${esc(m.name)}${m.recipe && m.recipe.length ? `<small class="muted rec-sum">${esc(m.recipe.map((r) => `${stockName(r.stockId)} ${r.qty}${byId(S.stock, r.stockId)?.unit || ''}`).join(' · '))}</small>` : ''}</span><b>${money(m.price)}</b>
         <label class="switch" title="Available"><input type="checkbox" data-act="menuToggle" data-id="${m.id}" ${m.available !== false ? 'checked' : ''}><i></i></label>
         <button class="icon-btn sm" data-act="menuEdit" data-id="${m.id}" aria-label="Edit">${icon('edit')}</button></div>`).join('')}</section>`).join('') || empty('No menu yet.', btn('Add first item', 'menuAdd', { cls: 'ghost', ic: 'plus' }))}`;
   } else {
@@ -482,6 +484,8 @@ function menuForm(m = {}) {
       <label class="field"><span>Price</span><input name="price" type="number" min="0" step="any" required value="${esc(m.price ?? '')}"></label>
       <label class="field"><span>Category</span><input name="cat" required maxlength="24" list="cat-list" value="${esc(m.cat || cats[0] || '')}"><datalist id="cat-list">${cats.map((c) => `<option value="${esc(c)}">`).join('')}</datalist></label>
     </div>
+    ${recipeEditor(m)}
+    <p class="neg sm" id="form-err" role="alert"></p>
     <div class="form-actions">${m.id ? btn('Delete', 'menuDel', { cls: 'danger-ghost', ic: 'trash', data: `data-id="${m.id}"` }) : '<span></span>'}<button class="btn primary" type="submit">Save</button></div>
   </form>`;
 }

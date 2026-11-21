@@ -189,11 +189,12 @@ function stepError(name, d) {
 
 /** Turn the draft rows into real records inside `state` (assigns employee IDs) */
 function applyDraft(state, d) {
-  filled(d.menu).forEach((r) => state.menu.push({ id: uid('m'), name: r.name.trim(), cat: String(r.cat || '').trim() || 'General', price: num(r.price), available: true }));
   filled(d.stock).forEach((r) => {
     const qty = num(r.qty), low = num(r.low);
     state.stock.push({ id: uid('s'), name: r.name.trim(), unit: r.unit || 'pcs', qty, low, max: Math.max(qty, low * 4, 1), step: 1 });
   });
+  // Menu items get typical ingredients from the stock above, so stock reduces as they are served
+  filled(d.menu).forEach((r) => state.menu.push({ id: uid('m'), name: r.name.trim(), cat: String(r.cat || '').trim() || 'General', price: num(r.price), available: true, recipe: suggestRecipe(r.name, state.stock) }));
   const logins = [];
   filled(d.staff).forEach((r) => {
     const joinDate = r.join || dayKey();

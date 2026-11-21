@@ -89,11 +89,15 @@ service cloud.firestore {
           // while the kitchen hasn't started, floor staff may change the ticket (items, quantities, instructions)
           || (can(cid, ['manager', 'cashier', 'waiter']) && resource.data.status == 'new' && request.resource.data.status == 'new')
           || (can(cid, ['manager', 'cashier', 'waiter']) && resource.data.status == 'ready'
-              && request.resource.data.status == 'served' && onlyKeys(['status', 'updatedAt']));
+              && request.resource.data.status == 'served' && onlyKeys(['status', 'updatedAt', 'stockDone']));
         allow delete: if can(cid, ['owner', 'kitchen'])
           || (can(cid, ['manager', 'cashier', 'waiter']) && resource.data.status == 'new');
       }
-      match /stock/{id}      { allow read, write: if can(cid, ['owner', 'manager']); }
+      match /stock/{id} {
+        allow read, write: if can(cid, ['owner', 'manager']);
+        // anyone serving food may only take ingredients OFF the stock (never add)
+        allow update: if can(cid, ['cashier', 'waiter', 'kitchen']) && onlyKeys(['qty']) && request.resource.data.qty < resource.data.qty;
+      }
       match /expenses/{id}   { allow read: if can(cid, ['owner', 'manager', 'cashier']); allow write: if can(cid, ['owner', 'manager']); }
       match /vendors/{id}    { allow read, write: if can(cid, ['owner', 'manager']); }
       match /vendorTx/{id}   { allow read, write: if can(cid, ['owner', 'manager']); }
