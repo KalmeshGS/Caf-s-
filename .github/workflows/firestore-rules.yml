@@ -1,0 +1,50 @@
+# Publishes firestore.rules to Firebase automatically whenever it changes on main.
+# Needs one repository secret: FIREBASE_SERVICE_ACCOUNT (the JSON key of a Firebase service account).
+name: Deploy Firestore rules
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - firestore.rules
+      - firebase.json
+      - .github/workflows/firestore-rules.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: firestore-rules
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Check the Firebase key is set
+        env:
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$SA" ]; then
+            echo "::error::Add the FIREBASE_SERVICE_ACCOUNT secret (Settings → Secrets and variables → Actions). See README → 'Automatic rules deploy'."
+            exit 1
+          fi
+
+      - name: Deploy rules to Firebase
+        env:
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          KEY="$RUNNER_TEMP/firebase-key.json"
+          printf '%s' "$SA" > "$KEY"
+          chmod 600 "$KEY"
+          export GOOGLE_APPLICATION_CREDENTIALS="$KEY"
+          npx --yes firebase-tools@15.37.0 deploy --only firestore:rules --project cafe-journal-9ba5e --non-interactive
+          rm -f "$KEY"
