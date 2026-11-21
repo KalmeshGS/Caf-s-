@@ -67,12 +67,14 @@ const ATT = { present: { label: 'Present', short: 'P' }, late: { label: 'Late', 
 
 const ROLES = {
   owner:   { label: 'Owner',   desc: 'Everything',            color: '#1f7a4d', views: ['dashboard', 'orders', 'kitchen', 'billing', 'stock', 'expenses', 'vendors', 'staff', 'reports', 'journal', 'team', 'settings'] },
-  manager: { label: 'Manager', desc: 'Orders · stock · staff', color: '#4f46e5', views: ['dashboard', 'orders', 'kitchen', 'billing', 'stock', 'expenses', 'vendors', 'staff', 'journal'] },
-  cashier: { label: 'Cashier', desc: 'Billing · closing',     color: '#c2783c', views: ['billing', 'orders', 'journal'] },
-  waiter:  { label: 'Waiter',  desc: 'Take table orders',     color: '#0f766e', views: ['orders'] },
-  kitchen: { label: 'Kitchen', desc: 'Kitchen screen only',   color: '#d97706', views: ['kitchen'] },
+  manager: { label: 'Manager', desc: 'Orders · billing · stock · expenses · vendors · staff', color: '#4f46e5', views: ['dashboard', 'orders', 'billing', 'stock', 'expenses', 'vendors', 'staff', 'journal'] },
+  cashier: { label: 'Cashier', desc: 'Billing · orders · day closing', color: '#c2783c', views: ['billing', 'orders', 'journal'] },
+  waiter:  { label: 'Waiter',  desc: 'Orders · tables & cleaning · reservations · serving', color: '#0f766e', views: ['orders'] },
+  kitchen: { label: 'Kitchen', desc: 'Kitchen screen: cooking & ready', color: '#d97706', views: ['kitchen'] },
 };
 
+/** Only these roles may start cooking / mark food ready (everyone may mark ready food as served) */
+const KITCHEN_ROLES = ['owner', 'kitchen'];
 const VIEWS = {
   dashboard: { label: 'Dashboard', icon: 'grid' },
   orders:    { label: 'Orders',    icon: 'clipboard' },
@@ -143,7 +145,7 @@ function emptyState() {
     seq: { day: '', n: 0, emp: 0 },
   };
 }
-const APP_VERSION = '3.4';
+const APP_VERSION = '3.5';
 const DEFAULT_PIN = '1234'; // only for accounts created by older versions; they must set a password
 
 /** Short code for employee IDs: "Kalmesh Kitchen" -> "KK", "KK" -> "KK", "Brewhouse" -> "BR" */

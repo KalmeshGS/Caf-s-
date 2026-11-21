@@ -143,9 +143,12 @@ const Actions = {
   /* kitchen */
   kotNext(el) {
     const k = byId(S.kots, el.dataset.id); if (!k) return;
+    const role = Session.role();
+    // Cooking and "ready" belong to the kitchen (and the owner); serving ready food is the floor staff's job
+    if (k.status !== 'ready' && !KITCHEN_ROLES.includes(role)) return toast('Only the kitchen can change cooking status.');
     k.status = { new: 'cooking', cooking: 'ready', ready: 'served' }[k.status] || 'served';
     k.updatedAt = Date.now();
-    S.kots = S.kots.filter((x) => x.status !== 'served' || Date.now() - x.updatedAt < 864e5); // keep one day
+    if (KITCHEN_ROLES.includes(role)) S.kots = S.kots.filter((x) => x.status !== 'served' || Date.now() - x.updatedAt < 864e5); // keep one day
     save();
   },
 

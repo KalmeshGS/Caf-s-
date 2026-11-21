@@ -31,7 +31,7 @@ const SPEC = [
   { key: 'seq', kind: 'doc', path: ['meta', 'seq'], read: ALL_ROLES, write: ['owner', 'manager', 'cashier', 'waiter'] },
   { key: 'menu', kind: 'items', coll: 'menu', read: ALL_ROLES, write: ['owner'] },
   { key: 'orders', kind: 'items', coll: 'orders', read: ALL_ROLES, write: ['owner', 'manager', 'cashier', 'waiter'], since: { field: 'createdAt', days: WINDOW_DAYS, num: true } },
-  { key: 'kots', kind: 'items', coll: 'kots', read: ALL_ROLES, write: ALL_ROLES, since: { field: 'updatedAt', days: 2, num: true } },
+  { key: 'kots', kind: 'items', coll: 'kots', read: ALL_ROLES, write: ALL_ROLES, since: { field: 'updatedAt', days: 2, num: true } }, // finer limits in firestore.rules
   { key: 'stock', kind: 'items', coll: 'stock', read: ['owner', 'manager'], write: ['owner', 'manager'] },
   { key: 'expenses', kind: 'items', coll: 'expenses', read: ['owner', 'manager', 'cashier'], write: ['owner', 'manager'], since: { field: 'date', days: WINDOW_DAYS } },
   { key: 'vendors', kind: 'items', coll: 'vendors', read: ['owner', 'manager'], write: ['owner', 'manager'] },

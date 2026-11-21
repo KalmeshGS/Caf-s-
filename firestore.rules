@@ -80,7 +80,16 @@ service cloud.firestore {
 
       match /menu/{id}       { allow read: if ok(cid); allow write: if owner(cid); }
       match /orders/{id}     { allow read: if ok(cid); allow write: if can(cid, ['owner', 'manager', 'cashier', 'waiter']); }
-      match /kots/{id}       { allow read, write: if ok(cid); }
+      // Kitchen tickets: floor staff send them (status "new") and mark ready food as served;
+      // only the kitchen and the owner can start cooking / mark ready / remove tickets.
+      match /kots/{id} {
+        allow read: if ok(cid);
+        allow create: if can(cid, ['owner', 'manager', 'cashier', 'waiter']) && request.resource.data.status == 'new';
+        allow update: if can(cid, ['owner', 'kitchen'])
+          || (can(cid, ['manager', 'cashier', 'waiter']) && resource.data.status == 'ready'
+              && request.resource.data.status == 'served' && onlyKeys(['status', 'updatedAt']));
+        allow delete: if can(cid, ['owner', 'kitchen']);
+      }
       match /stock/{id}      { allow read, write: if can(cid, ['owner', 'manager']); }
       match /expenses/{id}   { allow read: if can(cid, ['owner', 'manager', 'cashier']); allow write: if can(cid, ['owner', 'manager']); }
       match /vendors/{id}    { allow read, write: if can(cid, ['owner', 'manager']); }
