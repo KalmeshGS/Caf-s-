@@ -11,7 +11,14 @@
    Your data is protected by Firebase Authentication + firestore.rules.
    Leave it as null to keep the old on-device (offline) mode.
    ========================================================= */
-window.FIREBASE_CONFIG = null;
+window.FIREBASE_CONFIG = {
+  apiKey: 'AIzaSyCXC7K2IL9CLMIfJ0bCrBPkFP7zYU40rgM',
+  authDomain: 'cafe-journal-9ba5e.firebaseapp.com',
+  projectId: 'cafe-journal-9ba5e',
+  storageBucket: 'cafe-journal-9ba5e.firebasestorage.app',
+  messagingSenderId: '935495834232',
+  appId: '1:935495834232:web:a4a5d6417b1429b83eeb8d',
+};
 /* Example:
 window.FIREBASE_CONFIG = {
   apiKey: 'AIza…',
