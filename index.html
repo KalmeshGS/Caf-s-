@@ -15,8 +15,8 @@
 <body>
   <header class="nav wrap">
     <a class="logo" href="./"><img src="app/icons/icon.svg" alt="" width="30" height="30"><span>Cafe Journal</span></a>
-    <nav><a href="#features">Features</a><a href="#how">How it works</a><a href="#install">Install</a></nav>
-    <a class="btn primary sm" href="app/">Open app</a>
+    <nav><a href="#features">Features</a><a href="#how">How it works</a><a href="#start">Get started</a></nav>
+    <div class="nav-cta"><a class="btn ghost sm" href="app/index.html#/login" data-login>Log in</a><a class="btn primary sm" href="app/index.html#/signup">Sign up</a></div>
   </header>
 
   <main>
@@ -25,10 +25,10 @@
       <h1>Your whole place,<br>in one calm journal.</h1>
       <p class="lead">No more registers, Excel sheets and five different apps. Take orders, send them to the kitchen, bill, track stock and expenses — and know your real profit at the end of every month.</p>
       <div class="cta">
-        <a class="btn primary" href="app/">Start free — set up in 1 minute</a>
-        <a class="btn ghost" href="#features">See what's inside</a>
+        <a class="btn primary" href="app/index.html#/signup">Sign up free — 3 quick steps</a>
+        <a class="btn ghost" href="app/index.html#/login" data-login>Log in</a>
       </div>
-      <p class="fine">No sign-up. Works offline. Your data stays on your device — move it with an encrypted backup.</p>
+      <p class="fine" id="welcome-back">Free. Works offline. Your data stays on your device — move it with an encrypted backup.</p>
 
       <div class="mock" aria-hidden="true">
         <div class="m-card">
@@ -84,10 +84,38 @@
     <section id="how" class="wrap">
       <h2 class="center">Up and running before your first chai.</h2>
       <ol class="steps">
-        <li><b>Set up</b><p>Enter your place's name, type, currency and tables. Optional sample data lets you explore first.</p></li>
-        <li><b>Hand out logins</b><p>Each role has its own PIN. Put the kitchen screen on a tablet, billing on the counter.</p></li>
+        <li><b>Sign up</b><p>Enter your place's name, type, currency and tables, then create the owner account. Optional sample data lets you explore first.</p></li>
+        <li><b>Add your team</b><p>Add staff with their details — each gets an employee ID like KK26001 and their own login and password.</p></li>
         <li><b>Close the day</b><p>One tap saves the cash / UPI / card split to your journal. The month adds itself up.</p></li>
       </ol>
+    </section>
+
+    <section id="start" class="wrap start">
+      <h2 class="center">Get started</h2>
+      <div class="start-grid">
+        <article class="start-card primary">
+          <p class="eyebrow">New here</p>
+          <h3>Sign up your café</h3>
+          <p>We'll walk you through it and ask for just what's needed:</p>
+          <ol class="mini-steps">
+            <li><b>Your place</b><span>Name, short code (for employee IDs like KK26001), type of business</span></li>
+            <li><b>How you work</b><span>Currency, number of tables, tax on bills</span></li>
+            <li><b>Your owner account</b><span>Your name, mobile and a password — plus a recovery code to keep safe</span></li>
+          </ol>
+          <a class="btn primary" href="app/index.html#/signup">Sign up — it's free</a>
+        </article>
+        <article class="start-card">
+          <p class="eyebrow">Already have an account</p>
+          <h3>Log in</h3>
+          <p>Use your <b>Employee ID</b> (or phone / name) and your password.</p>
+          <ul class="mini-list">
+            <li>Staff: your first password is given by the owner — you'll change it the first time.</li>
+            <li>Forgot it? Tap <em>Forgot password</em> and the owner can reset it.</li>
+            <li>New phone or computer? Choose <em>Restore backup</em> to bring your café across.</li>
+          </ul>
+          <a class="btn ghost" href="app/index.html#/login" data-login>Log in</a>
+        </article>
+      </div>
     </section>
 
     <section id="install" class="wrap install">
@@ -100,7 +128,7 @@
           <li><b>Laptop:</b> install icon in the address bar</li>
         </ul>
       </div>
-      <a class="btn primary" href="app/">Open Cafe Journal</a>
+      <div class="nav-cta"><a class="btn ghost" href="app/index.html#/login" data-login>Log in</a><a class="btn primary" href="app/index.html#/signup">Sign up</a></div>
     </section>
   </main>
 
@@ -108,5 +136,6 @@
     <span>Cafe Journal · free & open source</span>
     <span>Data stays in your browser — download backups from Settings → Data.</span>
   </footer>
+  <script src="assets/site.js"></script>
 </body>
 </html>

@@ -17,8 +17,9 @@ Views.setup = () => {
         <div class="brand-mark lg">${icon('cup')}</div>
         <h1>Welcome to Cafe Journal</h1>
         <p class="muted center">Orders, kitchen, billing, stock, staff and reports — one calm app for your café, restaurant or hotel.</p>
-        <button class="choice primary" data-act="setupStart">${icon('plus')}<span><b>Set up a new café</b><small>Takes about a minute</small></span>${icon('right')}</button>
-        <button class="choice" data-act="importData">${icon('upload')}<span><b>I already use Cafe Journal</b><small>Restore your backup file from another phone or computer</small></span>${icon('right')}</button>
+        ${App.setup.intent === 'login' ? `<div class="banner info">${icon('lock')}<span><b>No café is set up on this device yet.</b> If you already have an account on another phone or computer, restore your backup below. If you're new, sign up.</span></div>` : ''}
+        <button class="choice primary" data-act="setupStart">${icon('plus')}<span><b>Sign up — new café</b><small>3 quick steps: your place, how you work, your owner account</small></span>${icon('right')}</button>
+        <button class="choice" data-act="importData">${icon('upload')}<span><b>I already have an account</b><small>Restore your backup file from another phone or computer, then log in</small></span>${icon('right')}</button>
         <input type="file" id="import-file" accept="application/json,.json" hidden>
         <p class="fine center">${icon('lock')} Your data stays on this device. Nothing is uploaded.</p>
       </div>
@@ -59,7 +60,7 @@ Views.setup = () => {
   return `<main class="center-screen onboard">
     <form class="card onb" data-form="setupStep" autocomplete="off">
       <div class="steps-bar" aria-label="Step ${step} of 3">${[1, 2, 3].map((i) => `<i class="${i <= step ? 'on' : ''}"></i>`).join('')}</div>
-      <p class="eyebrow">Step ${step} of 3</p>
+      <p class="eyebrow">Sign up · step ${step} of 3</p>
       <h1>${titles[step]}</h1>
       ${body}
       <p class="neg sm" id="form-err" role="alert"></p>
