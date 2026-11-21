@@ -341,9 +341,6 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && !$('#sheet').hidden) closeSheet();
   const el = e.target.closest?.('[role="button"][data-act]');
   if (el && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); Actions[el.dataset.act]?.(el, e); }
-  if (App.pinUser && !$('#sheet').hidden && /^[0-9]$|^Backspace$/.test(e.key) && $('#pin-dots')) {
-    Actions.pinKey({ dataset: { k: e.key === 'Backspace' ? '⌫' : e.key } });
-  }
 });
 document.addEventListener('submit', (e) => {
   const f = e.target; if (!f.dataset.form) return;

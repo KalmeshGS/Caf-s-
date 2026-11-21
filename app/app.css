@@ -481,3 +481,8 @@ button.role-pill { border: 0; cursor: pointer; max-width: 46vw; overflow: hidden
 .otp-input { font: 700 22px ui-monospace, Menlo, Consolas, monospace !important; letter-spacing: .3em; text-align: center; }
 .recovery-code { font: 700 30px/1 ui-monospace, Menlo, Consolas, monospace; letter-spacing: .12em; text-align: center; padding: 22px; border-radius: 14px; background: var(--surface-2); border: 1px dashed var(--line); user-select: all; }
 .with-av strong small { display: inline; font-weight: 500; }
+.login-card { width: min(400px, 100%); padding: 28px; display: grid; gap: 14px; }
+.login-card h1 { text-align: center; font-size: 28px; }
+.login-card .brand-mark.lg { margin-bottom: 0; }
+.login-card .eyebrow { margin: 6px 0 0; }
+.pin-input { letter-spacing: .5em; font-size: 20px !important; }
