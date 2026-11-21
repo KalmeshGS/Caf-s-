@@ -7,7 +7,7 @@ on:
     branches: [main]
     paths:
       - firestore.rules
-      - firebase.json
+      - .github/scripts/deploy-rules.cjs
       - .github/workflows/firestore-rules.yml
   workflow_dispatch:
 
@@ -23,11 +23,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Check the Firebase key is set
         env:
@@ -38,13 +38,10 @@ jobs:
             exit 1
           fi
 
-      - name: Deploy rules to Firebase
+      - name: Install Firebase Admin SDK
+        run: npm install --no-save --no-audit --no-fund firebase-admin@13.10.0
+
+      - name: Publish rules to Firebase
         env:
           SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-        run: |
-          KEY="$RUNNER_TEMP/firebase-key.json"
-          printf '%s' "$SA" > "$KEY"
-          chmod 600 "$KEY"
-          export GOOGLE_APPLICATION_CREDENTIALS="$KEY"
-          npx --yes firebase-tools@15.37.0 deploy --only firestore:rules --project cafe-journal-9ba5e --non-interactive
-          rm -f "$KEY"
+        run: node .github/scripts/deploy-rules.cjs
