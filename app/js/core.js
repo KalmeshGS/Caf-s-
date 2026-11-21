@@ -135,10 +135,20 @@ function save() { persist(); render(); }
 /** Run a mutation then save */
 function commit(fn) { fn(S); save(); }
 
+/* The signed-in role lives in memory only, so the PIN is asked every time
+   the app is opened or refreshed. It also locks itself after inactivity. */
+const LOCK_AFTER_MIN = 15;
 const Session = {
-  role() { try { const r = localStorage.getItem(SESSION_KEY); return ROLES[r] ? r : null; } catch (e) { return null; } },
-  set(r) { try { r ? localStorage.setItem(SESSION_KEY, r) : localStorage.removeItem(SESSION_KEY); } catch (e) { /* ignore */ } },
+  _role: null,
+  _last: Date.now(),
+  role() {
+    if (this._role && Date.now() - this._last > LOCK_AFTER_MIN * 60000) this._role = null;
+    return ROLES[this._role] ? this._role : null;
+  },
+  set(r) { this._role = ROLES[r] ? r : null; this._last = Date.now(); },
+  touch() { if (this._role) this._last = Date.now(); },
 };
+try { localStorage.removeItem(SESSION_KEY); } catch (e) { /* remove sign-in saved by older versions */ }
 
 /* ---------- selectors ---------- */
 const cur = () => CURRENCIES.find((c) => c.code === S.settings?.currency) || CURRENCIES[0];
