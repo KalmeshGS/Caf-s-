@@ -49,6 +49,7 @@ function badgeFor(v) {
 function render() {
   applyTheme();
   const root = $('#app');
+  if (typeof Cloud !== 'undefined' && Cloud.on && !Cloud.attached) { root.innerHTML = Cloud.screen(); return; }
   if (!S.settings) {
     // Links from the website: app/#/signup opens the sign-up steps, app/#/login explains how to log in here
     const entry = parseHash().view;
@@ -350,7 +351,7 @@ setInterval(() => { if ($('#sheet').hidden && ['orders', 'billing', 'dashboard']
 // Auto-lock: any tap or key keeps the session alive; after LOCK_AFTER_MIN idle minutes, back to the PIN screen
 ['pointerdown', 'keydown'].forEach((ev) => document.addEventListener(ev, () => Session.touch(), { capture: true, passive: true }));
 setInterval(() => {
-  if (Session._id && !Session.user()) { closeSheet(); history.replaceState(null, '', location.pathname); render(); toast('Locked — enter your PIN'); }
+  if (Session._id && !Session.user()) { closeSheet(); history.replaceState(null, '', location.pathname); render(); toast('Locked — please log in again'); }
 }, 30000);
 
 /* ---------------- boot (after every script, incl. auth.js, has loaded) ---------------- */

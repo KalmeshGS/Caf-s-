@@ -80,9 +80,32 @@ The installed app opens full-screen and works offline.
 - **Backups are encrypted** (AES-256-GCM) with a passphrase you choose.
 - A strict Content-Security-Policy blocks outside scripts.
 
+## Online database (Firebase) — recommended
+
+With an online database, **nothing is stored on the device**: all café data lives in Google Firebase, syncs live between every phone/computer, and each role can only reach what it's allowed to (enforced on Google's servers by `firestore.rules`). It's free for a café-sized workload (Firebase "Spark" plan).
+
+### One-time setup (about 10 minutes)
+1. Go to **https://console.firebase.google.com** → **Create a project** (any name, e.g. `cafe-journal`). Google Analytics is not needed.
+2. **Build → Authentication → Get started → Sign-in method → Email/Password → Enable → Save.**
+   Then **Settings → Authorized domains → Add domain →** `kalmeshgs.github.io`.
+3. **Build → Firestore Database → Create database** → choose a location near you (e.g. `asia-south1` Mumbai) → **Start in production mode**.
+4. In Firestore open the **Rules** tab, delete everything, paste the whole content of [`firestore.rules`](firestore.rules) and click **Publish**.
+5. **Project settings (⚙) → General → Your apps → Web (`</>`)** → register an app (no hosting needed) → copy the `firebaseConfig` values.
+6. Put them in [`app/js/firebase-config.js`](app/js/firebase-config.js) (`window.FIREBASE_CONFIG = { ... }`) and push — or send them to whoever maintains the site. These values are **not secret**.
+7. Recommended: Google Cloud console → APIs & Services → Credentials → your *Browser key* → restrict it to the website `https://kalmeshgs.github.io/*`.
+
+### How it works once connected
+- **Sign up**: the owner creates the café with name, mobile, **email** and password. The app shows a **café code** (e.g. `KK-7F3Q2`).
+  If the device had data from the offline version, it offers to **move it online** and then deletes it from the device.
+- **Owner login**: email + password, on any device. Forgot it → *Forgot password* emails a reset link.
+- **Staff login**: café code (asked once per device) + **Employee ID** + password. The owner types each person's first password; they must change it at first login.
+- 3 wrong passwords → *Ask owner to reset*; 4 → **locked** (stored online, enforced by the rules). The owner unlocks it / sets a temporary password from the dashboard.
+- KYC, salary, address and date of birth are stored separately and **only owners** can read them.
+- The login session is kept in memory only: closing/refreshing the app or 15 minutes idle asks for the password again.
+
 ## About your data
 
-All data is stored **in the browser on that device** (localStorage), and nothing is sent to any server. This means:
+**Without** the online database (no Firebase config), all data is stored **in the browser on that device** (localStorage). This means:
 
 - Back up regularly with **Settings → Data → Download backup** (encrypted). On another phone or computer choose **I already use Cafe Journal → Restore** on the welcome screen.
 - Several screens on the **same device** stay in sync. For example, the kitchen screen can be open in another window.

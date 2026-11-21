@@ -610,3 +610,8 @@ form.onb .eyebrow { margin: 4px 0 -8px; }
 }
 .acct-row .status, .acct-row .role-tag { justify-self: start; }
 @media (max-width: 760px) { .acct-row .role-tag { justify-self: end; } }
+.cafe-chip { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 12px; background: var(--accent-soft); font-size: 14px; }
+.cafe-chip span { flex: 1; }
+.cafe-chip b { font-family: ui-monospace, Menlo, Consolas, monospace; letter-spacing: .06em; }
+.cafe-chip .ic { color: var(--accent); }
+input::placeholder { text-transform: none; }

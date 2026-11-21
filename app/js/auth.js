@@ -251,6 +251,7 @@ Views.team = () => {
   const chips = [['all', `All (${all.length})`], ...ROLE_ORDER.map((r) => [r, `${ROLES[r].label} (${all.filter((u) => u.role === r).length})`]), ['attention', `Needs attention (${all.filter(needs).length})`]];
   return `${pageHead('Team & access', 'Who can log in', btn('Give login access', 'accessAdd', { cls: 'primary', ic: 'plus' }))}
     ${requestsCard()}
+    ${typeof Cloud !== 'undefined' && Cloud.on ? `<div class="banner info">${icon('lock')}<span>Café code <b class="emp-id">${esc(Cloud.cid.toUpperCase())}</b> — staff type it with their Employee ID the first time they log in on a phone.</span></div>` : ''}
     <div class="chip-row scroll">${chips.map(([k, l]) => `<button class="chip ${f === k ? 'on' : ''}" data-act="teamFilter" data-f="${k}">${esc(l)}</button>`).join('')}</div>
     <section class="card">
       ${list.length ? list.map((u) => {
@@ -279,8 +280,9 @@ Views.team = () => {
           <li>${icon('check')} The app locks itself after ${LOCK_AFTER_MIN} minutes without use.</li>
           <li>${icon('check')} Personal &amp; KYC details are visible to owners only.</li>
         </ul>
-        <p class="muted sm">Owner recovery code: ${S.recovery ? `created ${esc(fmtDate(S.recovery.createdAt, { day: 'numeric', month: 'short', year: 'numeric' }))}` : '<span class="neg">not created</span>'}</p>
-        <div class="btn-row">${btn(S.recovery ? 'New recovery code' : 'Create recovery code', 'recoveryNew', { cls: 'ghost sm', ic: 'lock' })}</div>
+        ${typeof Cloud !== 'undefined' && Cloud.on ? `<p class="muted sm">${icon('check')} Online: passwords are managed by Firebase Authentication and every read/write is checked by security rules on the server. Owners reset a forgotten password by email.</p>`
+        : `<p class="muted sm">Owner recovery code: ${S.recovery ? `created ${esc(fmtDate(S.recovery.createdAt, { day: 'numeric', month: 'short', year: 'numeric' }))}` : '<span class="neg">not created</span>'}</p>
+        <div class="btn-row">${btn(S.recovery ? 'New recovery code' : 'Create recovery code', 'recoveryNew', { cls: 'ghost sm', ic: 'lock' })}</div>`}
       </section>
     </div>`;
 };
