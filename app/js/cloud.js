@@ -376,8 +376,19 @@ Cloud.screen = () => {
     if (App.setup.step === 0) App.setup.step = 1;
     return Views.setup();
   }
+  if (!App.cloudView && !Cloud.cafeCode) return cloudWelcome(); // a device that was never used: choose sign up or log in
   return cloudLoginView();
 };
+function cloudWelcome() {
+  return `<main class="center-screen onboard"><div class="card onb">
+    <div class="brand-mark lg">${icon('cup')}</div>
+    <h1>Welcome to Cafe Journal</h1>
+    <p class="muted center">Orders, kitchen, billing, stock, staff and reports — one calm app for your café, restaurant or hotel.</p>
+    <button class="choice primary" data-act="goSignup">${icon('plus')}<span><b>Sign up — new café</b><small>Set up your place, menu, stock and staff step by step</small></span>${icon('right')}</button>
+    <button class="choice" data-act="goLogin">${icon('lock')}<span><b>Log in</b><small>Owner: your email · Staff: café code + Employee ID</small></span>${icon('right')}</button>
+    <p class="fine center">${icon('lock')} Your café's data is stored securely online.</p>
+  </div><p class="fine center version">Cafe Journal v${APP_VERSION}</p></main>`;
+}
 function cloudSheet(title, sub, body) { return `${sheetHead(title, sub)}${body}`; }
 function cloudWarnSheet(code, loginId, failed) {
   const left = LOCK_AFTER - failed;
@@ -527,7 +538,7 @@ function installOverrides() {
       App.setup.step = 1; render();
     },
     legacyFresh() { App.legacyChoice = 'fresh'; App.setup = { step: 1, mode: 'signup', d: newDraft() }; render(); },
-    setupBack(el) { if (App.setup.step <= 1 && App.setup.mode !== 'later') { App.cloudView = Cloud.legacy ? 'signup' : 'login'; App.setup.step = 0; App.legacyChoice = null; return render(); } origSetupBack(el); },
+    setupBack(el) { if (App.setup.step <= 1 && App.setup.mode !== 'later') { App.cloudView = Cloud.cafeCode ? 'login' : ''; App.setup.step = 0; App.legacyChoice = null; return render(); } origSetupBack(el); },
     changeCafe() { Cloud.cafeCode = ''; Cloud.cafeName = ''; try { localStorage.removeItem('cj.cafe'); localStorage.removeItem('cj.cafeName'); } catch (e) { /* ignore */ } render(); },
     monthNav(el) { origMonthNav(el); Cloud.ensureMonth(App.ui.month); },
     async forgotFromLogin() {
