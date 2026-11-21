@@ -121,6 +121,7 @@ const BAD_PASSWORD = ['auth/wrong-password', 'auth/invalid-credential', 'auth/in
 function writable(spec) { const r = Cloud.me && Cloud.me.active !== false ? Cloud.me.role : null; return !!r && spec.write.includes(r); }
 function readable(spec, r) { return spec.read.includes(r); }
 
+const chunkOf = (ops, i) => ops.slice(i, i + 400);
 async function pushNow() {
   if (!Cloud.cid || !Cloud.me) return;
   const ops = [];
@@ -158,9 +159,31 @@ async function pushNow() {
   }
   for (let i = 0; i < ops.length; i += 400) {
     const b = FB.writeBatch(Cloud.db);
-    ops.slice(i, i + 400).forEach(([op, ref, data]) => (op === 'set' ? b.set(ref, data) : op === 'update' ? b.update(ref, data) : b.delete(ref)));
-    try { await b.commit(); } catch (e) { console.warn('save failed', e); toast(`Couldn't save online — ${friendly(e)}`); }
+    chunkOf(ops, i).forEach(([op, ref, data]) => (op === 'set' ? b.set(ref, data) : op === 'update' ? b.update(ref, data) : b.delete(ref)));
+    const chunk = ops.slice(i, i + 400);
+    try { await b.commit(); } catch (e) {
+      console.warn('save failed', e);
+      toast(e.code === 'permission-denied' && chunk.some(([, ref]) => ref.path.includes('/kots/'))
+        ? 'Not changed — the kitchen has already started cooking it.' : `Couldn't save online — ${friendly(e)}`);
+      await reloadRecords(chunk); // put back what the server really has
+    }
   }
+}
+/** After a refused save, re-read those records so this screen matches the server again */
+async function reloadRecords(chunk) {
+  for (const [, ref] of chunk) {
+    try {
+      const seg = ref.path.split('/'); // cafes/{cid}/{coll}/{id}
+      if (seg.length < 4) continue;
+      const coll = seg[2], id = seg[3];
+      const spec = coll === 'meta' ? SPEC.find((s) => s.kind === 'doc' && s.path[1] === id) : SPEC.find((s) => s.coll === coll);
+      if (!spec) continue;
+      const snap = await FB.getDoc(ref);
+      if (spec.kind === 'doc') applySnap(spec, snap);
+      else applySnap(spec, { docChanges: () => [{ type: snap.exists() ? 'modified' : 'removed', doc: snap }] });
+    } catch (e) { /* ignore */ }
+  }
+  render();
 }
 let pushTimer = null;
 Cloud.push = () => { clearTimeout(pushTimer); pushTimer = setTimeout(pushNow, 120); };

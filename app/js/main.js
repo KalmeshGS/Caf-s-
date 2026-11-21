@@ -73,8 +73,9 @@ function render() {
 
   if (view === 'kitchen') {
     const n = S.kots.filter((k) => k.status === 'new').length;
-    if (App.lastNewKots !== null && n > App.lastNewKots) beep();
-    App.lastNewKots = n;
+    const ch = Math.max(0, ...S.kots.filter((k) => k.status === 'new').map((k) => k.changedAt || 0));
+    if (App.lastNewKots !== null && (n > App.lastNewKots || ch > (App.lastKotChange || 0))) beep();
+    App.lastNewKots = n; App.lastKotChange = ch;
   } else App.lastNewKots = null;
 
   root.innerHTML = shell(view, Views[view](params));
@@ -113,29 +114,60 @@ const Actions = {
       S.orders.push(o);
     }
     if (o.status !== 'open') return toast('This bill is already paid');
-    const l = o.items.find((x) => x.menuId === m.id);
-    if (l) l.qty += 1; else o.items.push({ id: uid('l'), menuId: m.id, name: m.name, price: m.price, qty: 1, sent: 0 });
+    // Same item without special instructions → just one more; items with instructions stay separate lines
+    const l = o.items.find((x) => x.menuId === m.id && !x.note);
+    if (l) l.qty += 1; else o.items.push({ id: uid('l'), menuId: m.id, name: m.name, price: m.price, qty: 1, sent: 0, note: '' });
     save();
   },
   incLine(el) { const r = line(el.dataset.id); if (r?.l) { r.l.qty += 1; save(); } },
   decLine(el) {
     const r = line(el.dataset.id); if (!r?.l) return;
-    if (r.l.qty <= r.l.sent && !confirm(`${r.l.name} was already sent to the kitchen. Remove one anyway?`)) return;
-    r.l.qty -= 1; r.l.sent = Math.min(r.l.sent, r.l.qty);
-    if (r.l.qty <= 0) r.o.items = r.o.items.filter((x) => x !== r.l);
-    if (!r.o.items.length && !S.kots.some((k) => k.orderId === r.o.id)) {
-      S.orders = S.orders.filter((x) => x !== r.o); persist(); return go('orders', r.o.table === 'Takeaway' ? {} : { t: r.o.table });
-    }
-    save();
+    const { o, l } = r, st = lineState(o, l);
+    if (l.qty <= st.locked) return toast(`${l.name}: the kitchen has started cooking it — it can't be changed now.`);
+    if (st.unsent > 0) l.qty -= 1; else { takeFromKitchen(o, l, 1); l.qty -= 1; }
+    finishLineChange(o, l);
+  },
+  removeLine(el) {
+    const r = line(el.dataset.id); if (!r?.l) return;
+    const { o, l } = r, st = lineState(o, l);
+    const removable = l.qty - st.locked;
+    if (!removable) return toast(`${l.name}: the kitchen has started cooking it — it can't be removed now.`);
+    if (!confirm(`Remove ${removable} × ${l.name}${st.locked ? ` (${st.locked} already cooking will stay)` : ''}?`)) return;
+    l.qty -= st.unsent; takeFromKitchen(o, l, st.queued); l.qty -= st.queued;
+    finishLineChange(o, l);
+  },
+  lineNote(el) {
+    const r = line(el.dataset.id); if (!r?.l) return;
+    const st = lineState(r.o, r.l);
+    if (st.locked) return toast(`${r.l.name} is already being cooked. To ask for something different, add the item again with new instructions.`);
+    openSheet(noteSheet(r.l));
+  },
+  noteChip(el) {
+    const i = $('#sheet input[name=note]'); if (!i) return;
+    const parts = i.value.split(',').map((x) => x.trim()).filter(Boolean);
+    const c = el.dataset.chip;
+    i.value = (parts.includes(c) ? parts.filter((x) => x !== c) : [...parts, c]).join(', ');
+    el.classList.toggle('on', !parts.includes(c));
   },
   sendKitchen() {
     const o = currentOrder(App.params); if (!o) return;
-    const items = o.items.filter((l) => l.qty > l.sent).map((l) => ({ name: l.name, qty: l.qty - l.sent }));
-    if (!items.length) return;
-    o.items.forEach((l) => { l.sent = l.qty; });
+    const lines = o.items.filter((l) => l.qty > l.sent);
+    if (!lines.length) return;
     const me = Session.user();
-    S.kots.push({ id: uid('k'), orderId: o.id, table: o.table, no: o.no, items, status: 'new', createdAt: Date.now(), updatedAt: Date.now(), byId: me?.id || o.byId || null, by: me?.name || '' });
-    persist(); toast(`Sent to kitchen ✓ ${orderLabel(o)}`);
+    const waiting = openKot(o);
+    if (waiting) {
+      // The kitchen hasn't started this order yet: add to the same ticket
+      lines.forEach((l) => {
+        const add = l.qty - l.sent;
+        const it = waiting.items.find((i) => i.lineId === l.id);
+        if (it) { it.qty += add; it.note = l.note || ''; } else waiting.items.push({ lineId: l.id, name: l.name, qty: add, note: l.note || '' });
+      });
+      kotTouch(waiting);
+    } else {
+      S.kots.push({ id: uid('k'), orderId: o.id, table: o.table, no: o.no, items: lines.map((l) => ({ lineId: l.id, name: l.name, qty: l.qty - l.sent, note: l.note || '' })), status: 'new', createdAt: Date.now(), updatedAt: Date.now(), byId: me?.id || o.byId || null, by: me?.name || '' });
+    }
+    o.items.forEach((l) => { l.sent = l.qty; });
+    persist(); toast(`${waiting ? 'Kitchen ticket updated' : 'Sent to kitchen'} ✓ ${orderLabel(o)}`);
     if (o.table === 'Takeaway') render(); else go('orders');
   },
   toBill(el) { go('billing', { o: el.dataset.id }); },
@@ -155,6 +187,7 @@ const Actions = {
   /* billing */
   selectBill(el) { go('billing', { o: el.dataset.id }); },
   closeBill() { go('billing'); },
+  noteClear() { const i = $('#sheet input[name=note]'); if (i) { i.value = ''; i.form.requestSubmit(); } },
   printBill(el) {
     const o = byId(S.orders, el.dataset.id); if (!o) return;
     const disc = num($('form.bill input[name=discount]')?.value);
@@ -245,9 +278,56 @@ const Actions = {
   },
 };
 
+/* ---------------- order lines vs kitchen tickets ---------------- */
+/** For one order line: not yet sent · waiting in the kitchen queue (can still change) · being cooked (locked) */
+function lineState(o, l) {
+  let queued = 0;
+  S.kots.forEach((k) => { if (k.orderId === o.id && k.status === 'new') k.items.forEach((i) => { if (i.lineId === l.id) queued += i.qty; }); });
+  return { unsent: Math.max(0, l.qty - l.sent), queued, locked: Math.max(0, l.sent - queued) };
+}
+const openKot = (o) => S.kots.find((k) => k.orderId === o.id && k.status === 'new');
+function kotTouch(k) { k.updatedAt = Date.now(); k.changedAt = Date.now(); }
+/** Take n of a line back out of tickets the kitchen hasn't started */
+function takeFromKitchen(o, l, n) {
+  for (const k of S.kots.filter((x) => x.orderId === o.id && x.status === 'new')) {
+    const it = k.items.find((i) => i.lineId === l.id); if (!it || n <= 0) continue;
+    const d = Math.min(n, it.qty); it.qty -= d; n -= d; l.sent -= d; kotTouch(k);
+    if (it.qty <= 0) k.items = k.items.filter((i) => i !== it);
+    if (!k.items.length) S.kots = S.kots.filter((x) => x !== k);
+  }
+}
+function finishLineChange(o, l) {
+  if (l.qty <= 0) o.items = o.items.filter((x) => x !== l);
+  if (!o.items.length && !S.kots.some((k) => k.orderId === o.id)) {
+    S.orders = S.orders.filter((x) => x !== o); persist(); return go('orders', o.table === 'Takeaway' ? {} : { t: o.table });
+  }
+  save();
+}
+const NOTE_CHIPS = ['Less spicy', 'Extra spicy', 'No onion', 'No garlic', 'Jain', 'Less oil', 'Less sugar', 'No sugar', 'Extra cheese', 'No ice', 'Parcel', 'Serve first'];
+function noteSheet(l) {
+  const parts = String(l.note || '').split(',').map((x) => x.trim());
+  return `${sheetHead('Cooking instructions', l.name)}
+  <form data-form="lineNote" class="form" autocomplete="off">
+    <input type="hidden" name="id" value="${l.id}">
+    <div class="chip-row">${NOTE_CHIPS.map((c) => `<button type="button" class="chip ${parts.includes(c) ? 'on' : ''}" data-act="noteChip" data-chip="${esc(c)}">${esc(c)}</button>`).join('')}</div>
+    <label class="field"><span>Instructions from the customer</span><input name="note" maxlength="120" value="${esc(l.note || '')}" placeholder="e.g. Less spicy, no onion, birthday candle"></label>
+    <p class="muted sm">Shown in bold on the kitchen ticket.${l.qty > 1 ? ` Applies to all ${l.qty}. For different instructions on one of them, add the item again.` : ''}</p>
+    <div class="form-actions">${l.note ? `<button type="button" class="btn ghost" data-act="noteClear">Clear</button>` : '<span></span>'}<button class="btn primary" type="submit">Save</button></div>
+  </form>`;
+}
+
 /* ---------------- forms (data-form) ---------------- */
 const num = (v) => (v === '' || v == null ? 0 : Number(v));
 const Forms = {
+  lineNote(fd) {
+    const r = line(fd.get('id')); if (!r?.l) return closeSheet();
+    const { o, l } = r, st = lineState(o, l);
+    if (st.locked) { closeSheet(); return toast('Already being cooked — instructions can\'t change now.'); }
+    l.note = String(fd.get('note') || '').trim();
+    S.kots.forEach((k) => { if (k.orderId === o.id && k.status === 'new') k.items.forEach((i) => { if (i.lineId === l.id && i.note !== l.note) { i.note = l.note; kotTouch(k); } }); });
+    // Merge back into an identical line if the note now matches one
+    closeSheet(); save();
+  },
   pay(fd) {
     const o = byId(S.orders, App.params.o); if (!o || o.status !== 'open') return;
     const t = orderTotals(o, num(fd.get('discount')));

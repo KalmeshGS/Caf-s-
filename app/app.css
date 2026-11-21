@@ -684,3 +684,16 @@ body.is-offline::after {
 .res-info a { color: var(--accent); }
 .nbadge.inline { display: inline-grid; margin-left: 4px; vertical-align: 1px; }
 a.tab { text-decoration: none; }
+
+/* ===== v3.6: editable orders & cooking instructions ===== */
+.tl-main { display: grid; gap: 3px; min-width: 0; }
+.tline small em { font-style: normal; font-weight: 600; margin-left: 4px; }
+.tline em.queued { color: #6366f1; }
+.tline em.lockd { color: var(--muted); display: inline-flex; align-items: center; gap: 3px; }
+.tline em.lockd .ic { width: 12px; height: 12px; }
+.tline.locked { opacity: .8; }
+.tnote, .knote { display: inline-block; font-weight: 700; font-size: 12.5px; color: var(--danger); background: color-mix(in srgb, var(--danger) 9%, transparent); padding: 2px 8px; border-radius: 6px; width: fit-content; }
+.knote { display: block; margin: 3px 0 2px 22px; font-size: 13.5px; }
+.tline .link-btn { justify-self: start; padding: 2px 0; }
+.tline .qty .icon-btn:disabled { opacity: .3; }
+.badge.changed { color: #fff; background: #6366f1; }
