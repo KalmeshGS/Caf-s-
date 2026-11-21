@@ -125,7 +125,7 @@ function emptyState() {
     seq: { day: '', n: 0, emp: 0 },
   };
 }
-const APP_VERSION = '3.0';
+const APP_VERSION = '3.1';
 const DEFAULT_PIN = '1234'; // only for accounts created by older versions; they must set a password
 
 /** Short code for employee IDs: "Kalmesh Kitchen" -> "KK", "KK" -> "KK", "Brewhouse" -> "BR" */

@@ -60,6 +60,7 @@ function render() {
   }
   const role = Session.role();
   if (!role) { root.innerHTML = Views.login(); return; }
+  if (App.setup.mode === 'later' && App.setup.step > 0 && role === 'owner') { root.innerHTML = Views.setup(); return; }
   let { view, params } = parseHash();
   const allowed = ROLES[role].views;
   if (!allowed.includes(view)) {
