@@ -36,7 +36,7 @@ Views.staff = () => {
   };
   return `${pageHead('Staff · today', 'Team & attendance', isOwner() ? btn('Add staff', 'staffAdd', { cls: 'primary', ic: 'plus' }) : '')}
   <div class="kpis two">${kpi('Present today', `${present} / ${active.length}`, fmtDate(new Date(), { weekday: 'long', day: 'numeric', month: 'short' }), 'pos')}
-    ${isOwner() ? kpi('Monthly salaries', money(sum(active, (p) => p.salary)), `${active.length} people`) : kpi('Team', String(active.length), 'active staff')}</div>
+    ${isOwner() ? kpi('Monthly salaries', money(sum(active, (p) => p.salary)), `${pl(active.length, 'person', 'people')}`) : kpi('Team', String(active.length), 'active staff')}</div>
   <section class="card">
     ${active.length ? active.map(row).join('') : empty('Add your team to keep their details, track attendance and print ID cards.', isOwner() ? btn('Add staff', 'staffAdd', { cls: 'ghost', ic: 'plus' }) : '')}
   </section>

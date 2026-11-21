@@ -106,6 +106,7 @@ Settings → Data → **Erase café data** (keeps your settings and logins), the
 - KYC, salary, address and date of birth are stored separately and **only owners** can read them.
 - A refresh keeps you logged in. **Owner, manager, cashier**: after 5 minutes without use the screen locks and only the **password** is asked (4 wrong → account locked). **Waiter & kitchen** stay logged in; screens refresh every 15 seconds.
 - **Food ready alerts**: when the kitchen marks an order *Ready*, the person who took it gets a sound, vibration and (if allowed) a phone notification, plus a *Ready to serve* list on Orders.
+- **Tables**: Free / Running is automatic from orders; staff can also mark a table *Needs cleaning*, *Reserved* or *Out of service* (⋯ on the table). **Reservations** tab: guest, phone, date, time, guests, table; *Arrived* opens that table for ordering.
 - **Billing**: *Print bill* before payment, or *Paid & print* to print the receipt.
 
 ## About your data

@@ -89,6 +89,8 @@ service cloud.firestore {
       match /staffPrivate/{id} { allow read, write: if owner(cid); }   // salary, KYC, address, DOB…
       match /attendance/{day} { allow read: if can(cid, ['owner', 'manager', 'cashier']); allow write: if can(cid, ['owner', 'manager']); }
       match /journal/{day}   { allow read, write: if can(cid, ['owner', 'manager', 'cashier']); }
+      match /tables/{table}  { allow read: if ok(cid); allow write: if can(cid, ['owner', 'manager', 'cashier', 'waiter']); }
+      match /reservations/{id} { allow read, write: if can(cid, ['owner', 'manager', 'cashier', 'waiter']); }
     }
 
     // Which café an owner belongs to (so owners can log in with just email + password)

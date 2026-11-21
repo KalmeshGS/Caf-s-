@@ -655,3 +655,32 @@ body.is-offline::after {
 .ready-row small { color: var(--muted); }
 .banner .btn { margin-left: auto; }
 .bill .row-2 { margin-top: 8px; }
+
+/* ===== v3.3: table status & reservations ===== */
+.table-tile { padding: 0; }
+.tt-main { all: unset; box-sizing: border-box; display: grid; gap: 2px; align-content: start; width: 100%; min-height: 96px; padding: 14px; padding-right: 34px; cursor: pointer; border-radius: var(--r); }
+.tt-main:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.tt-more { position: absolute; top: 6px; right: 6px; width: 30px; height: 30px; border-radius: 8px; border: 0; background: transparent; color: var(--muted); display: grid; place-items: center; }
+.tt-more:hover { background: var(--surface-2); color: var(--ink); }
+.table-tile .dot { top: auto; bottom: 12px; }
+.st-label { font-style: normal; font-weight: 600; font-size: 12.5px; display: inline-flex; gap: 4px; align-items: center; }
+.st-label .ic { width: 13px; height: 13px; }
+.table-tile.st-cleaning { border: 1px solid color-mix(in srgb, var(--amber) 55%, var(--line)); background: color-mix(in srgb, var(--amber) 9%, var(--surface)); }
+.table-tile.st-cleaning .st-label { color: var(--amber); }
+.table-tile.st-reserved { border: 1px solid color-mix(in srgb, #6366f1 55%, var(--line)); background: color-mix(in srgb, #6366f1 9%, var(--surface)); }
+.table-tile.st-reserved .st-label { color: #6366f1; }
+.table-tile.st-blocked { border: 1px dashed var(--muted); background: var(--surface-2); opacity: .75; }
+.res-line { display: flex; gap: 4px; align-items: center; color: #6366f1 !important; font-weight: 600; margin-top: 2px; }
+.res-line .ic { width: 12px; height: 12px; }
+.state-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.state-btn { display: flex; gap: 8px; align-items: center; padding: 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); font-weight: 600; text-align: left; }
+.state-btn.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.res-row { display: grid; grid-template-columns: 74px 1fr auto; gap: 12px; align-items: center; padding: 10px 0; }
+.res-row + .res-row { border-top: 1px dashed var(--line); }
+.res-row.done { opacity: .6; }
+.res-time b { display: block; font-size: 15px; }
+.res-time small, .res-info small { color: var(--muted); font-size: 12.5px; }
+.res-info strong { display: block; }
+.res-info a { color: var(--accent); }
+.nbadge.inline { display: inline-grid; margin-left: 4px; vertical-align: 1px; }
+a.tab { text-decoration: none; }
