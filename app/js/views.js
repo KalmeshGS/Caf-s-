@@ -34,7 +34,7 @@ Views.dashboard = () => {
   return `${pageHead(Session.role() === 'owner' ? 'Owner dashboard' : 'Dashboard', `Today · ${fmtDate(new Date(), { weekday: 'short', day: 'numeric', month: 'short' })}`, live())}
   ${requestsCard()}
   <div class="kpis">
-    ${kpi("Today's sales", money(sales), `${paid.length} bills${diff !== null && sales ? ` · ${diff >= 0 ? '+' : ''}${diff}% vs yesterday` : ''}`)}
+    ${kpi("Today's sales", money(sales), `${pl(paid.length, 'bill')}${diff !== null && sales ? ` · ${diff >= 0 ? '+' : ''}${diff}% vs yesterday` : ''}`)}
     ${kpi("Today's expenses", money(exp), `${expensesOn(today).length} ${expensesOn(today).length === 1 ? 'entry' : 'entries'}`, 'neg')}
     ${kpi("Today's profit", money(profit), 'Sales − expenses', profit >= 0 ? 'pos' : 'neg')}
     ${kpi('Running tables', String(open.length), open.length ? money(sum(open, orderSubtotal)) + ' on tables' : 'All clear')}
@@ -67,7 +67,6 @@ function currentOrder(p) {
   if (p.t) return S.orders.find((o) => o.status === 'open' && o.table === p.t);
   return null;
 }
-Views.orders = (p) => (p.t || p.o ? orderEditor(p) : tablesView());
 
 /** Tickets the kitchen marked ready: a waiter sees their own, others see all */
 function readyCard() {
@@ -82,24 +81,6 @@ function readyCard() {
       ${btn('Served', 'kotNext', { cls: 'primary sm', ic: 'check', data: `data-id="${k.id}"` })}</div>`).join('')}
     ${alertsOff ? `<div class="btn-row">${btn('Turn on alerts', 'enableAlerts', { cls: 'ghost sm', ic: 'alert' })}</div>` : ''}
   </section>`;
-}
-function tablesView() {
-  const open = openOrders();
-  const tables = tableNames().map((t) => {
-    const o = open.find((x) => x.table === t);
-    const pending = o && o.items.some((l) => l.qty > l.sent);
-    return `<button class="table-tile ${o ? 'busy' : ''}" data-act="openTable" data-t="${t}">
-      <strong>${esc(t)}</strong>
-      ${o ? `<span>${money(orderSubtotal(o))}</span><small>${sum(o.items, (l) => l.qty)} items · ${elapsedMin(o.createdAt)}</small>${pending ? '<i class="dot" title="Not sent to kitchen"></i>' : ''}`
-          : '<small>Free</small>'}
-    </button>`;
-  }).join('');
-  const takeaways = open.filter((o) => o.table === 'Takeaway');
-  return `${pageHead('Orders', 'Tables', btn('New takeaway', 'newTakeaway', { cls: 'primary', ic: 'plus' }))}
-    ${readyCard()}
-    ${tableNames().length ? `<div class="table-grid">${tables}</div>` : empty('No tables set. Add tables in Settings, or use takeaway orders.')}
-    ${takeaways.length ? `<h3 class="section-t">Takeaway</h3><div class="table-grid">${takeaways.map((o) => `
-      <button class="table-tile busy" data-act="openOrder" data-id="${o.id}"><strong>#${o.no}</strong><span>${money(orderSubtotal(o))}</span><small>${sum(o.items, (l) => l.qty)} items · ${elapsedMin(o.createdAt)}</small></button>`).join('')}</div>` : ''}`;
 }
 const elapsedMin = (ts) => { const m = Math.max(0, Math.round((Date.now() - ts) / 60000)); return m < 60 ? `${m} min` : `${Math.floor(m / 60)}h ${m % 60}m`; };
 
@@ -131,7 +112,7 @@ function orderEditor(p) {
     </section>
     <aside class="card ticket">
       ${eyebrow(o ? `Order #${o.no} · ${fmtTime(o.createdAt)}` : 'New order')}
-      <h2>${esc(label === 'Takeaway' ? 'Takeaway' : label.startsWith('T') ? 'Table ' + label.slice(1) : label)}</h2>
+      <h2>${esc(o && o.table === 'Takeaway' ? `Takeaway #${o.no}` : /^T\d+$/.test(label) ? 'Table ' + label.slice(1) : label)}</h2>
       <div class="ticket-lines">
       ${lines.length ? lines.map((l) => `<div class="tline">
           <div><strong>${esc(l.name)}</strong><small>${money(l.price)} × ${l.qty}${l.qty > l.sent ? ` <em class="new">+${l.qty - l.sent} new</em>` : ''}</small></div>
@@ -145,7 +126,7 @@ function orderEditor(p) {
       </div>
     </aside>
   </div>
-  <div class="mobile-bar"><span>${sum(lines, (l) => l.qty)} items · <b>${money(sub)}</b></span>
+  <div class="mobile-bar"><span>${pl(sum(lines, (l) => l.qty), 'item')} · <b>${money(sub)}</b></span>
     <button class="btn primary" data-act="sendKitchen" ${unsent ? '' : 'disabled'}>${unsent ? `Send (${unsent})` : 'Sent'}</button></div>`;
 }
 
@@ -201,7 +182,7 @@ Views.billing = (p) => {
   }
 
   const openList = open.length ? open.map((o) => `<button class="list-btn ${sel && sel.id === o.id ? 'on' : ''}" data-act="selectBill" data-id="${o.id}">
-      <span><strong>${esc(orderLabel(o))}</strong><small>#${o.no} · ${sum(o.items, (l) => l.qty)} items · ${elapsedMin(o.createdAt)}</small></span><b>${money(orderTotals(o).total)}</b></button>`).join('')
+      <span><strong>${esc(orderLabel(o))}</strong><small>#${o.no} · ${pl(sum(o.items, (l) => l.qty), 'item')} · ${elapsedMin(o.createdAt)}</small></span><b>${money(orderTotals(o).total)}</b></button>`).join('')
     : empty('No open bills. Orders from tables show up here.');
 
   const closing = S.journal[today]?.closing;
@@ -215,7 +196,7 @@ Views.billing = (p) => {
       <section class="card">
         <div class="card-head">${eyebrow(`Day closing · ${fmtDate(new Date())}`)}<b>${money(total)}</b></div>
         ${Object.entries(pm).map(([k, m]) => `<div class="meter-row"><span>${esc(m.label)}</span>${meter(total ? (bm[k] / total) * 100 : 0, m.color)}<b>${money(bm[k])}</b></div>`).join('')}
-        <p class="muted sm">${paid.length} bills paid today${closing ? ` · closed at ${fmtTime(closing.at)}` : ''}</p>
+        <p class="muted sm">${pl(paid.length, 'bill')} paid today${closing ? ` · closed at ${fmtTime(closing.at)}` : ''}</p>
         ${btn(closing ? 'Update day closing' : 'Close day & save to journal', 'closeDay', { cls: 'ghost block', ic: 'book' })}
       </section>
       <section class="card">${eyebrow('Paid today')}
@@ -307,7 +288,7 @@ function expenseForm() {
 Views.vendors = () => {
   const total = sum(S.vendors, (v) => v.due);
   return `${pageHead('Vendors', 'What you owe', btn('Vendor', 'vendorAdd', { cls: 'primary', ic: 'plus' }))}
-  <div class="kpis two">${kpi('Total due', money(total), `${S.vendors.filter((v) => v.due > 0).length} vendors pending`, total ? 'neg' : 'pos')}
+  <div class="kpis two">${kpi('Total due', money(total), `${pl(S.vendors.filter((v) => v.due > 0).length, 'vendor')} pending`, total ? 'neg' : 'pos')}
     ${kpi('Paid this month', money(sum(S.vendorTx.filter((t) => t.type === 'payment' && t.date.startsWith(monthKey())), (t) => t.amount)), 'All vendors')}</div>
   <section class="card">
     ${S.vendors.length ? S.vendors.map((v) => `<button class="list-btn" data-act="vendorOpen" data-id="${v.id}">
@@ -361,7 +342,7 @@ Views.reports = () => {
   return `${pageHead(`Report · ${monthLabel(mk)}`, 'Month at a glance', `<button class="btn ghost" data-act="exportCsv">${icon('download')}<span>CSV</span></button>`)}
   ${monthNav(mk)}
   <div class="kpis">
-    ${kpi('Sales', money(sales), `${paid.length} bills`)}
+    ${kpi('Sales', money(sales), `${pl(paid.length, 'bill')}`)}
     ${kpi('Expenses', money(spend), `${exps.length} ${exps.length === 1 ? 'entry' : 'entries'}`, 'neg')}
     ${kpi('Avg. bill', money(paid.length ? sales / paid.length : 0), daily.some(Boolean) ? `Best day: ${best + 1} ${fmtDate(d, { month: 'short' })}` : '')}
     <div class="kpi card profit"><p class="eyebrow">Real profit · ${esc(fmtDate(d, { month: 'long' }))}</p><p class="kpi-v">${money(profit)}</p><p class="kpi-s">${sales ? Math.round((profit / sales) * 100) + '% margin' : '—'}</p></div>
@@ -452,7 +433,7 @@ Views.settings = () => {
     </form>`;
   } else if (tab === 'menu') {
     const cats = [...new Set(S.menu.map((m) => m.cat))];
-    body = `<div class="card-head">${eyebrow(`${S.menu.length} items · ${cats.length} categories`)}${btn('Menu item', 'menuAdd', { cls: 'primary', ic: 'plus' })}</div>
+    body = `<div class="card-head">${eyebrow(`${pl(S.menu.length, 'item')} · ${pl(cats.length, 'category', 'categories')}`)}${btn('Menu item', 'menuAdd', { cls: 'primary', ic: 'plus' })}</div>
       ${cats.map((c) => `<section class="card">${eyebrow(c)}${S.menu.filter((m) => m.cat === c).map((m) => `<div class="menu-row ${m.available === false ? 'off' : ''}">
         <span>${esc(m.name)}</span><b>${money(m.price)}</b>
         <label class="switch" title="Available"><input type="checkbox" data-act="menuToggle" data-id="${m.id}" ${m.available !== false ? 'checked' : ''}><i></i></label>
@@ -462,6 +443,10 @@ Views.settings = () => {
     if (typeof Cloud !== 'undefined' && Cloud.on) {
       body = `<section class="card">${eyebrow('Online database')}<p>${icon('check')} Connected. All data is stored securely online and synced live to every device. Nothing is kept on this device.</p>
         <div class="line-row"><span>Café code (for staff logins)</span><b class="emp-id lg">${esc(Cloud.cid.toUpperCase())}</b></div></section>
+      <section class="card ${Cloud.rulesOutdated ? 'req-card' : ''}">${eyebrow('Database rules')}
+        <p>${Cloud.rulesOutdated ? `${icon('alert')} <b>Update needed</b> — table status and reservations are switched off until the new rules are published.` : `${icon('check')} Up to date.`}</p>
+        <p class="muted sm">When the app gets new features, the security rules in Firebase sometimes need updating. Tap the button: the new rules are copied and the Firebase Rules page opens. There, select everything, paste, and click <b>Publish</b>.</p>
+        <div class="btn-row">${btn('Update database rules', 'copyRules', { cls: Cloud.rulesOutdated ? 'primary' : 'ghost', ic: 'lock' })}</div></section>
       <section class="card">${eyebrow('Backup')}<p class="muted">Download an encrypted copy of everything, to keep for your records.</p><div class="btn-row">${btn('Download backup', 'exportData', { cls: 'primary', ic: 'download' })}</div></section>
       ${setupCards()}`;
     } else

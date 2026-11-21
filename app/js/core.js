@@ -21,6 +21,8 @@ const shiftMonth = (k, n) => { const d = keyToDate(k); return monthKey(new Date(
 const fmtDate = (d, o = { day: 'numeric', month: 'short' }) => new Date(d).toLocaleDateString(undefined, o);
 const fmtTime = (d) => new Date(d).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 const monthLabel = (mk) => keyToDate(mk).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+/** "1 bill", "2 bills" */
+const pl = (n, one, many = one + 's') => `${n} ${n === 1 ? one : many}`;
 const initials = (name) => String(name || '?').trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase();
 function elapsed(ts) {
   const s = Math.max(0, Math.floor((Date.now() - ts) / 1000));
@@ -120,12 +122,12 @@ function emptyState() {
     v: 1,
     settings: null,
     menu: [], orders: [], kots: [], stock: [], expenses: [],
-    vendors: [], vendorTx: [], staff: [], attendance: {}, journal: {},
+    vendors: [], vendorTx: [], staff: [], attendance: {}, journal: {}, tableState: {}, reservations: [],
     users: [], requests: [], recovery: null,
     seq: { day: '', n: 0, emp: 0 },
   };
 }
-const APP_VERSION = '3.2';
+const APP_VERSION = '3.3';
 const DEFAULT_PIN = '1234'; // only for accounts created by older versions; they must set a password
 
 /** Short code for employee IDs: "Kalmesh Kitchen" -> "KK", "KK" -> "KK", "Brewhouse" -> "BR" */

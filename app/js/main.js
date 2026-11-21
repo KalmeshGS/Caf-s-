@@ -94,7 +94,12 @@ const Actions = {
   /* orders */
   openTable(el) { go('orders', { t: el.dataset.t }); },
   openOrder(el) { go('orders', { o: el.dataset.id }); },
-  toTables() { go('orders'); },
+  toTables() {
+    // Leaving a takeaway that never got any items: throw the empty order away
+    const o = currentOrder(App.params);
+    if (o && o.table === 'Takeaway' && o.status === 'open' && !o.items.length && !S.kots.some((k) => k.orderId === o.id)) { S.orders = S.orders.filter((x) => x !== o); persist(); }
+    go('orders');
+  },
   newTakeaway() {
     const o = { id: uid('o'), no: nextBillNo(), table: 'Takeaway', items: [], status: 'open', createdAt: Date.now(), by: Session.user()?.name || Session.role(), byId: Session.user()?.id || null };
     S.orders.push(o); persist(); go('orders', { o: o.id });

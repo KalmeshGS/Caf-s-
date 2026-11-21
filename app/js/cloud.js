@@ -40,7 +40,10 @@ const SPEC = [
   { key: 'attendance', kind: 'map', coll: 'attendance', read: ['owner', 'manager', 'cashier'], write: ['owner', 'manager'], days: WINDOW_DAYS },
   { key: 'journal', kind: 'map', coll: 'journal', read: ['owner', 'manager', 'cashier'], write: ['owner', 'manager', 'cashier'], days: WINDOW_DAYS },
   { key: 'requests', kind: 'items', coll: 'requests', read: ['owner'], write: ['owner'], where: ['status', '==', 'open'] },
+  { key: 'tableState', kind: 'map', coll: 'tables', read: ALL_ROLES, write: ['owner', 'manager', 'cashier', 'waiter'] },
+  { key: 'reservations', kind: 'items', coll: 'reservations', read: ['owner', 'manager', 'cashier', 'waiter'], write: ['owner', 'manager', 'cashier', 'waiter'], since: { field: 'date', days: 7 } },
 ];
+const NEW_RULE_KEYS = ['tableState', 'reservations']; // need the v3.3 security rules
 
 /* ---------------- small helpers ---------------- */
 function canon(v) { // JSON with sorted keys, so the same data always gives the same text
@@ -110,6 +113,7 @@ async function pushNow() {
   const ops = [];
   for (const spec of SPEC) {
     if (!writable(spec)) continue;
+    if (Cloud.rulesOutdated && NEW_RULE_KEYS.includes(spec.key)) continue; // would make the whole save fail
     const m = Cloud.mirror[spec.key] || (Cloud.mirror[spec.key] = spec.kind === 'doc' ? { v: null } : new Map());
     if (spec.kind === 'doc') {
       const val = S[spec.key];
@@ -197,11 +201,13 @@ function specQuery(spec) {
   }
   return col;
 }
-function listen(q, onData) {
+function listen(q, onData, key) {
   return new Promise((resolve) => {
     let first = true;
     const un = FB.onSnapshot(q, (snap) => { onData(snap); if (first) { first = false; resolve(); } else Cloud.changed(); },
-      (err) => { console.warn('listener', err); if (first) { first = false; resolve(); } else if (err.code === 'permission-denied') Cloud.signOut('Your access has changed — please log in again.'); });
+      (err) => {
+        if (NEW_RULE_KEYS.includes(key) && err.code === 'permission-denied') { Cloud.rulesOutdated = true; if (first) { first = false; resolve(); } return; }
+        console.warn('listener', err); if (first) { first = false; resolve(); } else if (err.code === 'permission-denied') Cloud.signOut('Your access has changed — please log in again.'); });
     Cloud.unsubs.push(un);
   });
 }
@@ -244,13 +250,14 @@ async function attach(cid, user, restoring) {
   Cloud.me = { ...m, id: user.uid, hash: 'online' };
   if (!restoring || Session._id !== user.uid) Session.set(user.uid); // fresh login; a refresh keeps the lock state
   App.kotSeen = null;
+  Cloud.rulesOutdated = false;
   S = emptyState(); Cloud.mirror = {}; Cloud.privateCache = {}; Cloud.members = {}; Cloud.logins = {}; Cloud.loadedMonths = new Set();
   const role = m.role;
   const jobs = [];
   for (const spec of SPEC) {
     if (!readable(spec, role)) continue;
     if (spec.private && spec.private.roles.includes(role)) jobs.push(listen(ccol(spec.private.coll), (snap) => applyPrivate(spec, snap)));
-    jobs.push(listen(specQuery(spec), (snap) => applySnap(spec, snap)));
+    jobs.push(listen(specQuery(spec), (snap) => applySnap(spec, snap), spec.key));
   }
   if (role === 'owner') {
     jobs.push(listen(ccol('members'), (snap) => { snap.docChanges().forEach((ch) => { if (ch.type === 'removed') delete Cloud.members[ch.doc.id]; else Cloud.members[ch.doc.id] = ch.doc.data(); }); rebuildUsers(); }));
@@ -341,7 +348,7 @@ function cloudLegacyIntro() {
     <div class="brand-mark lg">${icon('upload')}</div>
     <h1>Move ${esc(st.name)} online</h1>
     <p class="muted center">Cafe Journal now keeps your data in a secure online database, so every phone and computer sees the same orders, staff and reports.</p>
-    <div class="banner info">${icon('box')}<span>We found <b>${esc(st.name)}</b> saved on this device from before: ${S.menu.length || Cloud.legacy.menu.length} menu items, ${Cloud.legacy.staff.length} staff, ${Cloud.legacy.orders.length} bills. Sign up once and it will all be moved online, then removed from this device.</span></div>
+    <div class="banner info">${icon('box')}<span>We found <b>${esc(st.name)}</b> saved on this device from before: ${pl(Cloud.legacy.menu.length, 'menu item')}, ${pl(Cloud.legacy.staff.length, 'staff member', 'staff')}, ${pl(Cloud.legacy.orders.length, 'bill')}. Sign up once and it will all be moved online, then removed from this device.</span></div>
     <button class="choice primary" data-act="legacyMove">${icon('upload')}<span><b>Move my café online</b><small>Create the owner account — 3 quick steps</small></span>${icon('right')}</button>
     <button class="choice" data-act="legacyFresh">${icon('plus')}<span><b>Start a new café instead</b><small>The old data stays on this device until you sign up</small></span>${icon('right')}</button>
     <button class="choice" data-act="goLogin">${icon('lock')}<span><b>Log in</b><small>My café is already online</small></span>${icon('right')}</button>
@@ -551,6 +558,15 @@ function installOverrides() {
     },
     async recoveryNew() { toast('Online accounts use email password reset — no recovery code needed.'); },
     exportData() { openSheet(backupSheet()); },
+    async copyRules() {
+      try {
+        const txt = await (await fetch('../firestore.rules', { cache: 'no-store' })).text();
+        if (!txt.includes('service cloud.firestore')) throw new Error('not found');
+        await navigator.clipboard.writeText(txt);
+        toast('New rules copied');
+      } catch (e) { return toast('Could not copy automatically — open firestore.rules in the GitHub repo and copy it.'); }
+      window.open(`https://console.firebase.google.com/project/${encodeURIComponent(window.FIREBASE_CONFIG.projectId)}/firestore/rules`, '_blank', 'noopener');
+    },
   });
 
   Object.assign(Forms, {
