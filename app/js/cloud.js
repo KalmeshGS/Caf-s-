@@ -86,8 +86,21 @@ const BAD_PASSWORD = ['auth/wrong-password', 'auth/invalid-credential', 'auth/in
     FB.connectAuthEmulator(Cloud.auth, 'http://127.0.0.1:9099', { disableWarnings: true });
     FB.connectFirestoreEmulator(Cloud.db, '127.0.0.1', 8080);
   }
-  // Data saved on this device by the older offline version: offer to move it online
-  if (S.settings) Cloud.legacy = S;
+  // Fresh start: online mode never uses data saved on the device by the old offline version.
+  // When DATA_EPOCH changes (e.g. after the online database was reset), every device also
+  // forgets its remembered café code, café name and sign-in once.
+  const DATA_EPOCH = '2026-11-21-fresh';
+  let freshDevice = false;
+  try {
+    localStorage.removeItem(DB_KEY);
+    if (localStorage.getItem('cj.epoch') !== DATA_EPOCH) {
+      ['cafe-journal.session', 'cj.cafe', 'cj.cafeName', 'cj.session'].forEach((k) => localStorage.removeItem(k));
+      localStorage.setItem('cj.epoch', DATA_EPOCH);
+      freshDevice = true;
+    }
+  } catch (e) { /* ignore */ }
+  if (freshDevice) Object.assign(Session, { _id: null, locked: false, fails: 0 });
+  Cloud.legacy = null;
   S = emptyState();
   try { Cloud.cafeCode = localStorage.getItem('cj.cafe') || ''; Cloud.cafeName = localStorage.getItem('cj.cafeName') || ''; } catch (e) { /* ignore */ }
   installOverrides();
