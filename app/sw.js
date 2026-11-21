@@ -1,5 +1,5 @@
 /* Cafe Journal service worker — makes the app work offline */
-const CACHE = 'cafe-journal-v3';
+const CACHE = 'cafe-journal-v4';
 const ASSETS = ['./', 'index.html', 'app.css', 'js/core.js', 'js/data.js', 'js/views.js', 'js/main.js', 'js/auth.js',
   'manifest.webmanifest', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/maskable-512.png'];
 

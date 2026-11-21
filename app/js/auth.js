@@ -6,6 +6,7 @@
    - Forgot PIN → a one-time code (OTP) appears on the Owner dashboard,
      and the owner can send it to the person's phone by SMS / WhatsApp
    - Owners recover with a recovery code shown when they first set their PIN
+   - Login page: type your name or phone + PIN (no list of people is shown)
    ========================================================= */
 
 App.fails = {}; // wrong-PIN counters, in memory only
@@ -36,37 +37,36 @@ function randomRecovery() {
 }
 const pinOk = (p) => /^[0-9]{4}$/.test(p);
 
-/* ---------------- Login screen ---------------- */
+/* ---------------- Login screen (classic: name/phone + PIN) ---------------- */
 Views.login = () => {
   const st = S.settings;
-  const people = activeUsers().sort((a, b) => ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role) || a.name.localeCompare(b.name));
-  const cards = people.map((u) => {
-    const r = ROLES[u.role];
-    return `<button class="role-card card" data-act="pickUser" data-id="${u.id}">
-      <span class="avatar" style="background:${r.color}">${esc(initials(u.name))}</span>
-      <strong>${esc(u.name)}</strong><small>${esc(r.label)}</small>
-      ${u.mustChange ? `<span class="role-lock">${icon('lock')} First login — set your PIN</span>` : ''}
-    </button>`;
-  }).join('');
+  const ownerFirst = activeOwners().some((u) => u.mustChange);
   return `<main class="center-screen">
-    <div class="login">
+    <form class="card login-card" data-form="login" autocomplete="off" novalidate>
       <div class="brand-mark lg">${esc(initials(st.name))}</div>
       <h1>${esc(st.name)}</h1>
-      ${st.tagline ? `<p class="muted">${esc(st.tagline)}</p>` : ''}
-      <p class="eyebrow center">Who's working?</p>
-      <div class="role-grid">${cards}</div>
-      <p class="fine">Tap your name and enter your PIN. New here? Your starting PIN is given by the owner — you'll choose your own the first time.</p>
-    </div></main>`;
+      ${st.tagline ? `<p class="muted center">${esc(st.tagline)}</p>` : ''}
+      <p class="eyebrow center">Log in</p>
+      <label class="field"><span>Your name or phone number</span>
+        <input name="who" autocomplete="username" autocapitalize="words" required autofocus placeholder="e.g. Priya or 98765 43210" value="${esc(App.loginWho || '')}"></label>
+      <label class="field"><span>PIN</span>
+        <input name="pin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="current-password" required placeholder="••••" class="pin-input"></label>
+      <p class="neg sm" id="form-err" role="alert"></p>
+      <button class="btn primary block" type="submit">${icon('lock')}<span>Log in</span></button>
+      <button class="btn ghost block" type="button" data-act="forgotFromLogin">Forgot PIN?</button>
+      ${ownerFirst ? `<p class="fine center">First time? Type <b>${esc(activeOwners().find((u) => u.mustChange).name)}</b> and the starting PIN <b>${esc(DEFAULT_PIN)}</b> — you'll set your own PIN right after.</p>`
+        : '<p class="fine center">New here? Use the name and starting PIN the owner gave you.</p>'}
+    </form></main>`;
 };
 
-function pinPadSheet(u, msg = '') {
-  const fail = App.fails[u.id];
-  const locked = fail && fail.until > Date.now();
-  return `${sheetHead(ROLES[u.role].label, u.name)}
-    <div class="pin-dots" id="pin-dots">${'<i></i>'.repeat(4)}</div>
-    <p class="pin-msg ${msg || locked ? 'neg' : 'muted'}" id="pin-msg">${esc(locked ? `Too many wrong tries. Wait ${Math.ceil((fail.until - Date.now()) / 1000)} seconds.` : msg || 'Enter your 4-digit PIN')}</p>
-    <div class="keypad">${[1, 2, 3, 4, 5, 6, 7, 8, 9, '', 0, '⌫'].map((k) => (k === '' ? '<span></span>' : `<button class="key" data-act="pinKey" data-k="${k}">${k}</button>`)).join('')}</div>
-    <button class="btn ghost block" data-act="forgotPin">Forgot PIN?</button>`;
+/** Find an active person by name (any case) or phone number (last 10 digits) */
+function findLogin(who) {
+  const w = String(who || '').trim().toLowerCase();
+  if (!w) return null;
+  const d = digits(w);
+  return activeUsers().find((u) => u.name.trim().toLowerCase() === w)
+    || (d.length >= 6 ? activeUsers().find((u) => digits(u.phone) && digits(u.phone).slice(-10) === d.slice(-10)) : null)
+    || null;
 }
 
 function changePinSheet(u, mode) {
@@ -203,7 +203,7 @@ function personForm(u = {}, role = 'manager') {
 }
 
 /* ---------------- helpers ---------------- */
-function formError(msg) { const e = $('#form-err'); if (e) e.textContent = msg; else toast(msg); }
+function formError(msg) { const e = ($('#sheet').hidden ? null : $('#sheet #form-err')) || $('#form-err'); if (e) e.textContent = msg; else toast(msg); }
 function newPinError(pin, pin2, u) {
   if (!pinOk(pin)) return 'PIN must be exactly 4 digits.';
   if (pin !== pin2) return "The two PINs don't match.";
@@ -232,31 +232,12 @@ function finishPinSet(u) {
 
 /* ---------------- actions ---------------- */
 Object.assign(Actions, {
-  pickUser(el) {
-    const u = userById(el.dataset.id); if (!u) return;
-    App.pin = ''; App.pinUser = u.id;
-    openSheet(pinPadSheet(u));
-  },
-  pinKey(el) {
-    const u = userById(App.pinUser); if (!u || !$('#pin-dots')) return;
-    const fail = App.fails[u.id];
-    if (fail && fail.until > Date.now()) { $('#pin-msg').textContent = `Too many wrong tries. Wait ${Math.ceil((fail.until - Date.now()) / 1000)} seconds.`; return; }
-    const k = el.dataset.k;
-    App.pin = k === '⌫' ? App.pin.slice(0, -1) : (App.pin + k).slice(0, 4);
-    $$('#pin-dots i').forEach((d, i) => d.classList.toggle('on', i < App.pin.length));
-    if (App.pin.length < 4) return;
-    if (App.pin === u.pin) {
-      delete App.fails[u.id];
-      if (u.mustChange) openSheet(changePinSheet(u, 'first'));
-      else loginAs(u);
-      return;
-    }
-    const f = App.fails[u.id] = { n: (fail?.n || 0) + 1, until: 0 };
-    if (f.n >= MAX_TRIES) { f.until = Date.now() + 30000; f.n = 0; }
-    const dots = $('#pin-dots'); dots.classList.add('shake');
-    $('#pin-msg').textContent = f.until ? 'Too many wrong tries. Wait 30 seconds.' : `Wrong PIN — ${MAX_TRIES - f.n} tries left`;
-    $('#pin-msg').className = 'pin-msg neg';
-    setTimeout(() => { dots.classList.remove('shake'); App.pin = ''; $$('#pin-dots i').forEach((d) => d.classList.remove('on')); }, 450);
+  forgotFromLogin() {
+    const who = $('form[data-form=login] input[name=who]')?.value || '';
+    const u = findLogin(who);
+    if (!who.trim()) return formError('Type your name or phone number first, then tap Forgot PIN.');
+    if (!u) return formError("We couldn't find that name or phone number. Ask the owner to add you.");
+    App.loginWho = who; App.pinUser = u.id; Actions.forgotPin();
   },
   forgotPin() {
     const u = userById(App.pinUser); if (!u) return;
@@ -306,6 +287,25 @@ function createOtp(u) {
 
 /* ---------------- forms ---------------- */
 Object.assign(Forms, {
+  login(fd, form) {
+    const who = (fd.get('who') || '').trim(), pin = fd.get('pin') || '';
+    App.loginWho = who;
+    const key = who.toLowerCase();
+    const fail = App.fails[key];
+    if (fail && fail.until > Date.now()) return formError(`Too many wrong tries. Wait ${Math.ceil((fail.until - Date.now()) / 1000)} seconds.`);
+    if (!who || !pin) return formError('Enter your name (or phone) and your PIN.');
+    const u = findLogin(who);
+    if (u && pin === u.pin) {
+      delete App.fails[key]; App.loginWho = '';
+      App.pinUser = u.id;
+      if (u.mustChange) return openSheet(changePinSheet(u, 'first'));
+      return loginAs(u);
+    }
+    const f = App.fails[key] = { n: (fail?.n || 0) + 1, until: 0 };
+    if (f.n >= MAX_TRIES) { f.until = Date.now() + 30000; f.n = 0; }
+    form.pin.value = ''; form.pin.focus();
+    formError(f.until ? 'Too many wrong tries. Wait 30 seconds.' : `Name/phone or PIN is not right — ${MAX_TRIES - f.n} tries left.`);
+  },
   newPin(fd) {
     const u = userById(fd.get('id')); if (!u) return;
     const mode = fd.get('mode'), pin = fd.get('pin'), pin2 = fd.get('pin2');
