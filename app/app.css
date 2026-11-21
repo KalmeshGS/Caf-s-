@@ -641,3 +641,17 @@ body.is-offline::after {
   position: fixed; top: 10px; left: 50%; transform: translateX(-50%); z-index: 300; max-width: 92vw;
   background: var(--amber); color: #fff; font-weight: 600; font-size: 13px; padding: 8px 14px; border-radius: 99px; text-align: center;
 }
+
+/* ===== v3.2: lock screen, ready-to-serve ===== */
+.lock-avatar { position: relative; width: 84px; margin: 0 auto; }
+.lock-avatar .avatar.xl { width: 84px; height: 84px; border-radius: 50%; font-size: 28px; }
+.lock-badge { position: absolute; right: -4px; bottom: -4px; width: 30px; height: 30px; border-radius: 50%; background: var(--ink); color: var(--bg); display: grid; place-items: center; border: 3px solid var(--surface); }
+.lock-badge .ic { width: 14px; height: 14px; }
+.login-card h1 + .muted { margin-top: -8px; }
+.ready-card { border-color: color-mix(in srgb, var(--ok) 45%, var(--line)); background: color-mix(in srgb, var(--ok) 6%, var(--surface)); }
+.ready-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; }
+.ready-row + .ready-row { border-top: 1px dashed var(--line); }
+.ready-row strong { display: block; font-size: 17px; }
+.ready-row small { color: var(--muted); }
+.banner .btn { margin-left: auto; }
+.bill .row-2 { margin-top: 8px; }

@@ -76,7 +76,8 @@ const BAD_PASSWORD = ['auth/wrong-password', 'auth/invalid-credential', 'auth/in
   if (!cfg || !cfg.apiKey || !window.FB) return;
   Cloud.on = true;
   Cloud.app = FB.initializeApp(cfg);
-  Cloud.auth = FB.initializeAuth(Cloud.app, { persistence: FB.inMemoryPersistence });
+  // Sign-in is remembered on this device (only the login token — café data is never stored here)
+  Cloud.auth = FB.initializeAuth(Cloud.app, { persistence: [FB.indexedDBLocalPersistence, FB.browserLocalPersistence] });
   Cloud.db = FB.initializeFirestore(Cloud.app, { localCache: FB.memoryLocalCache() });
   if (window.FIREBASE_EMULATOR) {
     FB.connectAuthEmulator(Cloud.auth, 'http://127.0.0.1:9099', { disableWarnings: true });
@@ -87,6 +88,17 @@ const BAD_PASSWORD = ['auth/wrong-password', 'auth/invalid-credential', 'auth/in
   S = emptyState();
   try { Cloud.cafeCode = localStorage.getItem('cj.cafe') || ''; Cloud.cafeName = localStorage.getItem('cj.cafeName') || ''; } catch (e) { /* ignore */ }
   installOverrides();
+  // Re-open the café after a refresh if this device is still signed in
+  Cloud.restoring = true;
+  let first = true;
+  FB.onAuthStateChanged(Cloud.auth, async (user) => {
+    if (!first) return; first = false;
+    if (user && Cloud.cafeCode && Session._id === user.uid) {
+      try { await attach(Cloud.cafeCode, user, true); } catch (e) { await Cloud.signOut(friendly(e)); }
+    } else if (user) { try { await FB.signOut(Cloud.auth); } catch (e) { /* ignore */ } }
+    Cloud.restoring = false;
+    if (!Cloud.attached) render();
+  });
 })();
 
 /* ---------------- syncing ---------------- */
@@ -203,6 +215,7 @@ function rebuildUsers() {
 }
 Cloud.changed = () => {
   if (!Cloud.attached) return;
+  if (Session.user()) checkReady();
   const busyTyping = document.activeElement && document.activeElement.matches('input, textarea, select');
   if (!$('#sheet').hidden || busyTyping) { Cloud.pending = true; return; }
   render();
@@ -223,13 +236,14 @@ Cloud.ensureMonth = async (mk) => {
 };
 
 /* ---------------- signing in & out ---------------- */
-async function attach(cid, user) {
+async function attach(cid, user, restoring) {
   Cloud.cid = cid; Cloud.loading = true; render();
   const ms = await FB.getDoc(cref('members', user.uid));
   const m = ms.exists() ? ms.data() : null;
   if (!m || m.active !== true) { await Cloud.signOut(m ? 'This account has been disabled. Ask the owner.' : 'You no longer have access to this café.'); return; }
   Cloud.me = { ...m, id: user.uid, hash: 'online' };
-  Session._id = user.uid; Session._last = Date.now();
+  if (!restoring || Session._id !== user.uid) Session.set(user.uid); // fresh login; a refresh keeps the lock state
+  App.kotSeen = null;
   S = emptyState(); Cloud.mirror = {}; Cloud.privateCache = {}; Cloud.members = {}; Cloud.logins = {}; Cloud.loadedMonths = new Set();
   const role = m.role;
   const jobs = [];
@@ -255,15 +269,17 @@ async function attach(cid, user) {
   Cloud.cafeCode = cid; Cloud.cafeName = S.settings.name;
   FB.updateDoc(cref('members', user.uid), { lastLogin: Date.now() }).catch(() => {});
   closeSheet();
-  history.replaceState(null, '', `#/${ROLES[role].views[0]}`);
+  const keep = restoring && ROLES[role].views.includes(parseHash().view);
+  if (!keep) history.replaceState(null, '', `#/${ROLES[role].views[0]}`);
   render();
+  if (restoring) return;
   const n = role === 'owner' ? openRequests().length : 0;
   toast(n ? `Welcome, ${m.name} — ${n} login request${n > 1 ? 's' : ''} waiting` : `Welcome, ${m.name}`);
 }
 Cloud.signOut = async (msg) => {
   Cloud.unsubs.forEach((u) => { try { u(); } catch (e) { /* ignore */ } });
   Cloud.unsubs = []; Cloud.attached = false; Cloud.loading = false; Cloud.me = null; Cloud.mirror = {}; Cloud.pendingUser = null;
-  Session._id = null;
+  Session._id = null; Session.locked = false; Session.save(); App.kotSeen = null;
   document.body.classList.remove('is-offline');
   S = emptyState();
   try { await FB.signOut(Cloud.auth); } catch (e) { /* ignore */ }
@@ -273,7 +289,20 @@ Cloud.signOut = async (msg) => {
   render();
   if (msg) toast(msg);
 };
+/** After too many wrong passwords on the lock screen: lock the staff login online (one step at a time, as the rules require) */
+async function lockLogin(cid, loginId) {
+  const ref = FB.doc(Cloud.db, 'cafes', cid, 'logins', loginId);
+  try {
+    let L = (await FB.getDoc(ref)).data();
+    for (let i = 0; L && !L.locked && i < LOCK_AFTER; i++) {
+      const failed = (L.failed || 0) + 1, locked = failed >= LOCK_AFTER;
+      await FB.updateDoc(ref, locked ? { failed, locked: true, lockedAt: FB.serverTimestamp() } : { failed });
+      L = { ...L, failed, locked };
+    }
+  } catch (e) { /* ignore */ }
+}
 async function afterSignIn(cid, user) {
+  Session.set(user.uid);
   const ms = await FB.getDoc(FB.doc(Cloud.db, 'cafes', cid, 'members', user.uid));
   const m = ms.exists() ? ms.data() : null;
   if (!m || m.active !== true) { await FB.signOut(Cloud.auth); return formError(m ? 'This account has been disabled. Ask the owner.' : 'You no longer have access to this café.'); }
@@ -319,7 +348,7 @@ function cloudLegacyIntro() {
   </div></main>`;
 }
 Cloud.screen = () => {
-  if (Cloud.loading) return `<main class="center-screen"><div class="card onb center"><div class="brand-mark lg">${icon('cup')}</div><h2>Loading your café…</h2><p class="muted">Fetching the latest data securely.</p></div></main>`;
+  if (Cloud.restoring || Cloud.loading) return `<main class="center-screen"><div class="card onb center"><div class="brand-mark lg">${icon('cup')}</div><h2>Loading your café…</h2><p class="muted">Fetching the latest data securely.</p></div></main>`;
   const v = parseHash().view;
   if (v === 'signup' || v === 'login') { App.cloudView = v; history.replaceState(null, '', location.pathname); }
   if (App.cloudView === 'signup' || (Cloud.legacy && !App.cloudView)) {
@@ -455,13 +484,9 @@ function installOverrides() {
   persist = function () { if (Cloud.attached || Cloud.me) Cloud.push(); return true; };
   loadState = function () { return S; };
   // The signed-in person comes from Firebase
-  Session.user = function () {
-    if (!Cloud.me || !Cloud.attached) return null;
-    if (Date.now() - this._last > LOCK_AFTER_MIN * 60000) { Cloud.signOut('Locked after 15 minutes without use — please log in again.'); return null; }
-    return Cloud.me;
-  };
-  Session.role = function () { const u = this.user(); return u ? u.role : null; };
-  Session.set = function (id) { if (!id) Cloud.signOut(); };
+  Session.account = function () { return Cloud.me && Cloud.attached ? Cloud.me : null; };
+  const baseSet = Session.set.bind(Session);
+  Session.set = function (id) { if (id) return baseSet(id); if (Cloud.me || Cloud.auth.currentUser) Cloud.signOut(); else baseSet(null); };
   // After a sheet closes, show changes that arrived from other devices meanwhile
   const origClose = closeSheet;
   closeSheet = function () { origClose(); if (Cloud.pending) { Cloud.pending = false; setTimeout(render, 0); } };
@@ -529,6 +554,25 @@ function installOverrides() {
   });
 
   Object.assign(Forms, {
+    async unlock(fd, form) {
+      const u = Cloud.me, user = Cloud.auth.currentUser;
+      if (!u || !user) return Cloud.signOut();
+      busy(form, true);
+      try {
+        await FB.reauthenticateWithCredential(user, FB.EmailAuthProvider.credential(user.email, String(fd.get('pw') || '')));
+        Session.unlock(); render();
+      } catch (e) {
+        if (!BAD_PASSWORD.includes(e.code)) return formError(friendly(e));
+        Session.fails += 1; Session.save();
+        if (Session.fails >= LOCK_AFTER) {
+          const { cid } = Cloud, loginId = u.loginId;
+          await Cloud.signOut();
+          if (loginId) { await lockLogin(cid, loginId); return openSheet(cloudLockedSheet(cid, loginId, false)); }
+          return toast('Too many wrong passwords — please log in again.');
+        }
+        formError(`Wrong password — ${LOCK_AFTER - Session.fails} ${LOCK_AFTER - Session.fails === 1 ? 'try' : 'tries'} left before the account locks.`);
+      } finally { busy(form, false); if (form.pw) form.pw.value = ''; }
+    },
     async login(fd, form) {
       const who = String(fd.get('who') || '').trim(), pw = String(fd.get('pw') || '');
       const code = String(fd.get('cafe') || Cloud.cafeCode || '').trim().toLowerCase();

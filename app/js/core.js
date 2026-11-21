@@ -125,7 +125,7 @@ function emptyState() {
     seq: { day: '', n: 0, emp: 0 },
   };
 }
-const APP_VERSION = '3.1';
+const APP_VERSION = '3.2';
 const DEFAULT_PIN = '1234'; // only for accounts created by older versions; they must set a password
 
 /** Short code for employee IDs: "Kalmesh Kitchen" -> "KK", "KK" -> "KK", "Brewhouse" -> "BR" */
@@ -176,21 +176,39 @@ function save() { persist(); render(); }
 /** Run a mutation then save */
 function commit(fn) { fn(S); save(); }
 
-/* The signed-in role lives in memory only, so the PIN is asked every time
-   the app is opened or refreshed. It also locks itself after inactivity. */
-const LOCK_AFTER_MIN = 15;
+/* Sign-in session — kept across refreshes.
+   Owners, managers and cashiers are LOCKED after IDLE_LOCK_MIN minutes without use
+   (they unlock with just their password). Waiters and kitchen stay signed in. */
+const IDLE_LOCK_MIN = 5;
+const LOCK_AFTER_MIN = IDLE_LOCK_MIN;
+const IDLE_ROLES = ['owner', 'manager', 'cashier'];
+const SESS_KEY = 'cj.session';
 const Session = {
-  _id: null,
-  _last: Date.now(),
-  user() {
-    if (this._id && Date.now() - this._last > LOCK_AFTER_MIN * 60000) this._id = null;
+  _id: null, _last: Date.now(), locked: false, fails: 0, _saved: 0,
+  load() {
+    try { const s = JSON.parse(localStorage.getItem(SESS_KEY) || 'null'); if (s && s.id) Object.assign(this, { _id: s.id, _last: s.last || 0, locked: !!s.locked, fails: s.fails || 0 }); } catch (e) { /* ignore */ }
+  },
+  save() {
+    try { if (this._id) localStorage.setItem(SESS_KEY, JSON.stringify({ id: this._id, last: this._last, locked: this.locked, fails: this.fails })); else localStorage.removeItem(SESS_KEY); } catch (e) { /* ignore */ }
+    this._saved = Date.now();
+  },
+  /** The signed-in person, even while the screen is locked */
+  account() {
     const u = this._id && (S.users || []).find((x) => x.id === this._id);
     return u && u.active !== false && !u.mustChange && !u.locked && u.hash && ROLES[u.role] ? u : null;
   },
+  idleLimit(role) { return IDLE_ROLES.includes(role) ? IDLE_LOCK_MIN * 60000 : Infinity; },
+  user() {
+    const u = this.account(); if (!u) return null;
+    if (!this.locked && Date.now() - this._last > this.idleLimit(u.role)) { this.locked = true; this.save(); }
+    return this.locked ? null : u;
+  },
   role() { const u = this.user(); return u ? u.role : null; },
-  set(id) { this._id = id || null; this._last = Date.now(); },
-  touch() { if (this._id) this._last = Date.now(); },
+  set(id) { Object.assign(this, { _id: id || null, locked: false, fails: 0, _last: Date.now() }); this.save(); },
+  unlock() { Object.assign(this, { locked: false, fails: 0, _last: Date.now() }); this.save(); },
+  touch() { if (this._id && !this.locked) { this._last = Date.now(); if (Date.now() - this._saved > 10000) this.save(); } },
 };
+Session.load();
 try { localStorage.removeItem(SESSION_KEY); } catch (e) { /* remove sign-in saved by older versions */ }
 
 /* ---------- selectors ---------- */

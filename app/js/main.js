@@ -59,7 +59,8 @@ function render() {
     root.innerHTML = Views.setup(); return;
   }
   const role = Session.role();
-  if (!role) { root.innerHTML = Views.login(); return; }
+  if (!role) { root.innerHTML = Session.locked && Session.account() ? Views.lockScreen() : Views.login(); return; }
+  checkReady();
   if (App.setup.mode === 'later' && App.setup.step > 0 && role === 'owner') { root.innerHTML = Views.setup(); return; }
   let { view, params } = parseHash();
   const allowed = ROLES[role].views;
@@ -95,7 +96,7 @@ const Actions = {
   openOrder(el) { go('orders', { o: el.dataset.id }); },
   toTables() { go('orders'); },
   newTakeaway() {
-    const o = { id: uid('o'), no: nextBillNo(), table: 'Takeaway', items: [], status: 'open', createdAt: Date.now(), by: Session.user()?.name || Session.role() };
+    const o = { id: uid('o'), no: nextBillNo(), table: 'Takeaway', items: [], status: 'open', createdAt: Date.now(), by: Session.user()?.name || Session.role(), byId: Session.user()?.id || null };
     S.orders.push(o); persist(); go('orders', { o: o.id });
   },
   setCat(el) { App.ui.cat = el.dataset.cat; render(); },
@@ -103,7 +104,7 @@ const Actions = {
     const m = byId(S.menu, el.dataset.id); if (!m) return;
     let o = currentOrder(App.params);
     if (!o) {
-      o = { id: uid('o'), no: nextBillNo(), table: App.params.t || 'Takeaway', items: [], status: 'open', createdAt: Date.now(), by: Session.user()?.name || Session.role() };
+      o = { id: uid('o'), no: nextBillNo(), table: App.params.t || 'Takeaway', items: [], status: 'open', createdAt: Date.now(), by: Session.user()?.name || Session.role(), byId: Session.user()?.id || null };
       S.orders.push(o);
     }
     if (o.status !== 'open') return toast('This bill is already paid');
@@ -127,7 +128,8 @@ const Actions = {
     const items = o.items.filter((l) => l.qty > l.sent).map((l) => ({ name: l.name, qty: l.qty - l.sent }));
     if (!items.length) return;
     o.items.forEach((l) => { l.sent = l.qty; });
-    S.kots.push({ id: uid('k'), orderId: o.id, table: o.table, no: o.no, items, status: 'new', createdAt: Date.now(), updatedAt: Date.now() });
+    const me = Session.user();
+    S.kots.push({ id: uid('k'), orderId: o.id, table: o.table, no: o.no, items, status: 'new', createdAt: Date.now(), updatedAt: Date.now(), byId: me?.id || o.byId || null, by: me?.name || '' });
     persist(); toast(`Sent to kitchen ✓ ${orderLabel(o)}`);
     if (o.table === 'Takeaway') render(); else go('orders');
   },
@@ -145,6 +147,19 @@ const Actions = {
   /* billing */
   selectBill(el) { go('billing', { o: el.dataset.id }); },
   closeBill() { go('billing'); },
+  printBill(el) {
+    const o = byId(S.orders, el.dataset.id); if (!o) return;
+    const disc = num($('form.bill input[name=discount]')?.value);
+    $('#print').innerHTML = receiptHtml(o, orderTotals(o, disc)); window.print();
+  },
+  payPrint(el) { App.printAfterPay = true; el.closest('form').requestSubmit(); },
+  async enableAlerts() {
+    beep(); // also unlocks sound on this device
+    if (!('Notification' in window)) return toast('This browser cannot show notifications — sound and vibration will still alert you.');
+    const r = await Notification.requestPermission();
+    toast(r === 'granted' ? 'Alerts on — you\'ll be notified when food is ready' : 'Notifications blocked — sound and on-screen alerts will still work');
+    render();
+  },
   printReceipt(el) {
     const o = byId(S.orders, el.dataset.id); if (!o) return;
     $('#print').innerHTML = receiptHtml(o); window.print();
@@ -231,6 +246,7 @@ const Forms = {
     Object.assign(o, { status: 'paid', paidAt: Date.now(), method: fd.get('method') || 'cash', subtotal: t.sub, discount: t.discount, tax: t.tax, total: t.total });
     S.kots.forEach((k) => { if (k.orderId === o.id && k.status === 'ready') { k.status = 'served'; k.updatedAt = Date.now(); } });
     save(); toast(`Paid ${money(t.total)} ✓`);
+    if (App.printAfterPay) { App.printAfterPay = false; $('#print').innerHTML = receiptHtml(o); setTimeout(() => window.print(), 50); }
   },
   stockItem(fd) {
     const d = { name: fd.get('name').trim(), qty: num(fd.get('qty')), unit: fd.get('unit'), max: num(fd.get('max')), low: num(fd.get('low')), step: num(fd.get('step')) || 1 };
@@ -347,13 +363,41 @@ setInterval(() => {
     t.classList.toggle('warn', mins >= 10 && mins < 20); t.classList.toggle('late', mins >= 20);
   });
 }, 1000);
-setInterval(() => { if ($('#sheet').hidden && ['orders', 'billing', 'dashboard'].includes(App.view) && !document.activeElement?.matches('input,textarea,select')) render(); }, 60000);
+// Keep every screen fresh (waiters, kitchen and counter): re-draw every 15 seconds when nobody is typing
+setInterval(() => { if (Session.user() && $('#sheet').hidden && !document.activeElement?.matches('input,textarea,select')) render(); }, 15000);
 
 // Auto-lock: any tap or key keeps the session alive; after LOCK_AFTER_MIN idle minutes, back to the PIN screen
 ['pointerdown', 'keydown'].forEach((ev) => document.addEventListener(ev, () => Session.touch(), { capture: true, passive: true }));
-setInterval(() => {
-  if (Session._id && !Session.user()) { closeSheet(); history.replaceState(null, '', location.pathname); render(); toast('Locked — please log in again'); }
-}, 30000);
+function checkLock() {
+  if (!Session._id || Session.locked) return;
+  if (Session.account() && !Session.user() && Session.locked) { closeSheet(); render(); toast(`Locked after ${IDLE_LOCK_MIN} minutes without use`); }
+}
+setInterval(checkLock, 10000);
+document.addEventListener('visibilitychange', () => { if (document.hidden) Session.save(); else checkLock(); });
+
+/* ---------------- "food is ready" alerts for the person who took the order ---------------- */
+function checkReady() {
+  const me = Session.user();
+  if (!me) { App.kotSeen = null; return; }
+  const prev = App.kotSeen;
+  App.kotSeen = Object.fromEntries(S.kots.map((k) => [k.id, k.status]));
+  if (!prev) return;
+  const mine = S.kots.filter((k) => k.status === 'ready' && prev[k.id] && prev[k.id] !== 'ready' && (k.byId ? k.byId === me.id : me.role === 'waiter'));
+  if (mine.length) notifyReady(mine);
+}
+function notifyReady(list) {
+  const what = list.map((k) => (k.table === 'Takeaway' ? `Takeaway #${k.no}` : k.table)).join(', ');
+  const body = list.map((k) => k.items.map((i) => `${i.qty}× ${i.name}`).join(', ')).join(' · ');
+  beep(); setTimeout(beep, 700);
+  try { navigator.vibrate && navigator.vibrate([250, 120, 250]); } catch (e) { /* ignore */ }
+  toast(`Food ready to serve: ${what}`);
+  if ('Notification' in window && Notification.permission === 'granted') {
+    const opts = { body, tag: 'ready-' + list[0].id, renotify: true, icon: 'icons/icon-192.png', badge: 'icons/icon-192.png', vibrate: [250, 120, 250] };
+    const title = `Ready to serve · ${what}`;
+    (navigator.serviceWorker ? navigator.serviceWorker.getRegistration() : Promise.resolve(null))
+      .then((reg) => (reg ? reg.showNotification(title, opts) : new Notification(title, opts))).catch(() => { try { new Notification(title, opts); } catch (e) { /* ignore */ } });
+  }
+}
 
 /* ---------------- boot (after every script, incl. auth.js, has loaded) ---------------- */
 document.addEventListener('DOMContentLoaded', render);

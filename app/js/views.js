@@ -69,6 +69,20 @@ function currentOrder(p) {
 }
 Views.orders = (p) => (p.t || p.o ? orderEditor(p) : tablesView());
 
+/** Tickets the kitchen marked ready: a waiter sees their own, others see all */
+function readyCard() {
+  const me = Session.user(); if (!me) return '';
+  const list = S.kots.filter((k) => k.status === 'ready' && (me.role !== 'waiter' || !k.byId || k.byId === me.id));
+  const alertsOff = 'Notification' in window && Notification.permission === 'default';
+  if (!list.length) return alertsOff ? `<div class="banner info">${icon('alert')}<span>Get an alert when food is ready to serve.</span>${btn('Turn on alerts', 'enableAlerts', { cls: 'primary sm' })}</div>` : '';
+  return `<section class="card ready-card">
+    <div class="card-head">${eyebrow('Ready to serve')}<span class="badge ok">${list.length}</span></div>
+    ${list.map((k) => `<div class="ready-row"><div><strong>${esc(k.table === 'Takeaway' ? 'Takeaway #' + k.no : k.table)}</strong>
+      <small>${esc(k.items.map((i) => `${i.qty}× ${i.name}`).join(', '))}</small></div>
+      ${btn('Served', 'kotNext', { cls: 'primary sm', ic: 'check', data: `data-id="${k.id}"` })}</div>`).join('')}
+    ${alertsOff ? `<div class="btn-row">${btn('Turn on alerts', 'enableAlerts', { cls: 'ghost sm', ic: 'alert' })}</div>` : ''}
+  </section>`;
+}
 function tablesView() {
   const open = openOrders();
   const tables = tableNames().map((t) => {
@@ -82,6 +96,7 @@ function tablesView() {
   }).join('');
   const takeaways = open.filter((o) => o.table === 'Takeaway');
   return `${pageHead('Orders', 'Tables', btn('New takeaway', 'newTakeaway', { cls: 'primary', ic: 'plus' }))}
+    ${readyCard()}
     ${tableNames().length ? `<div class="table-grid">${tables}</div>` : empty('No tables set. Add tables in Settings, or use takeaway orders.')}
     ${takeaways.length ? `<h3 class="section-t">Takeaway</h3><div class="table-grid">${takeaways.map((o) => `
       <button class="table-tile busy" data-act="openOrder" data-id="${o.id}"><strong>#${o.no}</strong><span>${money(orderSubtotal(o))}</span><small>${sum(o.items, (l) => l.qty)} items · ${elapsedMin(o.createdAt)}</small></button>`).join('')}</div>` : ''}`;
@@ -173,6 +188,7 @@ Views.billing = (p) => {
       <div class="line-row"><span>Tax (${Number(S.settings.tax) || 0}%)</span><span id="bill-tax">${money(t.tax)}</span></div>
       <div class="seg">${Object.entries(pm).map(([k, m], i) => `<label><input type="radio" name="method" value="${k}" ${i === 1 ? 'checked' : ''}><span>${esc(m.label)}</span></label>`).join('')}</div>
       <button class="btn primary block" type="submit">${icon('check')}<span>Mark as paid</span></button>
+      <div class="row-2">${btn('Print bill', 'printBill', { cls: 'ghost', ic: 'printer', data: `data-id="${sel.id}"` })}${btn('Paid & print', 'payPrint', { cls: 'ghost', ic: 'receipt' })}</div>
     </form>`;
   } else if (sel && sel.status === 'paid') {
     bill = `<div class="card bill paid">
@@ -481,15 +497,17 @@ function menuForm(m = {}) {
 }
 
 /* ---------------- Receipt (print) ---------------- */
-function receiptHtml(o) {
+/** Printable bill. `draft` (totals) = bill printed before payment */
+function receiptHtml(o, draft) {
   const st = S.settings, pm = payMethods();
+  const t = draft || { sub: o.subtotal, discount: o.discount, tax: o.tax, total: o.total };
   return `<div class="receipt">
     <h2>${esc(st.name)}</h2>${st.tagline ? `<p>${esc(st.tagline)}</p>` : ''}
-    <p>${esc(orderLabel(o))} · Bill #${o.no}<br>${new Date(o.paidAt).toLocaleString()}</p><hr>
+    <p>${draft ? '<b>BILL</b><br>' : '<b>RECEIPT</b><br>'}${esc(orderLabel(o))} · Bill #${o.no}<br>${new Date(draft ? Date.now() : o.paidAt).toLocaleString()}</p><hr>
     ${o.items.map((l) => `<div class="r"><span>${esc(l.name)} × ${l.qty}</span><span>${money(l.qty * l.price)}</span></div>`).join('')}<hr>
-    <div class="r"><span>Subtotal</span><span>${money(o.subtotal)}</span></div>
-    ${o.discount ? `<div class="r"><span>Discount</span><span>−${money(o.discount)}</span></div>` : ''}
-    ${o.tax ? `<div class="r"><span>Tax</span><span>${money(o.tax)}</span></div>` : ''}
-    <div class="r b"><span>Total</span><span>${money(o.total)}</span></div>
-    <p>Paid by ${esc(pm[o.method]?.label || o.method)}</p><hr><p>${esc(st.footer || 'Thank you, visit again!')}</p></div>`;
+    <div class="r"><span>Subtotal</span><span>${money(t.sub)}</span></div>
+    ${t.discount ? `<div class="r"><span>Discount</span><span>−${money(t.discount)}</span></div>` : ''}
+    ${t.tax ? `<div class="r"><span>Tax (${Number(st.tax) || 0}%)</span><span>${money(t.tax)}</span></div>` : ''}
+    <div class="r b"><span>Total</span><span>${money(t.total)}</span></div>
+    <p>${draft ? 'Payment pending' : `Paid by ${esc(pm[o.method]?.label || o.method)}`}</p><hr><p>${esc(st.footer || 'Thank you, visit again!')}</p></div>`;
 }

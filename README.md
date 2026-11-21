@@ -104,7 +104,9 @@ Settings → Data → **Erase café data** (keeps your settings and logins), the
 - **Staff login**: café code (asked once per device) + **Employee ID** + password. The owner types each person's first password; they must change it at first login.
 - 3 wrong passwords → *Ask owner to reset*; 4 → **locked** (stored online, enforced by the rules). The owner unlocks it / sets a temporary password from the dashboard.
 - KYC, salary, address and date of birth are stored separately and **only owners** can read them.
-- The login session is kept in memory only: closing/refreshing the app or 15 minutes idle asks for the password again.
+- A refresh keeps you logged in. **Owner, manager, cashier**: after 5 minutes without use the screen locks and only the **password** is asked (4 wrong → account locked). **Waiter & kitchen** stay logged in; screens refresh every 15 seconds.
+- **Food ready alerts**: when the kitchen marks an order *Ready*, the person who took it gets a sound, vibration and (if allowed) a phone notification, plus a *Ready to serve* list on Orders.
+- **Billing**: *Print bill* before payment, or *Paid & print* to print the receipt.
 
 ## About your data
 
