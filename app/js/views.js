@@ -62,7 +62,7 @@ Views.login = () => {
 function defaultPinHint() {
   const d = emptyState().pins;
   const still = Object.keys(ROLES).filter((k) => S.pins[k] === d[k]);
-  return still.length ? `<p class="fine">Default PINs still in use — ${still.map((k) => `${ROLES[k].label} ${d[k]}`).join(' · ')}. Change them in Settings → Logins.</p>` : '';
+  return still.length ? `<p class="fine">Tip for the owner: some logins still use their starting PIN. Change them in Settings → Logins.</p>` : '';
 }
 
 /* ---------------- 01 Dashboard ---------------- */
@@ -540,7 +540,7 @@ Views.settings = () => {
         <button class="icon-btn sm" data-act="menuEdit" data-id="${m.id}" aria-label="Edit">${icon('edit')}</button></div>`).join('')}</section>`).join('') || empty('No menu yet.', btn('Add first item', 'menuAdd', { cls: 'ghost', ic: 'plus' }))}`;
   } else if (tab === 'team') {
     body = `<section class="card">${eyebrow('Everyone gets their own login')}
-      ${Object.entries(ROLES).map(([k, r]) => `<div class="staff-row"><span class="with-av"><span class="avatar sm" style="background:${r.color}">${r.label[0]}</span><span><strong>${esc(r.label)}</strong><small>${esc(r.views.map((v) => VIEWS[v].label).join(' · '))}</small></span></span>
+      ${Object.entries(ROLES).map(([k, r]) => `<div class="staff-row"><span class="with-av"><span class="avatar sm" style="background:${r.color}">${r.label[0]}</span><span><strong>${esc(r.label)}</strong><small>${esc(r.views.map((v) => VIEWS[v].label).join(' · '))}</small>${S.pins[k] === emptyState().pins[k] ? `<small class="neg">Still using starting PIN ${esc(S.pins[k])} — please change</small>` : ''}</span></span>
         ${btn('Change PIN', 'pinChange', { cls: 'ghost sm', ic: 'lock', data: `data-role="${k}"` })}</div>`).join('')}
     </section><p class="fine">PINs keep screens separate on a shared device — e.g. the kitchen tablet only sees the kitchen screen.</p>`;
   } else {

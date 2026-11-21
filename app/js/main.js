@@ -393,7 +393,6 @@ window.addEventListener('storage', (e) => {
     if (active && (active.tagName === 'TEXTAREA' || (active.tagName === 'INPUT' && active.type !== 'checkbox'))) { S = loadState(); return; }
     S = loadState(); if ($('#sheet').hidden) render();
   }
-  if (e.key === SESSION_KEY) render();
 });
 // live timers on kitchen tickets + refresh "x min" labels
 setInterval(() => {
@@ -404,6 +403,12 @@ setInterval(() => {
   });
 }, 1000);
 setInterval(() => { if ($('#sheet').hidden && ['orders', 'billing', 'dashboard'].includes(App.view) && !document.activeElement?.matches('input,textarea,select')) render(); }, 60000);
+
+// Auto-lock: any tap or key keeps the session alive; after LOCK_AFTER_MIN idle minutes, back to the PIN screen
+['pointerdown', 'keydown'].forEach((ev) => document.addEventListener(ev, () => Session.touch(), { capture: true, passive: true }));
+setInterval(() => {
+  if (Session._role && !Session.role()) { closeSheet(); history.replaceState(null, '', location.pathname); render(); toast('Locked — enter your PIN'); }
+}, 30000);
 
 /* ---------------- boot ---------------- */
 render();
