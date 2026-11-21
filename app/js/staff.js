@@ -9,6 +9,8 @@
 const BLOOD_GROUPS = ['A+', 'A−', 'B+', 'B−', 'AB+', 'AB−', 'O+', 'O−'];
 const ID_TYPES = ['Aadhaar', 'PAN', 'Voter ID', 'Driving licence', 'Passport', 'Other'];
 const isOwner = () => Session.role() === 'owner';
+const canManageStaff = () => ['owner', 'manager'].includes(Session.role());
+const PRIVATE_FIELDS = ['salary', 'dob', 'email', 'address', 'emergencyName', 'emergencyPhone', 'idType', 'idNumber', 'pan'];
 const maskId = (s) => { const c = String(s || '').replace(/\s/g, ''); return c ? `•••• •••• ${c.slice(-4)}` : '—'; };
 const staffAvatar = (p, cls = 'sm') => (p.photo
   ? `<img class="avatar ${cls} photo" src="${esc(p.photo)}" alt="">`
@@ -34,11 +36,11 @@ Views.staff = () => {
       ${p.active === false ? '<span class="status off">Left</span>' : `<div class="att" role="group" aria-label="Attendance for ${esc(p.name)}">${Object.entries(ATT).map(([k, a]) => `<button class="att-b ${k} ${s === k ? 'on' : ''}" data-act="att" data-id="${p.id}" data-s="${k}" title="${a.label}">${a.short}</button>`).join('')}</div>`}
     </div>`;
   };
-  return `${pageHead('Staff · today', 'Team & attendance', isOwner() ? btn('Add staff', 'staffAdd', { cls: 'primary', ic: 'plus' }) : '')}
+  return `${pageHead('Staff · today', 'Team & attendance', canManageStaff() ? btn('Add staff', 'staffAdd', { cls: 'primary', ic: 'plus' }) : '')}
   <div class="kpis two">${kpi('Present today', `${present} / ${active.length}`, fmtDate(new Date(), { weekday: 'long', day: 'numeric', month: 'short' }), 'pos')}
     ${isOwner() ? kpi('Monthly salaries', money(sum(active, (p) => p.salary)), `${pl(active.length, 'person', 'people')}`) : kpi('Team', String(active.length), 'active staff')}</div>
   <section class="card">
-    ${active.length ? active.map(row).join('') : empty('Add your team to keep their details, track attendance and print ID cards.', isOwner() ? btn('Add staff', 'staffAdd', { cls: 'ghost', ic: 'plus' }) : '')}
+    ${active.length ? active.map(row).join('') : empty('Add your team to keep their details, track attendance and print ID cards.', canManageStaff() ? btn('Add staff', 'staffAdd', { cls: 'ghost', ic: 'plus' }) : '')}
   </section>
   ${former.length && isOwner() ? `<details class="card former"><summary>${eyebrow(`Former staff (${former.length})`)}</summary>${former.map(row).join('')}</details>` : ''}
   <p class="fine">P = Present · L = Late · Lv = Leave · A = Absent. Tap a name to see the profile${isOwner() ? ', print an ID card or pay salary' : ''}.</p>`;
@@ -47,6 +49,7 @@ Views.staff = () => {
 /* ---------------- add / edit form ---------------- */
 function staffForm(p = {}) {
   const isNew = !p.id;
+  const own = isOwner();
   const preview = isNew ? nextEmpId(S, dayKey()).empId : p.empId;
   const sel = (name, list, v) => `<select name="${name}"><option value="">—</option>${list.map((x) => `<option ${x === v ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select>`;
   return `${sheetHead('Staff', isNew ? 'Add staff' : `Edit · ${p.name}`)}
@@ -71,18 +74,18 @@ function staffForm(p = {}) {
     <div class="row-3">
       <label class="field"><span>Joining date *</span><input name="joinDate" type="date" required value="${esc(p.joinDate || dayKey())}" max="${shiftDay(dayKey(), 60)}" ${isNew ? 'data-input="joinYear"' : ''}></label>
       <label class="field"><span>Shift</span><input name="shift" maxlength="30" value="${esc(p.shift || '')}" placeholder="09:00 – 18:00"></label>
-      <label class="field"><span>Salary / month</span><input name="salary" type="number" min="0" step="any" value="${esc(p.salary ?? '')}"></label>
+      ${own ? `<label class="field"><span>Salary / month</span><input name="salary" type="number" min="0" step="any" value="${esc(p.salary ?? '')}"></label>` : ''}
     </div>
 
     <p class="form-section">Personal</p>
     <div class="row-3">
       <label class="field"><span>Mobile *</span><input name="phone" type="tel" required maxlength="20" value="${esc(p.phone || '')}"></label>
-      <label class="field"><span>Email</span><input name="email" type="email" maxlength="80" value="${esc(p.email || '')}"></label>
-      <label class="field"><span>Date of birth</span><input name="dob" type="date" value="${esc(p.dob || '')}" max="${dayKey()}"></label>
-    </div>
-    <div class="row-3">
       <label class="field"><span>Gender</span>${sel('gender', ['Female', 'Male', 'Other'], { F: 'Female', M: 'Male' }[p.gender] || p.gender)}</label>
       <label class="field"><span>Blood group</span>${sel('blood', BLOOD_GROUPS, String(p.blood || '').replace('-', '−'))}</label>
+    </div>
+    ${own ? `<div class="row-3">
+      <label class="field"><span>Email</span><input name="email" type="email" maxlength="80" value="${esc(p.email || '')}"></label>
+      <label class="field"><span>Date of birth</span><input name="dob" type="date" value="${esc(p.dob || '')}" max="${dayKey()}"></label>
       <label class="field"><span>Emergency contact</span><input name="emergencyName" maxlength="40" value="${esc(p.emergencyName || '')}" placeholder="Name / relation"></label>
     </div>
     <div class="row-2">
@@ -95,10 +98,10 @@ function staffForm(p = {}) {
       <label class="field"><span>ID proof type</span>${sel('idType', ID_TYPES, p.idType || 'Aadhaar')}</label>
       <label class="field"><span>ID number</span><input name="idNumber" maxlength="30" value="${esc(p.idNumber || '')}" autocomplete="off" spellcheck="false"></label>
       <label class="field"><span>PAN <em>(optional)</em></span><input name="pan" maxlength="10" value="${esc(p.pan || '')}" style="text-transform:uppercase" autocomplete="off" spellcheck="false"></label>
-    </div>
+    </div>` : `<p class="muted sm">${icon('lock')} Salary, date of birth, address, emergency contact and KYC are filled in by the owner.</p>`}
     ${isNew ? '' : `<label class="check"><input type="checkbox" name="active" ${p.active !== false ? 'checked' : ''}><span>Still working here (untick if they have left)</span></label>`}
     <p class="neg sm" id="form-err" role="alert"></p>
-    <div class="form-actions">${isNew ? '<span></span>' : btn('Delete record', 'staffDel', { cls: 'danger-ghost', ic: 'trash', data: `data-id="${p.id}"` })}
+    <div class="form-actions">${isNew || !own ? '<span></span>' : btn('Delete record', 'staffDel', { cls: 'danger-ghost', ic: 'trash', data: `data-id="${p.id}"` })}
       <button class="btn primary" type="submit">${isNew ? 'Add staff' : 'Save'}</button></div>
   </form>`;
 }
@@ -114,8 +117,9 @@ function staffSheet(p) {
       <p class="emp-id lg">${esc(p.empId || '')}</p></div>
       <button class="icon-btn" data-act="closeSheet" aria-label="Close">${icon('x')}</button></div>`;
   if (!isOwner()) {
-    return `${head}${eyebrow(`Attendance · ${monthLabel(mk)}`)}${attRow}
-      <div class="dl"><div><span>Shift</span><b>${esc(p.shift || '—')}</b></div><div><span>Joined</span><b>${fmtD(p.joinDate)}</b></div></div>`;
+    return `${head}${canManageStaff() ? `<div class="btn-row">${btn('Edit', 'staffEdit', { cls: 'ghost', ic: 'edit', data: `data-id="${p.id}"` })}</div>` : ''}
+      ${eyebrow(`Attendance · ${monthLabel(mk)}`)}${attRow}
+      <div class="dl"><div><span>Mobile</span><b>${esc(p.phone || '—')}</b></div><div><span>Shift</span><b>${esc(p.shift || '—')}</b></div><div><span>Joined</span><b>${fmtD(p.joinDate)}</b></div>${p.blood ? `<div><span>Blood group</span><b>${esc(p.blood)}</b></div>` : ''}</div>`;
   }
   const paid = S.expenses.find((e) => e.staffId === p.id && e.forMonth === mk);
   const u = loginFor(p);
@@ -211,9 +215,9 @@ Inputs.joinYear = (el) => { const b = $('#emp-preview'); if (b && el.value) b.te
 
 /* ---------------- actions & forms ---------------- */
 Object.assign(Actions, {
-  staffAdd() { if (isOwner()) openSheet(staffForm(), { wide: true }); },
+  staffAdd() { if (canManageStaff()) openSheet(staffForm(), { wide: true }); },
   staffOpen(el) { const p = byId(S.staff, el.dataset.id); p && openSheet(staffSheet(p), { wide: true }); },
-  staffEdit(el) { const p = byId(S.staff, el.dataset.id); p && isOwner() && openSheet(staffForm(p), { wide: true }); },
+  staffEdit(el) { const p = byId(S.staff, el.dataset.id); p && canManageStaff() && openSheet(staffForm(p), { wide: true }); },
   staffDel(el) {
     const p = byId(S.staff, el.dataset.id); if (!p || !isOwner()) return;
     if (!confirm(`Delete ${p.name}'s record completely? (To keep history, untick "Still working here" instead.) Their employee ID will not be reused.`)) return;
@@ -251,7 +255,7 @@ Object.assign(Actions, {
 
 Object.assign(Forms, {
   staff(fd) {
-    if (!isOwner()) return;
+    if (!canManageStaff()) return;
     const g = (k) => String(fd.get(k) || '').trim();
     const d = {
       name: g('name'), role: designationValue(g('role'), g('role_other')), phone: g('phone'), email: g('email'), joinDate: g('joinDate') || dayKey(), shift: g('shift'),
@@ -264,6 +268,7 @@ Object.assign(Forms, {
     if (d.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email)) return formError('That email address looks wrong.');
     if (d.pan && !/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(d.pan)) return formError('PAN should look like ABCDE1234F.');
     if (d.idType === 'Aadhaar' && d.idNumber && !/^\d{12}$/.test(d.idNumber.replace(/\s/g, ''))) return formError('Aadhaar number should be 12 digits.');
+    if (!isOwner()) PRIVATE_FIELDS.forEach((k) => delete d[k]); // managers never touch salary / KYC
     const p = byId(S.staff, fd.get('id'));
     if (p) {
       Object.assign(p, d, { active: !!fd.get('active') });

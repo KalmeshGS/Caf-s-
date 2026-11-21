@@ -50,25 +50,57 @@ function suggestRecipe(name, stock = S.stock) {
 }
 const stockName = (id) => byId(S.stock, id)?.name || 'Removed item';
 
+/* ---------------- units: pick ml or L, g or kg — saved in the stock item's own unit ---------------- */
+const UNIT_BASE = { ml: ['L', 0.001], L: ['L', 1], g: ['kg', 0.001], kg: ['kg', 1], pcs: ['pcs', 1], dozen: ['pcs', 12] };
+function convertUnit(q, from, to) {
+  if (from === to) return q;
+  const a = UNIT_BASE[from], b = UNIT_BASE[to];
+  if (!a || !b || a[0] !== b[0]) return null;
+  return (q * a[1]) / b[1];
+}
+const unitChoices = (u) => { const g = UNIT_BASE[u]?.[0]; return g ? Object.keys(UNIT_BASE).filter((k) => UNIT_BASE[k][0] === g) : [u]; };
+const handyUnit = (u) => ({ L: 'ml', kg: 'g' })[u] || u; // small amounts read better in ml / g
+const fmtAmount = (q) => String(+Number(q).toFixed(3));
+/** "Milk 100 ml · Sugar 10 g · Tea powder 5 g" */
+function recipeText(recipe) {
+  return (recipe || []).map((r) => {
+    const s = byId(S.stock, r.stockId); if (!s) return 'Removed item';
+    const u = handyUnit(s.unit); const q = convertUnit(r.qty, s.unit, u);
+    return `${s.name} ${fmtAmount(q ?? r.qty)} ${q == null ? s.unit : u}`;
+  }).join(' · ');
+}
+
 /* ---------------- menu form: ingredients editor ---------------- */
+function recipeRow(r = {}) {
+  const s = byId(S.stock, r.stockId);
+  const unit = s ? handyUnit(s.unit) : '';
+  const shown = s && r.qty != null ? fmtAmount(convertUnit(r.qty, s.unit, unit) ?? r.qty) : '';
+  return `<div class="rec-row">
+    <select name="r_stock" aria-label="Ingredient"><option value="">Choose ingredient…</option>${S.stock.map((x) => `<option value="${x.id}" ${x.id === r.stockId ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select>
+    <input name="r_qty" type="number" min="0" step="any" inputmode="decimal" value="${esc(shown)}" placeholder="How much" aria-label="Amount per serving">
+    <select name="r_unit" aria-label="Unit">${s ? unitChoices(s.unit).map((u) => `<option ${u === unit ? 'selected' : ''}>${u}</option>`).join('') : '<option value="">unit</option>'}</select>
+    <button type="button" class="icon-btn sm" data-act="recDel" aria-label="Remove ingredient">${icon('x')}</button></div>`;
+}
 function recipeEditor(m = {}) {
-  const rows = m.recipe && m.recipe.length ? m.recipe : (m.id ? [] : []);
-  const opts = (sel) => `<option value="">Choose stock item…</option>${S.stock.map((s) => `<option value="${s.id}" ${s.id === sel ? 'selected' : ''}>${esc(s.name)} (${esc(s.unit)})</option>`).join('')}`;
-  const row = (r = {}) => `<div class="rec-row"><select name="r_stock" aria-label="Stock item">${opts(r.stockId)}</select>
-      <input name="r_qty" type="number" min="0" step="any" value="${esc(r.qty ?? '')}" placeholder="Qty" aria-label="Quantity per serving">
-      <span class="rec-unit">${esc(byId(S.stock, r.stockId)?.unit || '')}</span>
-      <button type="button" class="icon-btn sm" data-act="recDel" aria-label="Remove ingredient">${icon('x')}</button></div>`;
-  return `<div class="field recipe"><span>Ingredients per serving <em>(stock reduces by this when served)</em></span>
-    ${S.stock.length ? `<div id="rec-rows">${rows.map(row).join('') || row()}</div>
+  const rows = m.recipe && m.recipe.length ? m.recipe : [];
+  return `<div class="field recipe"><span>Ingredients for ONE serving <em>(set once — stock goes down by this each time it's served)</em></span>
+    ${S.stock.length ? `<div class="rec-head"><span>Ingredient</span><span>Amount</span><span>Unit</span><span></span></div>
+      <div id="rec-rows">${rows.map(recipeRow).join('') || recipeRow()}</div>
       <div class="btn-row tight">${btn('Add ingredient', 'recAdd', { cls: 'ghost sm', ic: 'plus' })}${btn('Fill typical amounts', 'recSuggest', { cls: 'ghost sm' })}</div>
-      <template id="rec-tpl">${row()}</template>`
+      <p class="fine">Rough amounts are fine, e.g. tea: Milk 100 ml, Tea powder 5 g, Sugar 10 g.</p>
+      <template id="rec-tpl">${recipeRow()}</template>`
       : '<p class="muted sm">Add stock items first (Stock → Add item), then choose what each dish uses.</p>'}
   </div>`;
 }
 function readRecipe(fd) {
-  const ids = fd.getAll('r_stock').map(String), q = fd.getAll('r_qty').map(Number);
+  const ids = fd.getAll('r_stock').map(String), q = fd.getAll('r_qty').map(Number), units = fd.getAll('r_unit').map(String);
   const out = [];
-  ids.forEach((id, i) => { if (id && q[i] > 0 && byId(S.stock, id)) { const e = out.find((x) => x.stockId === id); if (e) e.qty = r3(e.qty + q[i]); else out.push({ stockId: id, qty: r3(q[i]) }); } });
+  ids.forEach((id, i) => {
+    const s = byId(S.stock, id); if (!s || !(q[i] > 0)) return;
+    const inStockUnit = convertUnit(q[i], units[i] || s.unit, s.unit) ?? q[i];
+    const e = out.find((x) => x.stockId === id);
+    if (e) e.qty = r3(e.qty + inStockUnit); else out.push({ stockId: id, qty: r3(inStockUnit) });
+  });
   return out;
 }
 
@@ -103,15 +135,8 @@ Object.assign(Actions, {
   recSuggest(el) {
     const form = el.closest('form'); const name = form.name.value;
     const sug = suggestRecipe(name);
-    if (!sug.length) return toast(name ? `No typical recipe known for "${name}" with your stock items — add ingredients by hand.` : 'Type the item name first.');
-    const box = $('#rec-rows'), tpl = $('#rec-tpl').innerHTML;
-    box.innerHTML = '';
-    sug.forEach((r) => {
-      box.insertAdjacentHTML('beforeend', tpl);
-      const row = box.lastElementChild;
-      row.querySelector('select').value = r.stockId; row.querySelector('input').value = r.qty;
-      row.querySelector('.rec-unit').textContent = byId(S.stock, r.stockId).unit;
-    });
+    if (!sug.length) return toast(name ? `No typical recipe known for "${name}" with your stock items — choose ingredients from the list.` : 'Type the item name first.');
+    $('#rec-rows').innerHTML = sug.map(recipeRow).join('');
     toast('Typical amounts filled in — adjust if your recipe differs');
   },
   fillRecipes() {
@@ -122,10 +147,13 @@ Object.assign(Actions, {
   },
 });
 Changes.recStock = () => {};
+// Choosing an ingredient offers the right units (ml / L, g / kg …)
 document.addEventListener('change', (e) => {
   if (e.target.name !== 'r_stock') return;
-  const u = e.target.closest('.rec-row')?.querySelector('.rec-unit');
-  if (u) u.textContent = byId(S.stock, e.target.value)?.unit || '';
+  const row = e.target.closest('.rec-row'); const s = byId(S.stock, e.target.value);
+  const sel = row?.querySelector('select[name=r_unit]'); if (!sel) return;
+  sel.innerHTML = s ? unitChoices(s.unit).map((u) => `<option ${u === handyUnit(s.unit) ? 'selected' : ''}>${u}</option>`).join('') : '<option value="">unit</option>';
+  row.querySelector('input[name=r_qty]').focus();
 });
 
 Object.assign(Forms, {

@@ -66,11 +66,11 @@ const BUSINESS_TYPES = { cafe: 'Café', restaurant: 'Restaurant', hotel: 'Hotel 
 const ATT = { present: { label: 'Present', short: 'P' }, late: { label: 'Late', short: 'L' }, leave: { label: 'Leave', short: 'Lv' }, absent: { label: 'Absent', short: 'A' } };
 
 const ROLES = {
-  owner:   { label: 'Owner',   desc: 'Everything',            color: '#1f7a4d', views: ['dashboard', 'orders', 'kitchen', 'billing', 'stock', 'expenses', 'vendors', 'staff', 'reports', 'journal', 'team', 'settings'] },
-  manager: { label: 'Manager', desc: 'Orders · billing · stock · expenses · vendors · staff', color: '#4f46e5', views: ['dashboard', 'orders', 'billing', 'stock', 'expenses', 'vendors', 'staff', 'journal'] },
+  owner:   { label: 'Owner',   desc: 'Everything',            color: '#1f7a4d', views: ['dashboard', 'orders', 'kitchen', 'billing', 'menu', 'stock', 'expenses', 'vendors', 'staff', 'reports', 'journal', 'team', 'settings'] },
+  manager: { label: 'Manager', desc: 'Orders · billing · menu & recipes · stock · expenses · vendors · staff', color: '#4f46e5', views: ['dashboard', 'orders', 'billing', 'menu', 'stock', 'expenses', 'vendors', 'staff', 'journal'] },
   cashier: { label: 'Cashier', desc: 'Billing · orders · day closing', color: '#c2783c', views: ['billing', 'orders', 'journal'] },
   waiter:  { label: 'Waiter',  desc: 'Orders · tables & cleaning · reservations · serving', color: '#0f766e', views: ['orders'] },
-  kitchen: { label: 'Kitchen', desc: 'Kitchen screen: cooking & ready', color: '#d97706', views: ['kitchen'] },
+  kitchen: { label: 'Kitchen', desc: 'Kitchen screen · menu & recipes', color: '#d97706', views: ['kitchen', 'menu'] },
 };
 
 /** Only these roles may start cooking / mark food ready (everyone may mark ready food as served) */
@@ -80,6 +80,7 @@ const VIEWS = {
   orders:    { label: 'Orders',    icon: 'clipboard' },
   kitchen:   { label: 'Kitchen',   icon: 'flame' },
   billing:   { label: 'Billing',   icon: 'receipt' },
+  menu:      { label: 'Menu & recipes', icon: 'cup' },
   stock:     { label: 'Stock',     icon: 'box' },
   expenses:  { label: 'Expenses',  icon: 'wallet' },
   vendors:   { label: 'Vendors',   icon: 'truck' },
@@ -145,7 +146,7 @@ function emptyState() {
     seq: { day: '', n: 0, emp: 0 },
   };
 }
-const APP_VERSION = '3.8';
+const APP_VERSION = '3.9';
 const DEFAULT_PIN = '1234'; // only for accounts created by older versions; they must set a password
 
 /** Short code for employee IDs: "Kalmesh Kitchen" -> "KK", "KK" -> "KK", "Brewhouse" -> "BR" */

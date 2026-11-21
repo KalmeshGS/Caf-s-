@@ -116,6 +116,8 @@ This deletes **all** café data and **all** login accounts in Firebase (rules st
 - A refresh keeps you logged in. **Owner, manager, cashier**: after 5 minutes without use the screen locks and only the **password** is asked (4 wrong → account locked). **Waiter & kitchen** stay logged in; screens refresh every 15 seconds.
 - **Food ready alerts**: when the kitchen marks an order *Ready*, the person who took it gets a sound, vibration and (if allowed) a phone notification, plus a *Ready to serve* list on Orders.
 - **Tables**: Free / Running is automatic from orders; staff can also mark a table *Needs cleaning*, *Reserved* or *Out of service* (⋯ on the table). **Reservations** tab: guest, phone, date, time, guests, table; *Arrived* opens that table for ordering.
+- **Menu & recipes** screen for Owner, Manager and Kitchen: add/edit dishes and pick each ingredient from a dropdown with the amount in ml / L or g / kg (set once).
+- **Managers** can add and edit staff (salary, DOB, address, emergency contact and KYC stay owner-only), update stock and the menu.
 - **Recipes → automatic stock**: each menu item has *Ingredients per serving* (e.g. Tea: Milk 0.1 L, Sugar 0.01 kg, Tea 0.005 kg). Typical amounts are filled in automatically from your stock names. When a ticket is marked **Served** (or its bill is paid) the stock goes down by recipe × quantity.
 - **Notifications (🔔)**: an inbox for everyone with an unread count — food ready (waiters: their own orders), new/changed kitchen tickets (kitchen), upcoming reservations, low stock and login-help requests (owner/manager), and **notices** the owner or a manager posts to everyone or one role.
 - **Billing**: *Print bill* before payment, or *Paid & print* to print the receipt.
