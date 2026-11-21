@@ -3,6 +3,7 @@
    First-run: welcome screen + 3-step setup wizard
    ========================================================= */
 
+const ONLINE = () => typeof Cloud !== 'undefined' && Cloud.on;
 App.setup = { step: 0, d: { type: 'cafe', currency: 'INR', tables: 8, tax: 5, demo: 'on' } };
 const SETUP_TYPES = [
   ['cafe', 'Café', 'cup'], ['restaurant', 'Restaurant', 'flame'], ['hotel', 'Hotel / Dhaba', 'grid'],
@@ -52,10 +53,11 @@ Views.setup = () => {
         <label class="field"><span>Your name</span><input name="owner" required maxlength="40" value="${v('owner')}" autocomplete="name"></label>
         <label class="field"><span>Your mobile</span><input name="phone" type="tel" required maxlength="20" value="${v('phone')}" autocomplete="tel"></label>
       </div>
+      ${ONLINE() ? `<label class="field"><span>Your email <em>(you log in with it; password-reset links are sent here)</em></span><input name="email" type="email" required maxlength="80" value="${v('email')}" autocomplete="email"></label>` : ''}
       ${pwField('pw1', `Create a password <em>(at least ${PW_MIN} characters)</em>`)}
       ${pwField('pw2', 'Repeat password')}
-      <label class="check"><input type="checkbox" name="demo" ${d.demo ? 'checked' : ''}><span>Add sample data so I can explore first <small class="muted">(remove later in Settings → Data)</small></span></label>
-      <p class="muted sm">${icon('lock')} You'll log in with your name or mobile and this password. Next you'll get a recovery code in case you ever forget it.</p>`;
+      ${App.legacyChoice === 'move' ? `<p class="banner info">${icon('upload')}<span>Your existing data on this device will be moved online.</span></p>` : `<label class="check"><input type="checkbox" name="demo" ${d.demo ? 'checked' : ''}><span>Add sample data so I can explore first <small class="muted">(remove later in Settings → Data)</small></span></label>`}
+      <p class="muted sm">${icon('lock')} ${ONLINE() ? "Your café's data is stored securely online, not on this phone. You'll get a café code for your staff." : "You'll log in with your name or mobile and this password. Next you'll get a recovery code in case you ever forget it."}</p>`;
   }
   return `<main class="center-screen onboard">
     <form class="card onb" data-form="setupStep" autocomplete="off">

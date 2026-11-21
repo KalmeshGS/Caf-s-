@@ -1,0 +1,102 @@
+rules_version = '2';
+// =====================================================================
+//  Cafe Journal — Firestore security rules
+//  Paste this whole file into Firebase console → Firestore → Rules → Publish.
+//  Every read/write is checked here on Google's servers, so a modified
+//  app cannot get around them.
+// =====================================================================
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- helpers ----------
+    function signedIn() { return request.auth != null; }
+    function memberDoc(cid) { return get(/databases/$(database)/documents/cafes/$(cid)/members/$(request.auth.uid)); }
+    function isMember(cid) { return signedIn() && exists(/databases/$(database)/documents/cafes/$(cid)/members/$(request.auth.uid)); }
+    // Active, not disabled, and (for staff) not locked after wrong passwords
+    function ok(cid) {
+      return isMember(cid) && memberDoc(cid).data.active == true
+        && (memberDoc(cid).data.get('loginId', null) == null
+            || get(/databases/$(database)/documents/cafes/$(cid)/logins/$(memberDoc(cid).data.loginId)).data.locked == false);
+    }
+    function role(cid) { return memberDoc(cid).data.role; }
+    function can(cid, roles) { return ok(cid) && role(cid) in roles; }
+    function owner(cid) { return can(cid, ['owner']); }
+    function onlyKeys(keys) { return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys); }
+
+    // ---------- public café card (name shown on the login page) ----------
+    match /cafes/{cid} {
+      allow get: if true;
+      allow list: if false;
+      allow create: if signedIn() && request.resource.data.ownerUid == request.auth.uid
+                    && request.resource.data.keys().hasOnly(['name', 'short', 'tagline', 'ownerUid', 'createdAt']);
+      allow update: if owner(cid) && onlyKeys(['name', 'short', 'tagline']);
+      allow delete: if false;
+
+      // ---------- people & logins ----------
+      match /members/{uid} {
+        allow get: if signedIn() && (request.auth.uid == uid || owner(cid));
+        allow list: if owner(cid);
+        // The café creator adds themself as the first owner
+        allow create: if (signedIn() && uid == request.auth.uid
+                          && get(/databases/$(database)/documents/cafes/$(cid)).data.ownerUid == request.auth.uid
+                          && request.resource.data.role == 'owner')
+                      || owner(cid);
+        allow update: if owner(cid)
+                      || (signedIn() && uid == request.auth.uid && onlyKeys(['mustChange', 'lastLogin'])
+                          && request.resource.data.mustChange == false);
+        allow delete: if owner(cid) && uid != request.auth.uid;
+      }
+
+      // One document per staff login ID: which hidden email it uses, and the lock state
+      match /logins/{loginId} {
+        allow get: if true;            // needed before signing in (contains no personal data)
+        allow list: if owner(cid);
+        allow create, delete: if owner(cid);
+        allow update: if owner(cid)
+          // Signed-out wrong password: may only add exactly one failed attempt; 4 locks the account
+          || (!signedIn() && resource.data.locked == false && onlyKeys(['failed', 'locked', 'lockedAt'])
+              && request.resource.data.failed == resource.data.failed + 1
+              && request.resource.data.locked == (request.resource.data.failed >= 4)
+              && (request.resource.data.locked == false || request.resource.data.lockedAt == request.time))
+          // Successful sign-in: the person may only reset their own counter
+          || (signedIn() && request.auth.uid == resource.data.uid && resource.data.locked == false
+              && onlyKeys(['failed']) && request.resource.data.failed == 0);
+      }
+
+      // "Forgot password" requests: anyone may create one for an existing login; only owners read them
+      match /requests/{rid} {
+        allow create: if request.resource.data.keys().hasOnly(['id', 'loginId', 'userId', 'type', 'status', 'createdAt'])
+                      && request.resource.data.status == 'open'
+                      && request.resource.data.type in ['reset', 'unlock']
+                      && request.resource.data.createdAt is number
+                      && exists(/databases/$(database)/documents/cafes/$(cid)/logins/$(request.resource.data.loginId))
+                      && get(/databases/$(database)/documents/cafes/$(cid)/logins/$(request.resource.data.loginId)).data.uid == request.resource.data.userId;
+        allow read, update, delete: if owner(cid);
+      }
+
+      // ---------- café data, by role ----------
+      match /meta/settings { allow read: if ok(cid); allow write: if owner(cid); }
+      match /meta/seq { allow read: if ok(cid); allow write: if can(cid, ['owner', 'manager', 'cashier', 'waiter']); }
+
+      match /menu/{id}       { allow read: if ok(cid); allow write: if owner(cid); }
+      match /orders/{id}     { allow read: if ok(cid); allow write: if can(cid, ['owner', 'manager', 'cashier', 'waiter']); }
+      match /kots/{id}       { allow read, write: if ok(cid); }
+      match /stock/{id}      { allow read, write: if can(cid, ['owner', 'manager']); }
+      match /expenses/{id}   { allow read: if can(cid, ['owner', 'manager', 'cashier']); allow write: if can(cid, ['owner', 'manager']); }
+      match /vendors/{id}    { allow read, write: if can(cid, ['owner', 'manager']); }
+      match /vendorTx/{id}   { allow read, write: if can(cid, ['owner', 'manager']); }
+      match /staff/{id}      { allow read: if can(cid, ['owner', 'manager', 'cashier']); allow write: if owner(cid); }
+      match /staffPrivate/{id} { allow read, write: if owner(cid); }   // salary, KYC, address, DOB…
+      match /attendance/{day} { allow read: if can(cid, ['owner', 'manager', 'cashier']); allow write: if can(cid, ['owner', 'manager']); }
+      match /journal/{day}   { allow read, write: if can(cid, ['owner', 'manager', 'cashier']); }
+    }
+
+    // Which café an owner belongs to (so owners can log in with just email + password)
+    match /profiles/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow create: if signedIn() && request.auth.uid == uid
+                    && get(/databases/$(database)/documents/cafes/$(request.resource.data.cafeId)).data.ownerUid == uid;
+      allow update, delete: if false;
+    }
+  }
+}

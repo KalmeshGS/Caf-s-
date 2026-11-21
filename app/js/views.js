@@ -443,6 +443,12 @@ Views.settings = () => {
         <button class="icon-btn sm" data-act="menuEdit" data-id="${m.id}" aria-label="Edit">${icon('edit')}</button></div>`).join('')}</section>`).join('') || empty('No menu yet.', btn('Add first item', 'menuAdd', { cls: 'ghost', ic: 'plus' }))}`;
   } else {
     const size = (JSON.stringify(S).length / 1024).toFixed(0);
+    if (typeof Cloud !== 'undefined' && Cloud.on) {
+      body = `<section class="card">${eyebrow('Online database')}<p>${icon('check')} Connected. All data is stored securely online and synced live to every device. Nothing is kept on this device.</p>
+        <div class="line-row"><span>Café code (for staff logins)</span><b class="emp-id lg">${esc(Cloud.cid.toUpperCase())}</b></div></section>
+      <section class="card">${eyebrow('Backup')}<p class="muted">Download an encrypted copy of everything, to keep for your records.</p><div class="btn-row">${btn('Download backup', 'exportData', { cls: 'primary', ic: 'download' })}</div></section>
+      <section class="card">${eyebrow('Sample data')}<p class="muted">Replace all café data (online, for everyone) with ~5 weeks of sample data. Logins are kept.</p>${btn('Load sample data', 'loadDemo', { cls: 'ghost' })}</section>`;
+    } else
     body = `<section class="card">${eyebrow('Backup')}<p class="muted">All data lives in this browser (${size} KB). Download an <b>encrypted backup</b> regularly — it is locked with a passphrase you choose — and restore it on any other phone or computer.</p>
       <div class="btn-row">${btn('Download backup', 'exportData', { cls: 'primary', ic: 'download' })}${btn('Restore backup', 'importData', { cls: 'ghost', ic: 'upload' })}</div>
       <input type="file" id="import-file" accept="application/json,.json" hidden></section>
