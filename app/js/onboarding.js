@@ -60,7 +60,7 @@ function rowsEditor(list) {
       <div class="staff-card-h"><b>Person ${i + 1}</b>${del(i)}</div>
       <div class="row-2">
         <label class="field"><span>Full name</span><input name="p_name" maxlength="60" value="${esc(r.name || '')}" placeholder="e.g. Priya Nair"></label>
-        <label class="field"><span>Designation</span><input name="p_role" maxlength="30" value="${esc(r.role || '')}" placeholder="e.g. Chef, Waiter"></label>
+        ${designationField('p_role', r.role)}
       </div>
       <div class="row-2">
         <label class="field"><span>Mobile</span><input name="p_phone" type="tel" maxlength="20" value="${esc(r.phone || '')}"></label>
@@ -161,7 +161,7 @@ function keepSetupFields(form) {
   const col = (k) => fd.getAll(k).map(String);
   if (name === 'menu') { const n = col('m_name'), c = col('m_cat'), p = col('m_price'); d.menu = n.map((x, i) => ({ name: x, cat: c[i], price: p[i] })); }
   if (name === 'stock') { const n = col('s_name'), u = col('s_unit'), q = col('s_qty'), l = col('s_low'); d.stock = n.map((x, i) => ({ name: x, unit: u[i], qty: q[i], low: l[i] })); }
-  if (name === 'staff') { const n = col('p_name'), r = col('p_role'), ph = col('p_phone'), j = col('p_join'), a = col('p_access'), pw = col('p_pw'); d.staff = n.map((x, i) => ({ name: x, role: r[i], phone: ph[i], join: j[i], access: a[i], pw: pw[i] })); }
+  if (name === 'staff') { const n = col('p_name'), r0 = col('p_role'), ro = col('p_role_other'), r = r0.map((x, i) => designationValue(x, ro[i])), ph = col('p_phone'), j = col('p_join'), a = col('p_access'), pw = col('p_pw'); d.staff = n.map((x, i) => ({ name: x, role: r[i], phone: ph[i], join: j[i], access: a[i], pw: pw[i] })); }
 }
 function stepError(name, d) {
   if (name === 'place') {

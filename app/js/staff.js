@@ -63,7 +63,7 @@ function staffForm(p = {}) {
       <div class="stack">
         <div class="emp-badge"><small>Employee ID</small><b id="emp-preview">${esc(preview)}</b>${isNew ? '<small>assigned automatically when you save (year = joining year)</small>' : ''}</div>
         <label class="field"><span>Full name *</span><input name="name" required maxlength="60" value="${esc(p.name || '')}"></label>
-        <label class="field"><span>Designation</span><input name="role" maxlength="30" value="${esc(p.role || '')}" placeholder="e.g. Chef, Barista, Cashier"></label>
+        ${designationField('role', p.role)}
       </div>
     </div>
 
@@ -254,7 +254,7 @@ Object.assign(Forms, {
     if (!isOwner()) return;
     const g = (k) => String(fd.get(k) || '').trim();
     const d = {
-      name: g('name'), role: g('role'), phone: g('phone'), email: g('email'), joinDate: g('joinDate') || dayKey(), shift: g('shift'),
+      name: g('name'), role: designationValue(g('role'), g('role_other')), phone: g('phone'), email: g('email'), joinDate: g('joinDate') || dayKey(), shift: g('shift'),
       salary: num(fd.get('salary')), dob: g('dob'), gender: g('gender'), blood: g('blood'), address: g('address'),
       emergencyName: g('emergencyName'), emergencyPhone: g('emergencyPhone'),
       idType: g('idType'), idNumber: g('idNumber'), pan: g('pan').toUpperCase(), photo: g('photo'),
