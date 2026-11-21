@@ -49,7 +49,14 @@ function badgeFor(v) {
 function render() {
   applyTheme();
   const root = $('#app');
-  if (!S.settings) { root.innerHTML = Views.setup(); return; }
+  if (!S.settings) {
+    // Links from the website: app/#/signup opens the sign-up steps, app/#/login explains how to log in here
+    const entry = parseHash().view;
+    if (entry === 'signup' && App.setup.step === 0) App.setup.step = 1;
+    App.setup.intent = entry === 'login' ? 'login' : '';
+    if (entry === 'signup' || entry === 'login') history.replaceState(null, '', location.pathname);
+    root.innerHTML = Views.setup(); return;
+  }
   const role = Session.role();
   if (!role) { root.innerHTML = Views.login(); return; }
   let { view, params } = parseHash();

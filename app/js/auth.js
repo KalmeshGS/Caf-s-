@@ -147,6 +147,7 @@ Views.login = () => {
       <h1>${esc(st.name)}</h1>
       ${st.tagline ? `<p class="muted center">${esc(st.tagline)}</p>` : ''}
       <p class="eyebrow center">Staff log in</p>
+      ${parseHash().view === 'signup' ? `<div class="banner info">${icon('check')}<span><b>${esc(st.name)}</b> is already set up on this device. Log in below. (To register a different café, the owner can use Settings → Data → Erase.)</span></div>` : ''}
       <label class="field"><span>Employee ID, phone or name</span>
         <input name="who" autocomplete="username" autocapitalize="none" spellcheck="false" required autofocus placeholder="e.g. ${esc((st.short || 'KK') + String(new Date().getFullYear()).slice(-2))}001" value="${esc(App.loginWho || '')}"></label>
       ${pwField('pw', 'Password')}
