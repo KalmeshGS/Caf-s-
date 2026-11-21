@@ -122,12 +122,23 @@ function makeDemo(state) {
 
   // Staff & attendance
   const roles = { cafe: ['Barista', 'Cashier', 'Waiter', 'Helper'], restaurant: ['Chef', 'Cashier', 'Waiter', 'Helper'], hotel: ['Cook', 'Cashier', 'Waiter', 'Helper'], bakery: ['Baker', 'Cashier', 'Counter', 'Helper'], other: ['Lead', 'Cashier', 'Staff', 'Helper'] }[st.type] || ['Chef', 'Cashier', 'Waiter', 'Helper'];
-  state.staff = [
-    { id: uid('p'), name: 'Ravi', role: roles[0], shift: '09:00 – 18:00', salary: amt(18000), phone: '' },
-    { id: uid('p'), name: 'Pooja', role: roles[1], shift: '10:00 – 19:00', salary: amt(14000), phone: '' },
-    { id: uid('p'), name: 'Aman', role: roles[2], shift: '12:00 – 21:00', salary: amt(12000), phone: '' },
-    { id: uid('p'), name: 'Sunil', role: roles[3], shift: '09:00 – 18:00', salary: amt(10000), phone: '' },
+  const people = [
+    ['Ravi Kumar', roles[0], '09:00 – 18:00', 18000, 'B+', 'M', 420],
+    ['Pooja Sharma', roles[1], '10:00 – 19:00', 14000, 'O+', 'F', 300],
+    ['Aman Verma', roles[2], '12:00 – 21:00', 12000, 'A+', 'M', 150],
+    ['Sunil Patil', roles[3], '09:00 – 18:00', 10000, 'AB+', 'M', 40],
   ];
+  state.seq.emp = 0;
+  state.staff = people.map(([name, role, shift, salary, blood, gender, daysAgo], i) => {
+    const joinDate = shiftDay(dayKey(), -daysAgo);
+    const { empId, n } = nextEmpId(state, joinDate); state.seq.emp = n;
+    return {
+      id: uid('p'), empId, name, role, shift, salary: amt(salary), phone: `98450${String(10000 + i * 1111).slice(-5)}`, email: '',
+      joinDate, dob: `199${i + 2}-0${i + 3}-1${i + 2}`, gender, blood, address: 'Sample address, City',
+      emergencyName: 'Family contact', emergencyPhone: `99000${String(20000 + i * 1234).slice(-5)}`,
+      idType: 'Aadhaar', idNumber: `${4000 + i * 7} ${5100 + i * 3} ${6200 + i * 11}`, pan: '', photo: '', active: true,
+    };
+  });
   for (let back = 34; back >= 0; back--) {
     const dk = dayKey(new Date(now.getFullYear(), now.getMonth(), now.getDate() - back));
     state.attendance[dk] = {};

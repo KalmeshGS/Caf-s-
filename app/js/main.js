@@ -26,11 +26,11 @@ function shell(view, content) {
       <div class="brand"><span class="brand-mark">${esc(initials(st.name))}</span><span><strong>${esc(st.name)}</strong><small>${esc(st.tagline || BUSINESS_TYPES[st.type] || '')}</small></span></div>
       <nav class="nav">${r.views.map((v) => navItem(v)).join('')}</nav>
       <div class="me"><span class="avatar sm" style="background:${r.color}">${esc(initials(me.name))}</span><span><strong>${esc(me.name)}</strong><small>${esc(r.label)}</small></span>
-        <button class="icon-btn" data-act="myPin" title="Change my PIN" aria-label="Change my PIN">${icon('lock')}</button>
+        <button class="icon-btn" data-act="myPin" title="Change my password" aria-label="Change my password">${icon('lock')}</button>
         <button class="icon-btn" data-act="logout" title="Log out" aria-label="Log out">${icon('logout')}</button></div>
     </aside>
     <div class="topbar"><span class="brand-mark sm">${esc(initials(st.name))}</span><strong>${esc(st.name)}</strong>
-      <button class="role-pill" style="--c:${r.color}" data-act="myPin" title="Change my PIN">${esc(me.name.split(' ')[0])} · ${esc(r.label)}</button>
+      <button class="role-pill" style="--c:${r.color}" data-act="myPin" title="Change my password">${esc(me.name.split(' ')[0])} · ${esc(r.label)}</button>
       <button class="icon-btn" data-act="logout" aria-label="Log out">${icon('logout')}</button></div>
     <main class="main" id="main">${content}</main>
     ${r.views.length > 1 ? `<nav class="tabbar">${tabs.map((v) => navItem(v)).join('')}
@@ -42,7 +42,7 @@ function badgeFor(v) {
   if (v === 'kitchen') n = S.kots.filter((k) => k.status === 'new').length;
   else if (v === 'billing') n = openOrders().filter((o) => o.items.length).length;
   else if (v === 'stock') n = S.stock.filter(isLow).length;
-  else if (v === 'team') n = pendingOtps().length;
+  else if (v === 'team') n = openRequests().length;
   return n ? `<i class="nbadge">${n}</i>` : '';
 }
 
@@ -180,23 +180,12 @@ const Actions = {
   },
 
   /* staff */
-  staffAdd() { openSheet(staffForm()); },
-  staffOpen(el) { const p = byId(S.staff, el.dataset.id); p && openSheet(staffSheet(p)); },
-  staffEdit(el) { const p = byId(S.staff, el.dataset.id); p && openSheet(staffForm(p)); },
-  staffDel(el) { if (confirm('Remove this person from staff?')) { S.staff = S.staff.filter((x) => x.id !== el.dataset.id); closeSheet(); save(); } },
   att(el) {
     const dk = dayKey(); S.attendance[dk] = S.attendance[dk] || {};
     const cur = S.attendance[dk][el.dataset.id];
     if (cur === el.dataset.s) delete S.attendance[dk][el.dataset.id]; else S.attendance[dk][el.dataset.id] = el.dataset.s;
     save();
   },
-  staffPay(el) {
-    const p = byId(S.staff, el.dataset.id); if (!p) return;
-    if (!confirm(`Record salary of ${money(p.salary)} for ${p.name}? It will be added to expenses.`)) return;
-    S.expenses.push({ id: uid('e'), date: dayKey(), cat: 'Salary', title: `Salary · ${p.name}`, amount: Number(p.salary) || 0, staffId: p.id, forMonth: monthKey() });
-    save(); openSheet(staffSheet(p)); toast('Salary recorded');
-  },
-
   /* journal */
   dayNav(el) { const d = shiftDay(App.ui.day, Number(el.dataset.d)); App.ui.day = d > dayKey() ? dayKey() : d; render(); },
   dayGo(el) { App.ui.day = el.dataset.day; render(); window.scrollTo(0, 0); },
@@ -213,11 +202,10 @@ const Actions = {
   menuEdit(el) { const m = byId(S.menu, el.dataset.id); m && openSheet(menuForm(m)); },
   menuDel(el) { if (confirm('Delete this menu item?')) { S.menu = S.menu.filter((x) => x.id !== el.dataset.id); closeSheet(); save(); } },
   menuToggle(el) { const m = byId(S.menu, el.dataset.id); if (m) { m.available = el.checked; save(); } },
-  exportData() { download(`${slug(S.settings.name)}-backup-${dayKey()}.json`, JSON.stringify(S, null, 1), 'application/json'); toast('Backup downloaded'); },
-  importData() { $('#import-file').click(); },
   loadDemo() {
     if (!confirm('Replace ALL current data with sample data?')) return;
-    makeDemo(S); save(); toast('Sample data loaded');
+    makeDemo(S); S.users.forEach((u) => { if (u.staffId && !byId(S.staff, u.staffId)) u.staffId = null; });
+    save(); toast('Sample data loaded');
   },
   resetAll() {
     if (!confirm('Erase everything on this device? This cannot be undone. Download a backup first if unsure.')) return;
@@ -228,21 +216,6 @@ const Actions = {
 /* ---------------- forms (data-form) ---------------- */
 const num = (v) => (v === '' || v == null ? 0 : Number(v));
 const Forms = {
-  setup(fd) {
-    const st = {
-      name: fd.get('name').trim(), tagline: fd.get('tagline').trim(), type: fd.get('type') || 'cafe',
-      currency: fd.get('currency'), tables: clamp(num(fd.get('tables')), 0, 99), tax: num(fd.get('tax')),
-      openHour: 8, closeHour: 22, accent: 'green', theme: 'auto', footer: 'Thank you, visit again!',
-    };
-    S = emptyState(); S.settings = st;
-    const owner = makeUser(fd.get('owner').trim() || 'Owner', 'owner', fd.get('phone').trim());
-    S.users = [owner, ...['manager', 'cashier', 'waiter', 'kitchen'].map((r) => makeUser(ROLES[r].label, r))];
-    if (fd.get('demo')) makeDemo(S);
-    else { S.menu = starterMenu(st.type, st.currency); S.stock = starterStock(st.type); }
-    persist(); history.replaceState(null, '', location.pathname); render();
-    // Owner chooses their own PIN straight away
-    App.pinUser = owner.id; openSheet(changePinSheet(owner, 'first'));
-  },
   pay(fd) {
     const o = byId(S.orders, App.params.o); if (!o || o.status !== 'open') return;
     const t = orderTotals(o, num(fd.get('discount')));
@@ -280,18 +253,13 @@ const Forms = {
     S.vendorTx.push({ id: uid('t'), vendorId: v.id, type: 'payment', amount: a, date: dayKey(), method: fd.get('method') });
     save(); openSheet(vendorSheet(v), { wide: true }); toast('Payment recorded');
   },
-  staff(fd) {
-    const d = { name: fd.get('name').trim(), role: fd.get('role').trim(), shift: fd.get('shift').trim(), salary: num(fd.get('salary')), phone: fd.get('phone').trim() };
-    const p = byId(S.staff, fd.get('id'));
-    if (p) Object.assign(p, d); else S.staff.push({ id: uid('p'), ...d });
-    closeSheet(); save();
-  },
   business(fd) {
     Object.assign(S.settings, {
       name: fd.get('name').trim(), tagline: fd.get('tagline').trim(), type: fd.get('type'), currency: fd.get('currency'),
       tables: clamp(num(fd.get('tables')), 0, 99), tax: num(fd.get('tax')),
       openHour: clamp(num(fd.get('openHour')), 0, 23), closeHour: clamp(num(fd.get('closeHour')), 0, 23),
       footer: fd.get('footer').trim(), accent: fd.get('accent'), theme: fd.get('theme'),
+      short: shortCode(fd.get('short') || fd.get('name')),
     });
     save(); toast('Saved');
   },
@@ -348,15 +316,11 @@ document.addEventListener('submit', (e) => {
 });
 document.addEventListener('input', (e) => { const el = e.target.closest('[data-input]'); el && Inputs[el.dataset.input]?.(el, e); });
 document.addEventListener('change', (e) => {
-  if (e.target.id !== 'import-file') return;
-  const file = e.target.files[0]; if (!file) return;
-  file.text().then((txt) => {
-    const data = JSON.parse(txt);
-    if (!data || !data.settings || !Array.isArray(data.orders)) throw new Error('bad');
-    if (!confirm(`Restore backup of "${data.settings.name}"? This replaces current data.`)) return;
-    S = migrate(Object.assign(emptyState(), data)); Session.set(null); save(); toast('Backup restored — please log in');
-  }).catch(() => toast('That file is not a valid backup'));
+  if (e.target.id === 'import-file') { const f = e.target.files[0]; e.target.value = ''; if (f) restoreFile(f); return; }
+  const el = e.target.closest('[data-change]'); el && Changes[el.dataset.change]?.(el, e);
 });
+/** Handlers for <input data-change="..."> (file pickers etc.), filled in by other modules */
+const Changes = {};
 window.addEventListener('hashchange', () => { closeSheet(); render(); });
 // Keep several tabs/windows on the same device in sync (e.g. kitchen screen in another window)
 window.addEventListener('storage', (e) => {
@@ -385,5 +349,9 @@ setInterval(() => {
 /* ---------------- boot (after every script, incl. auth.js, has loaded) ---------------- */
 document.addEventListener('DOMContentLoaded', render);
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
-  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').then((r) => r.update()).catch(() => {}));
+  // When a new version takes over, reload once so nobody keeps using old screens
+  const hadController = !!navigator.serviceWorker.controller;
+  let reloaded = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadController && !reloaded) { reloaded = true; location.reload(); } });
 }
