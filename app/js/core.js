@@ -45,6 +45,22 @@ const CURRENCIES = [
 ];
 const ACCENTS = { green: '#1f7a4d', coffee: '#8a5a33', indigo: '#4f46e5', terracotta: '#c2410c', teal: '#0f766e', charcoal: '#3f3f46' };
 const EXPENSE_CATS = { Rent: '#6366f1', Utilities: '#eab308', Vendor: '#c2783c', Kitchen: '#16a34a', Salary: '#0ea5e9', Maintenance: '#a855f7', Marketing: '#ec4899', Other: '#94a3b8' };
+/** Common job titles for the Designation dropdown ("Other" lets you type your own) */
+const DESIGNATIONS = ['Manager', 'Assistant Manager', 'Head Chef', 'Chef', 'Cook', 'Kitchen Helper', 'Barista', 'Cashier', 'Captain', 'Waiter', 'Steward', 'Bartender', 'Baker', 'Housekeeping', 'Dishwasher', 'Delivery', 'Security', 'Accountant', 'Helper'];
+/** Designation picker: a dropdown of common roles + "Other" with a text box */
+function designationField(name, value, label = 'Designation') {
+  const v = String(value || '').trim();
+  const other = !!v && !DESIGNATIONS.includes(v);
+  return `<label class="field"><span>${label}</span>
+    <select name="${name}" data-change="designation" aria-label="${label}">
+      <option value="">Choose…</option>
+      ${DESIGNATIONS.map((d) => `<option ${d === v ? 'selected' : ''}>${esc(d)}</option>`).join('')}
+      <option value="__other" ${other ? 'selected' : ''}>Other (type it)</option>
+    </select>
+    <input name="${name}_other" maxlength="30" value="${other ? esc(v) : ''}" placeholder="Type the designation" ${other ? '' : 'hidden'} aria-label="Other designation"></label>`;
+}
+/** Read the chosen designation (the typed text when "Other" is picked) */
+const designationValue = (sel, other) => (sel === '__other' ? String(other || '').trim() : String(sel || '').trim());
 const UNITS = ['kg', 'g', 'L', 'ml', 'pcs', 'packs', 'dozen', 'bottles', 'cylinders'];
 const BUSINESS_TYPES = { cafe: 'Café', restaurant: 'Restaurant', hotel: 'Hotel / Dhaba', bakery: 'Bakery', other: 'Something else' };
 const ATT = { present: { label: 'Present', short: 'P' }, late: { label: 'Late', short: 'L' }, leave: { label: 'Leave', short: 'Lv' }, absent: { label: 'Absent', short: 'A' } };

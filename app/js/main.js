@@ -350,7 +350,14 @@ document.addEventListener('change', (e) => {
   const el = e.target.closest('[data-change]'); el && Changes[el.dataset.change]?.(el, e);
 });
 /** Handlers for <input data-change="..."> (file pickers etc.), filled in by other modules */
-const Changes = {};
+const Changes = {
+  designation(el) {
+    const box = el.parentElement.querySelector('input[name$="_other"]');
+    if (!box) return;
+    box.hidden = el.value !== '__other';
+    if (!box.hidden) box.focus();
+  },
+};
 window.addEventListener('hashchange', () => { closeSheet(); render(); });
 // Keep several tabs/windows on the same device in sync (e.g. kitchen screen in another window)
 window.addEventListener('storage', (e) => {
