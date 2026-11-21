@@ -34,6 +34,7 @@ const toUnit = (qty, base, unit) => {
   return null; // units don't match (e.g. kg vs pcs) — don't guess
 };
 const r3 = (n) => Math.round(n * 1000) / 1000;
+const r6 = (n) => Math.round(n * 1e6) / 1e6; // stored amounts keep small quantities exact (3.75 g = 0.00375 kg)
 
 /** Suggest a recipe for a menu item name, using only stock items you actually have */
 function suggestRecipe(name, stock = S.stock) {
@@ -84,12 +85,13 @@ function recipeRow(r = {}) {
 function recipeEditor(m = {}) {
   const rows = m.recipe && m.recipe.length ? m.recipe : [];
   return `<div class="field recipe"><span>Ingredients for ONE serving <em>(set once — stock goes down by this each time it's served)</em></span>
-    ${S.stock.length ? `<div class="rec-head"><span>Ingredient</span><span>Amount</span><span>Unit</span><span></span></div>
-      <div id="rec-rows">${rows.map(recipeRow).join('') || recipeRow()}</div>
-      <div class="btn-row tight">${btn('Add ingredient', 'recAdd', { cls: 'ghost sm', ic: 'plus' })}${btn('Fill typical amounts', 'recSuggest', { cls: 'ghost sm' })}</div>
-      <p class="fine">Rough amounts are fine, e.g. tea: Milk 100 ml, Tea powder 5 g, Sugar 10 g.</p>
-      <template id="rec-tpl">${recipeRow()}</template>`
-      : '<p class="muted sm">Add stock items first (Stock → Add item), then choose what each dish uses.</p>'}
+    ${!S.stock.length ? `<p class="muted sm">No stock items yet. Use "Paste ingredients" or "From a photo" below — new ingredients can be added to stock right there${canAddStock() ? '' : ' (by the owner or a manager)'}.</p>` : ''}
+    <div class="rec-head"><span>Ingredient</span><span>Amount</span><span>Unit</span><span></span></div>
+    <div id="rec-rows">${rows.map(recipeRow).join('') || recipeRow()}</div>
+    <div class="btn-row tight">${btn('Add ingredient', 'recAdd', { cls: 'ghost sm', ic: 'plus' })}${btn('Fill typical amounts', 'recSuggest', { cls: 'ghost sm' })}</div>
+    ${importTools()}
+    <p class="fine">Rough amounts are fine, e.g. tea: Milk 100 ml, Tea powder 5 g, Sugar 10 g.</p>
+    <template id="rec-tpl">${recipeRow()}</template>
   </div>`;
 }
 function readRecipe(fd) {
@@ -99,7 +101,7 @@ function readRecipe(fd) {
     const s = byId(S.stock, id); if (!s || !(q[i] > 0)) return;
     const inStockUnit = convertUnit(q[i], units[i] || s.unit, s.unit) ?? q[i];
     const e = out.find((x) => x.stockId === id);
-    if (e) e.qty = r3(e.qty + inStockUnit); else out.push({ stockId: id, qty: r3(inStockUnit) });
+    if (e) e.qty = r6(e.qty + inStockUnit); else out.push({ stockId: id, qty: r6(inStockUnit) });
   });
   return out;
 }
@@ -110,13 +112,13 @@ function stockUse(k) {
   const use = {};
   (k.items || []).forEach((i) => {
     const m = byId(S.menu, i.menuId) || S.menu.find((x) => x.name === i.name);
-    (m?.recipe || []).forEach((r) => { use[r.stockId] = r3((use[r.stockId] || 0) + r.qty * i.qty); });
+    (m?.recipe || []).forEach((r) => { use[r.stockId] = r6((use[r.stockId] || 0) + r.qty * i.qty); });
   });
   return use;
 }
 /** Offline: change S directly. (Online mode replaces this with safe server-side decrements.) */
 let applyStockUse = (use) => {
-  Object.entries(use).forEach(([id, q]) => { const s = byId(S.stock, id); if (s) s.qty = r3(Number(s.qty) - q); });
+  Object.entries(use).forEach(([id, q]) => { const s = byId(S.stock, id); if (s) s.qty = r6(Number(s.qty) - q); });
 };
 /** Call when a ticket becomes Served — once per ticket */
 function useStockFor(k) {
