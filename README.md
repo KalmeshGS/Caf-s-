@@ -94,8 +94,11 @@ With an online database, **nothing is stored on the device**: all café data liv
 6. Put them in [`app/js/firebase-config.js`](app/js/firebase-config.js) (`window.FIREBASE_CONFIG = { ... }`) and push — or send them to whoever maintains the site. These values are **not secret**.
 7. Recommended: Google Cloud console → APIs & Services → Credentials → your *Browser key* → restrict it to the website `https://kalmeshgs.github.io/*`.
 
+### Already have sample data in your café?
+Settings → Data → **Erase café data** (keeps your settings and logins), then **Set up menu, stock & staff** to type your real details.
+
 ### How it works once connected
-- **Sign up**: the owner creates the café with name, mobile, **email** and password. The app shows a **café code** (e.g. `KK-7F3Q2`).
+- **Sign up** (6 steps, no sample data): place → how you work → **menu → stock → staff & their logins** (each optional) → owner account. The owner creates the café with name, mobile, **email** and password. The app shows a **café code** (e.g. `KK-7F3Q2`).
   If the device had data from the offline version, it offers to **move it online** and then deletes it from the device.
 - **Owner login**: email + password, on any device. Forgot it → *Forgot password* emails a reset link.
 - **Staff login**: café code (asked once per device) + **Employee ID** + password. The owner types each person's first password; they must change it at first login.

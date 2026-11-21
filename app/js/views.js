@@ -447,18 +447,25 @@ Views.settings = () => {
       body = `<section class="card">${eyebrow('Online database')}<p>${icon('check')} Connected. All data is stored securely online and synced live to every device. Nothing is kept on this device.</p>
         <div class="line-row"><span>Café code (for staff logins)</span><b class="emp-id lg">${esc(Cloud.cid.toUpperCase())}</b></div></section>
       <section class="card">${eyebrow('Backup')}<p class="muted">Download an encrypted copy of everything, to keep for your records.</p><div class="btn-row">${btn('Download backup', 'exportData', { cls: 'primary', ic: 'download' })}</div></section>
-      <section class="card">${eyebrow('Sample data')}<p class="muted">Replace all café data (online, for everyone) with ~5 weeks of sample data. Logins are kept.</p>${btn('Load sample data', 'loadDemo', { cls: 'ghost' })}</section>`;
+      ${setupCards()}`;
     } else
     body = `<section class="card">${eyebrow('Backup')}<p class="muted">All data lives in this browser (${size} KB). Download an <b>encrypted backup</b> regularly — it is locked with a passphrase you choose — and restore it on any other phone or computer.</p>
       <div class="btn-row">${btn('Download backup', 'exportData', { cls: 'primary', ic: 'download' })}${btn('Restore backup', 'importData', { cls: 'ghost', ic: 'upload' })}</div>
       <input type="file" id="import-file" accept="application/json,.json" hidden></section>
-    <section class="card">${eyebrow('Sample data')}<p class="muted">Replace everything with ~5 weeks of realistic sample data to explore the app.</p>${btn('Load sample data', 'loadDemo', { cls: 'ghost' })}</section>
+    ${setupCards()}
+    <section class="card">${eyebrow('Sample data')}<p class="muted">For trying the app only: replace everything with ~5 weeks of made-up sample data.</p>${btn('Load sample data', 'loadDemo', { cls: 'ghost' })}</section>
     <section class="card danger-zone">${eyebrow('Start over')}<p class="muted">Erase all data on this device and run setup again.</p>${btn('Erase everything', 'resetAll', { cls: 'danger-ghost', ic: 'trash' })}</section>`;
   }
   return `${pageHead('Settings', st.name, '')}
     <div class="tabs">${Object.entries(tabs).map(([k, v]) => `<button class="tab ${k === tab ? 'on' : ''}" data-act="settingsTab" data-tab="${k}">${v}</button>`).join('')}</div>
     <div class="stack">${body}</div>`;
 };
+function setupCards() {
+  return `<section class="card">${eyebrow('Café details')}<p class="muted">Add your menu, stock and staff (with their logins) step by step.</p>
+      <div class="btn-row">${btn('Set up menu, stock & staff', 'setupLater', { cls: 'primary', ic: 'plus' })}</div></section>
+    <section class="card danger-zone">${eyebrow('Start clean')}<p class="muted">Remove all menu items, stock, staff records, bills, expenses, vendors, attendance and journal — for example to clear sample data. Your café settings and login accounts stay.</p>
+      ${btn('Erase café data', 'eraseCafeData', { cls: 'danger-ghost', ic: 'trash' })}</section>`;
+}
 function menuForm(m = {}) {
   const cats = [...new Set(S.menu.map((x) => x.cat))];
   return `${sheetHead('Menu', m.id ? 'Edit item' : 'Add item')}

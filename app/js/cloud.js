@@ -243,6 +243,10 @@ async function attach(cid, user) {
     jobs.push(listen(ccol('logins'), (snap) => { snap.docChanges().forEach((ch) => { if (ch.type === 'removed') delete Cloud.logins[ch.doc.id]; else Cloud.logins[ch.doc.id] = ch.doc.data(); }); rebuildUsers(); }));
   } else S.users = [Cloud.me];
   await Promise.all(jobs);
+  // Show a small "offline" notice whenever the live connection drops
+  Cloud.unsubs.push(FB.onSnapshot(cref('meta', 'settings'), { includeMetadataChanges: true }, (snap) => {
+    document.body.classList.toggle('is-offline', snap.metadata.fromCache);
+  }, () => {}));
   if (!S.settings) { await Cloud.signOut('Could not load this café. Please try again.'); return; }
   S.seq = Object.assign({ day: '', n: 0, emp: 0 }, S.seq);
   if (!S.settings.short) S.settings.short = shortCode(S.settings.name);
@@ -260,6 +264,7 @@ Cloud.signOut = async (msg) => {
   Cloud.unsubs.forEach((u) => { try { u(); } catch (e) { /* ignore */ } });
   Cloud.unsubs = []; Cloud.attached = false; Cloud.loading = false; Cloud.me = null; Cloud.mirror = {}; Cloud.pendingUser = null;
   Session._id = null;
+  document.body.classList.remove('is-offline');
   S = emptyState();
   try { await FB.signOut(Cloud.auth); } catch (e) { /* ignore */ }
   closeSheet();
@@ -363,6 +368,38 @@ async function createStaffAccount(email, pw) {
   return newUid;
 }
 
+/** Retry a database read a few times if the connection dropped for a moment */
+async function withRetry(fn, tries = 4) {
+  for (let i = 0; ; i++) {
+    try { return await fn(); } catch (e) {
+      if (e.code !== 'unavailable' || i >= tries - 1) throw e;
+      await sleep(800 * (i + 1));
+    }
+  }
+}
+/** Owner gives someone a staff login: creates their sign-in and access records */
+Cloud.giveAccess = async ({ staff, name, phone, role, pw }) => {
+  const loginId = (staff ? staff.empId : name).toLowerCase().replace(/[^a-z0-9]/g, '');
+  const label = loginId.toUpperCase();
+  if (!loginId) return { ok: false, name, role, error: 'Add the person under Staff first.' };
+  if (Cloud.logins[loginId]) return { ok: false, name, role, error: `Login ID ${label} is already in use.` };
+  try {
+    const email = staffEmail(loginId, Cloud.cid, 1);
+    const newUid = await createStaffAccount(email, pw);
+    const b = FB.writeBatch(Cloud.db);
+    b.set(cref('members', newUid), { name, phone: phone || '', role, staffId: staff ? staff.id : null, loginId, active: true, mustChange: true, createdAt: Date.now() });
+    b.set(cref('logins', loginId), { email, uid: newUid, failed: 0, locked: false, version: 1 });
+    await b.commit();
+    Cloud.logins[loginId] = { email, uid: newUid, failed: 0, locked: false, version: 1 };
+    return { ok: true, name, role, loginId: label };
+  } catch (e) { return { ok: false, name, role, error: friendly(e) }; }
+};
+Cloud.giveAccessMany = async (list) => {
+  const out = [];
+  for (const L of list) out.push(await Cloud.giveAccess({ staff: L.staff, name: L.staff.name, phone: L.staff.phone, role: L.role, pw: L.pw }));
+  return out;
+};
+
 /* ---------------- sign up (owner creates the café) ---------------- */
 async function cloudSignup(fd, form) {
   keepSetupFields(form);
@@ -381,10 +418,11 @@ async function cloudSignup(fd, form) {
       currency: d.currency || 'INR', tables: clamp(num(d.tables), 0, 99), tax: num(d.tax),
       openHour: 8, closeHour: 22, accent: 'green', theme: 'auto', footer: 'Thank you, visit again!',
     };
-    let base;
     const moving = App.legacyChoice === 'move' && Cloud.legacy;
-    if (moving) { base = Cloud.legacy; base.settings = Object.assign({}, base.settings, st); }
-    else { base = emptyState(); base.settings = st; if (d.demo) makeDemo(base); else { base.menu = starterMenu(st.type, st.currency); base.stock = starterStock(st.type); } }
+    const base = moving ? Object.assign(emptyState(), Cloud.legacy) : emptyState();
+    base.settings = moving ? Object.assign({}, base.settings, st) : st;
+    base.seq = Object.assign({ day: '', n: 0, emp: 0 }, base.seq);
+    const logins = applyDraft(base, d); // the menu, stock and staff typed during sign-up — no sample data
     let cid = '';
     for (let i = 0; i < 5 && !cid; i++) { const c = `${st.short.toLowerCase()}-${randomCode(5)}`; if (!(await FB.getDoc(FB.doc(Cloud.db, 'cafes', c))).exists()) cid = c; }
     await FB.setDoc(FB.doc(Cloud.db, 'cafes', cid), { name: st.name, short: st.short, tagline: st.tagline, ownerUid: user.uid, createdAt: Date.now() });
@@ -398,13 +436,15 @@ async function cloudSignup(fd, form) {
     await Cloud.flush();
     if (moving) { try { localStorage.removeItem(DB_KEY); } catch (e) { /* ignore */ } Cloud.legacy = null; }
     FB.sendEmailVerification(user).catch(() => {});
-    App.setup = { step: 0, d: {} }; App.legacyChoice = null; App.cloudView = 'login';
+    App.setup = { step: 0, mode: 'signup', d: newDraft() }; App.legacyChoice = null; App.cloudView = 'login';
     await attach(cid, user);
+    const results = await Cloud.giveAccessMany(logins);
     openSheet(`${sheetHead('Your café is online', st.name)}
       <p>Everything is now stored securely online${moving ? ' — and removed from this device' : ''}.</p>
       <p class="muted">Your <b>café code</b> — staff type it the first time they log in on a phone:</p>
       <div class="recovery-code">${esc(cid.toUpperCase())}</div>
       <p class="muted sm">You log in with <b>${esc(email)}</b>. Forgot your password? Use "Forgot password" on the login page and a reset link is emailed to you.</p>
+      ${loginsSummary(results)}
       ${btn('Got it', 'closeSheet', { cls: 'primary block' })}`);
   } catch (e) { formError(friendly(e)); } finally { busy(form, false); }
 }
@@ -437,11 +477,12 @@ function installOverrides() {
     legacyMove() {
       const st = Cloud.legacy.settings;
       App.legacyChoice = 'move';
-      Object.assign(App.setup.d, { name: st.name, short: st.short || shortCode(st.name), type: st.type, tagline: st.tagline || '', currency: st.currency, tables: st.tables, tax: st.tax, demo: '' });
+      App.setup.mode = 'signup';
+      Object.assign(App.setup.d, newDraft(), { name: st.name, short: st.short || shortCode(st.name), type: st.type, tagline: st.tagline || '', currency: st.currency, tables: st.tables, tax: st.tax });
       App.setup.step = 1; render();
     },
-    legacyFresh() { App.legacyChoice = 'fresh'; App.setup.step = 1; render(); },
-    setupBack(el) { if (App.setup.step <= 1) { App.cloudView = Cloud.legacy ? 'signup' : 'login'; App.setup.step = 0; App.legacyChoice = null; return render(); } origSetupBack(el); },
+    legacyFresh() { App.legacyChoice = 'fresh'; App.setup = { step: 1, mode: 'signup', d: newDraft() }; render(); },
+    setupBack(el) { if (App.setup.step <= 1 && App.setup.mode !== 'later') { App.cloudView = Cloud.legacy ? 'signup' : 'login'; App.setup.step = 0; App.legacyChoice = null; return render(); } origSetupBack(el); },
     changeCafe() { Cloud.cafeCode = ''; Cloud.cafeName = ''; try { localStorage.removeItem('cj.cafe'); localStorage.removeItem('cj.cafeName'); } catch (e) { /* ignore */ } render(); },
     monthNav(el) { origMonthNav(el); Cloud.ensureMonth(App.ui.month); },
     async forgotFromLogin() {
@@ -541,7 +582,7 @@ function installOverrides() {
         await attach(cid, user);
       } catch (e) { formError(BAD_PASSWORD.includes(e.code) ? 'Current password is not right.' : friendly(e)); } finally { busy(form, false); }
     },
-    async setupStep(fd, form) { if (App.setup.step < 3) return origSetupStep(fd, form); return cloudSignup(fd, form); },
+    async setupStep(fd, form) { if (App.setup.mode === 'later' || stepName() !== 'owner') return origSetupStep(fd, form); return cloudSignup(fd, form); },
     async access(fd, form) {
       const id = fd.get('id'), staffId = fd.get('staffId') || '', role = fd.get('role') || 'waiter';
       const p = staffId ? byId(S.staff, staffId) : null;
@@ -560,17 +601,10 @@ function installOverrides() {
           closeSheet(); return toast('Saved');
         }
         const err = passwordError(fd.get('pw1'), fd.get('pw2'), { name }); if (err) return formError(err);
-        const loginId = (p ? p.empId : name).toLowerCase().replace(/[^a-z0-9]/g, '');
-        if (!loginId) return formError('Could not make a login ID — add the person under Staff first.');
-        if ((await FB.getDoc(cref('logins', loginId))).exists()) return formError(`Login ID ${loginId.toUpperCase()} is already in use.`);
-        const email = staffEmail(loginId, Cloud.cid, 1);
-        const newUid = await createStaffAccount(email, fd.get('pw1'));
-        const b = FB.writeBatch(Cloud.db);
-        b.set(cref('members', newUid), { name, phone, role, staffId: staffId || null, loginId, active: true, mustChange: true, createdAt: Date.now() });
-        b.set(cref('logins', loginId), { email, uid: newUid, failed: 0, locked: false, version: 1 });
-        await b.commit();
+        const r = await Cloud.giveAccess({ staff: p, name, phone, role, pw: fd.get('pw1') });
+        if (!r.ok) return formError(r.error);
         closeSheet();
-        toast(`${name} can now log in with ${loginId.toUpperCase()} and café code ${Cloud.cid.toUpperCase()}`);
+        toast(`${name} can now log in with ${r.loginId} and café code ${Cloud.cid.toUpperCase()}`);
       } catch (e) { formError(friendly(e)); } finally { busy(form, false); }
     },
     async setPw(fd, form) {
@@ -578,7 +612,7 @@ function installOverrides() {
       const err = passwordError(fd.get('pw1'), fd.get('pw2'), u); if (err) return formError(err);
       busy(form, true);
       try {
-        const L = (await FB.getDoc(cref('logins', u.loginId))).data() || {};
+        const L = Cloud.logins[u.loginId] || (await withRetry(() => FB.getDoc(cref('logins', u.loginId)))).data() || {};
         const version = (L.version || 1) + 1;
         const email = staffEmail(u.loginId, Cloud.cid, version);
         const newUid = await createStaffAccount(email, fd.get('pw1'));
