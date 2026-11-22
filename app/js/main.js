@@ -425,7 +425,8 @@ document.addEventListener('click', (e) => {
   fn(el, e);
 });
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && !$('#sheet').hidden) closeSheet();
+  // Escape closes an open ingredient list first, the sheet only after that
+  if (e.key === 'Escape' && !$('#sheet').hidden && !e.target.closest?.('.combo')?.querySelector('.combo-list:not([hidden])')) closeSheet();
   const el = e.target.closest?.('[role="button"][data-act]');
   if (el && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); Actions[el.dataset.act]?.(el, e); }
 });

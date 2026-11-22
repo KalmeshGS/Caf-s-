@@ -45,7 +45,7 @@ const CURRENCIES = [
 ];
 /** Older cafés kept the first default (green, auto) — they get the new house look until they choose one in Settings */
 const lookOf = (st = {}) => (st.look === 2 ? { accent: st.accent || 'red', theme: st.theme || 'dark' } : { accent: !st.accent || st.accent === 'green' ? 'red' : st.accent, theme: !st.theme || st.theme === 'auto' ? 'dark' : st.theme });
-const ACCENTS = { red: '#e5262f', green: '#1f7a4d', coffee: '#8a5a33', indigo: '#4f46e5', terracotta: '#c2410c', teal: '#0f766e', charcoal: '#3f3f46' };
+const ACCENTS = { red: '#d61f28', green: '#1f7a4d', coffee: '#8a5a33', indigo: '#4f46e5', terracotta: '#c2410c', teal: '#0f766e', charcoal: '#3f3f46' };
 const EXPENSE_CATS = { Rent: '#6366f1', Utilities: '#eab308', Vendor: '#c2783c', Kitchen: '#16a34a', Salary: '#0ea5e9', Maintenance: '#a855f7', Marketing: '#ec4899', Other: '#94a3b8' };
 /** Common job titles for the Designation dropdown ("Other" lets you type your own) */
 const DESIGNATIONS = ['Manager', 'Assistant Manager', 'Head Chef', 'Chef', 'Cook', 'Kitchen Helper', 'Barista', 'Cashier', 'Captain', 'Waiter', 'Steward', 'Bartender', 'Baker', 'Housekeeping', 'Dishwasher', 'Delivery', 'Security', 'Accountant', 'Helper'];
@@ -118,6 +118,7 @@ const ICONS = {
   edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
   more: '<circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/>',
   left: '<path d="m15 18-6-6 6-6"/>',
+  down: '<path d="m6 9 6 6 6-6"/>',
   right: '<path d="m9 18 6-6-6-6"/>',
   clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
   send: '<path d="M22 2 11 13M22 2l-7 20-4-9-9-4z"/>',
