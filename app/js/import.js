@@ -84,6 +84,8 @@ function parseIngredients(text) {
   }
   return { servings, items };
 }
+const CHANGERS = ['ice', 'powder', 'sauce', 'syrup', 'oil', 'flour', 'paste', 'essence', 'juice', 'masala', 'batter', 'bag', 'bottle', 'sheet', 'base', 'bun', 'patty'];
+const CHANGERS_ING = CHANGERS.filter((w) => w !== 'powder' && w !== 'masala');
 /** Best matching stock item for an ingredient name */
 function matchStock(name, stock = S.stock) {
   const ing = normName(name); if (!ing.length) return null;
@@ -91,6 +93,8 @@ function matchStock(name, stock = S.stock) {
   stock.forEach((s) => {
     const st = normName(s.name);
     const hit = st.filter((w) => ing.includes(w)).length;
+    // "cream" is not "Ice cream", "milk" is not "Milk powder", "rice" is not "Rice flour"
+    if (st.some((w) => CHANGERS.includes(w) && !ing.includes(w)) || ing.some((w) => CHANGERS_ING.includes(w) && !st.includes(w))) return;
     const sc = st.length ? hit / st.length + (hit ? 0.1 * hit : 0) : 0;
     if (sc > score) { score = sc; best = s; }
   });
@@ -114,6 +118,8 @@ function importTools() {
   return `<div class="imp-tools">
     <span class="muted sm">Add ingredients faster:</span>
     <div class="btn-row tight">
+      ${btn('Recipe library', 'libFill', { cls: 'ghost sm', ic: 'book' })}
+      ${window.AI_RECIPE_URL ? btn('Ask AI', 'aiFill', { cls: 'ghost sm', ic: 'spark' }) : ''}
       ${btn('Search on Google', 'impGoogle', { cls: 'ghost sm', ic: 'search' })}
       ${btn('Paste ingredients', 'impPaste', { cls: 'ghost sm', ic: 'clipboard' })}
       ${btn('From a photo', 'impPhoto', { cls: 'ghost sm', ic: 'camera' })}
@@ -186,8 +192,17 @@ function downscale(file, max = 2000) {
   });
 }
 
+/** Show reader items (from text, a photo, the library or AI) for checking before adding */
+function showItems(items, note) {
+  App.impItems = items;
+  $('#imp-preview').innerHTML = items.length
+    ? `<p class="muted sm">${esc(note)}. Check the matches and amounts, then add.</p>
+      <div class="imp-list">${items.map(previewRow).join('')}</div>
+      <div class="btn-row">${btn('Add ticked to recipe', 'impAdd', { cls: 'primary', ic: 'plus' })}</div>`
+    : '<p class="neg sm">No ingredients found. Put one ingredient per line, like "2 cups milk".</p>';
+}
 /* ---------------- actions ---------------- */
-function showPanel() { const p = $('#imp-panel'); if (p) { p.hidden = false; } return p; }
+function showPanel(noText) { const p = $('#imp-panel'); if (p) { p.hidden = false; p.querySelectorAll(':scope > .field, :scope > .imp-row2').forEach((x) => { x.hidden = !!noText; }); } return p; }
 Object.assign(Actions, {
   impGoogle(el) {
     const name = el.closest('form').name.value.trim();
@@ -203,12 +218,7 @@ Object.assign(Actions, {
     if (sv && (+sv.value || 1) === 1 && servings > 1) sv.value = servings;
     const per = Math.max(1, +(sv?.value) || 1);
     const scaled = items.filter((it) => it.amount != null || matchStock(it.name)).map((it) => ({ ...it, amount: it.amount != null ? it.amount / per : null })); // titles / headings without amounts are left out
-    App.impItems = scaled;
-    $('#imp-preview').innerHTML = scaled.length
-      ? `<p class="muted sm">${pl(scaled.length, 'ingredient')} found${per > 1 ? ` · amounts divided by ${per} servings` : ''}. Check the matches, then add.</p>
-        <div class="imp-list">${scaled.map(previewRow).join('')}</div>
-        <div class="btn-row">${btn('Add ticked to recipe', 'impAdd', { cls: 'primary', ic: 'plus' })}</div>`
-      : '<p class="neg sm">No ingredients found. Put one ingredient per line, like "2 cups milk".</p>';
+    showItems(scaled, `${pl(scaled.length, 'ingredient')} found${per > 1 ? ` · amounts divided by ${per} servings` : ''}`);
   },
   impAdd() {
     const rows = $$('#imp-preview .imp-item').filter((r) => r.querySelector('.imp-on').checked);

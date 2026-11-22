@@ -38,6 +38,8 @@ const r6 = (n) => Math.round(n * 1e6) / 1e6; // stored amounts keep small quanti
 
 /** Suggest a recipe for a menu item name, using only stock items you actually have */
 function suggestRecipe(name, stock = S.stock) {
+  const lib = typeof libraryRecipe === 'function' ? libraryRecipe(name, stock) : [];
+  if (lib.length) return lib;
   const rule = TYPICAL_RECIPES.find((t) => t.match.test(String(name || '')));
   if (!rule) return [];
   const out = [];
@@ -88,7 +90,7 @@ function recipeEditor(m = {}) {
     ${!S.stock.length ? `<p class="muted sm">No stock items yet. Use "Paste ingredients" or "From a photo" below — new ingredients can be added to stock right there${canAddStock() ? '' : ' (by the owner or a manager)'}.</p>` : ''}
     <div class="rec-head"><span>Ingredient</span><span>Amount</span><span>Unit</span><span></span></div>
     <div id="rec-rows">${rows.map(recipeRow).join('') || recipeRow()}</div>
-    <div class="btn-row tight">${btn('Add ingredient', 'recAdd', { cls: 'ghost sm', ic: 'plus' })}${btn('Fill typical amounts', 'recSuggest', { cls: 'ghost sm' })}</div>
+    <div class="btn-row tight">${btn('Add ingredient', 'recAdd', { cls: 'ghost sm', ic: 'plus' })}</div>
     ${importTools()}
     <p class="fine">Rough amounts are fine, e.g. tea: Milk 100 ml, Tea powder 5 g, Sugar 10 g.</p>
     <template id="rec-tpl">${recipeRow()}</template>
@@ -134,18 +136,11 @@ const usedBy = (stockId) => S.menu.filter((m) => (m.recipe || []).some((r) => r.
 Object.assign(Actions, {
   recAdd() { const t = $('#rec-tpl'), box = $('#rec-rows'); if (t && box) box.insertAdjacentHTML('beforeend', t.innerHTML); },
   recDel(el) { const row = el.closest('.rec-row'); const box = $('#rec-rows'); if (row && box.children.length > 1) row.remove(); else if (row) { row.querySelector('select').value = ''; row.querySelector('input').value = ''; } },
-  recSuggest(el) {
-    const form = el.closest('form'); const name = form.name.value;
-    const sug = suggestRecipe(name);
-    if (!sug.length) return toast(name ? `No typical recipe known for "${name}" with your stock items — choose ingredients from the list.` : 'Type the item name first.');
-    $('#rec-rows').innerHTML = sug.map(recipeRow).join('');
-    toast('Typical amounts filled in — adjust if your recipe differs');
-  },
   fillRecipes() {
     let n = 0;
     S.menu.forEach((m) => { if (!(m.recipe && m.recipe.length)) { const r = suggestRecipe(m.name); if (r.length) { m.recipe = r; n++; } } });
-    if (!n) return toast('No new recipes to fill — items already have ingredients, or no matching stock items.');
-    save(); toast(`Typical ingredients added to ${pl(n, 'menu item')} — check them in Settings → Menu`);
+    if (!n) return toast('Nothing filled — dishes already have ingredients, or their ingredients are not in your stock yet. Open a dish and use "Recipe library" to add them.');
+    save(); toast(`Ingredients from the recipe library added to ${pl(n, 'menu item')} — tap a dish to check the amounts`);
   },
 });
 Changes.recStock = () => {};
