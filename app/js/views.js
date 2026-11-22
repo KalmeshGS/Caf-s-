@@ -8,7 +8,7 @@ const App = {
   ui: { cat: 'All', q: '', month: monthKey(), day: dayKey(), stockFilter: 'all', settingsTab: 'business' },
   lastNewKots: null,
 };
-const can = (view) => { const r = Session.role(); return !!r && ROLES[r].views.includes(view); };
+const can = (view) => { const r = Session.role(); return !!r && viewsFor(r).includes(view); };
 const Views = {};
 
 /* Setup wizard: onboarding.js · Login & Team: auth.js · Staff & ID cards: staff.js */
@@ -33,12 +33,14 @@ Views.dashboard = () => {
 
   return `${typeof homeHero === 'function' ? homeHero() : ''}${pageHead(Session.role() === 'owner' ? 'Owner dashboard' : 'Dashboard', `Today · ${fmtDate(new Date(), { weekday: 'short', day: 'numeric', month: 'short' })}`, live())}
   ${requestsCard()}
+  ${typeof setupBanner === 'function' ? setupBanner() : ''}
   <div class="kpis">
     ${kpi("Today's sales", money(sales), `${pl(paid.length, 'bill')}${diff !== null && sales ? ` · ${diff >= 0 ? '+' : ''}${diff}% vs yesterday` : ''}`)}
     ${kpi("Today's expenses", money(exp), `${expensesOn(today).length} ${expensesOn(today).length === 1 ? 'entry' : 'entries'}`, 'neg')}
     ${kpi("Today's profit", money(profit), 'Sales − expenses', profit >= 0 ? 'pos' : 'neg')}
-    ${kpi('Running tables', String(open.length), open.length ? money(sum(open, orderSubtotal)) + ' on tables' : 'All clear')}
+    ${typeof feat !== 'function' || feat('tables') ? kpi('Running tables', String(open.length), open.length ? money(sum(open, orderSubtotal)) + ' on tables' : 'All clear') : kpi('Open orders', String(open.length), open.length ? money(sum(open, orderSubtotal)) + ' not paid yet' : 'All clear')}
   </div>
+  ${moneyReceivedCard(paid)}
   <div class="grid-2 wide-left">
     <section class="card">
       <div class="card-head">${eyebrow('Sales · hourly')}<span class="muted sm">${paid.length ? 'Avg bill ' + money(sales / paid.length) : ''}</span></div>
@@ -60,6 +62,31 @@ Views.dashboard = () => {
     </section>
   </div>`;
 };
+
+/** Dashboard: money received today, split by how it was paid (cash, UPI, card and any other way used) */
+function moneyReceivedCard(paid) {
+  const pm = payMethods();
+  const by = {};
+  paid.forEach((o) => { const k = o.method || 'other'; (by[k] = by[k] || { amt: 0, n: 0 }); by[k].amt += Number(o.total) || 0; by[k].n += 1; });
+  const keys = [...Object.keys(pm), ...Object.keys(by).filter((k) => !pm[k])];
+  const total = sum(Object.values(by), (x) => x.amt);
+  const ICON = { cash: 'cash', upi: 'phone', card: 'card' };
+  const label = (k) => pm[k]?.label || (k === 'other' ? 'Other' : k.replace(/^\w/, (c) => c.toUpperCase()));
+  return `<section class="card money-in">
+    <div class="card-head">${eyebrow('Money received today')}<b class="money-total">${money(total)}</b></div>
+    <div class="pay-grid">${keys.map((k) => {
+      const x = by[k] || { amt: 0, n: 0 }; const pct = total ? Math.round((x.amt / total) * 100) : 0;
+      return `<div class="pay-tile">
+        <span class="pay-ic" style="--c:${pm[k]?.color || '#8a837c'}">${icon(ICON[k] || 'wallet')}</span>
+        <span class="pay-name">${esc(label(k))}</span>
+        <b class="pay-amt">${money(x.amt)}</b>
+        <small class="muted">${pl(x.n, 'bill')}${total ? ` · ${pct}%` : ''}</small>
+        ${meter(pct, pm[k]?.color || 'var(--muted)')}
+      </div>`;
+    }).join('')}</div>
+    ${total ? '' : '<p class="muted sm">No payments yet today — they appear here as bills are paid.</p>'}
+  </section>`;
+}
 
 /* ---------------- 02 Orders ---------------- */
 function currentOrder(p) {
@@ -424,7 +451,7 @@ Views.settings = () => {
   const st = S.settings;
   let body = '';
   if (tab === 'business') {
-    body = `<form class="card form" data-form="business">
+    body = `${Session.role() === 'owner' ? businessSetupCard() : ''}<form class="card form" data-form="business">
       <div class="row-3"><label class="field"><span>Name</span><input name="name" required maxlength="40" value="${esc(st.name)}"></label>
       <label class="field"><span>Short code <em>(employee IDs)</em></span><input name="short" maxlength="4" value="${esc(st.short || shortCode(st.name))}" style="text-transform:uppercase"></label>
       <label class="field"><span>Tagline</span><input name="tagline" maxlength="60" value="${esc(st.tagline || '')}"></label></div>
@@ -513,6 +540,7 @@ function receiptHtml(o, draft) {
   const t = draft || { sub: o.subtotal, discount: o.discount, tax: o.tax, total: o.total };
   return `<div class="receipt">
     <h2>${esc(st.name)}</h2>${st.tagline ? `<p>${esc(st.tagline)}</p>` : ''}
+    ${st.gstin ? `<p>GSTIN: ${esc(st.gstin)}</p>` : ''}${st.fssai ? `<p>FSSAI: ${esc(st.fssai)}</p>` : ''}${st.taxProfile ? `<p><b>${esc(st.taxProfile.billTitle || 'Tax Invoice')}</b></p>` : ''}
     <p>${draft ? '<b>BILL</b><br>' : '<b>RECEIPT</b><br>'}${esc(orderLabel(o))} · Bill #${o.no}<br>${new Date(draft ? Date.now() : o.paidAt).toLocaleString()}</p><hr>
     ${o.items.map((l) => `<div class="r"><span>${esc(l.name)} × ${l.qty}</span><span>${money(l.qty * l.price)}</span></div>`).join('')}<hr>
     <div class="r"><span>Subtotal</span><span>${money(t.sub)}</span></div>

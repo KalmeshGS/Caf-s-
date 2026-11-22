@@ -24,7 +24,8 @@ function nextReservation(t) {
 }
 const ordersTabs = (tab) => {
   const n = (S.reservations || []).filter((r) => r.status === 'booked' && r.date === dayKey()).length;
-  return `<div class="tabs"><a class="tab ${tab === 'tables' ? 'on' : ''}" href="#/orders">Tables</a><a class="tab ${tab === 'res' ? 'on' : ''}" href="#/orders?tab=res">Reservations${n ? ` <i class="nbadge inline">${n}</i>` : ''}</a></div>`;
+  if (!feat('reservations')) return ''; // bookings switched off in Business setup (data kept)
+  return `<div class="tabs"><a class="tab ${tab === 'tables' ? 'on' : ''}" href="#/orders">${feat('tables') ? 'Tables' : 'Orders'}</a><a class="tab ${tab === 'res' ? 'on' : ''}" href="#/orders?tab=res">Reservations${n ? ` <i class="nbadge inline">${n}</i>` : ''}</a></div>`;
 };
 const rulesNotice = () => (typeof Cloud !== 'undefined' && Cloud.on && Cloud.rulesOutdated
   ? `<div class="banner warn">${icon('alert')}<span>Table status and reservations are being switched on for your café. Please refresh in a minute.</span></div>` : '');
@@ -52,14 +53,16 @@ function tablesView() {
     </div>`;
   }).join('');
   const takeaways = open.filter((o) => o.table === 'Takeaway' && (o.items.length || Date.now() - o.createdAt < 10 * 60000));
-  return `${pageHead('Orders', 'Tables', btn('New takeaway', 'newTakeaway', { cls: 'primary', ic: 'plus' }))}
+  const withTables = feat('tables');
+  const newLabel = withTables ? 'New takeaway' : feat('takeaway') ? 'New order' : 'New order';
+  return `${pageHead('Orders', withTables ? 'Tables' : 'Counter', btn(newLabel, 'newTakeaway', { cls: 'primary', ic: 'plus' }))}
     ${ordersTabs('tables')}
     ${rulesNotice()}
     ${readyCard()}
-    ${tableNames().length ? `<div class="table-grid">${tiles}</div>
+    ${!withTables ? `<div class="banner info">${icon('receipt')}<span>Tap <b>${newLabel}</b> for each customer. Open orders show below until they are paid.</span></div>` : tableNames().length ? `<div class="table-grid">${tiles}</div>
       <p class="fine">Tables show <b>Free</b> / <b>Running</b> automatically from orders. Tap ⋯ on a table to mark it as needing cleaning, reserved or out of service.</p>`
       : empty('No tables set. Add tables in Settings, or use takeaway orders.')}
-    ${takeaways.length ? `<h3 class="section-t">Takeaway</h3><div class="table-grid">${takeaways.map((o) => `
+    ${takeaways.length ? `<h3 class="section-t">${withTables ? 'Takeaway' : 'Open orders'}</h3><div class="table-grid">${takeaways.map((o) => `
       <div class="table-tile busy"><button class="tt-main" data-act="openOrder" data-id="${o.id}"><strong>#${o.no}</strong><span>${money(orderSubtotal(o))}</span><small>${pl(sum(o.items, (l) => l.qty), 'item')} · ${elapsedMin(o.createdAt)}</small></button></div>`).join('')}</div>` : ''}`;
 }
 
@@ -131,7 +134,7 @@ function resForm(r = {}, presetTable = '') {
 }
 
 /* ---------------- actions ---------------- */
-Views.orders = (p) => (p.t || p.o ? orderEditor(p) : p.tab === 'res' ? reservationsView() : tablesView());
+Views.orders = (p) => (p.t || p.o ? orderEditor(p) : p.tab === 'res' && feat('reservations') ? reservationsView() : tablesView());
 
 const origOpenTable = Actions.openTable;
 const origAddItem = Actions.addItem;

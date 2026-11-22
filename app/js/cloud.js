@@ -313,8 +313,8 @@ async function attach(cid, user, restoring) {
   Cloud.cafeCode = cid; Cloud.cafeName = S.settings.name;
   FB.updateDoc(cref('members', user.uid), { lastLogin: Date.now() }).catch(() => {});
   closeSheet();
-  const keep = restoring && ROLES[role].views.includes(parseHash().view);
-  if (!keep) history.replaceState(null, '', `#/${ROLES[role].views[0]}`);
+  const keep = restoring && viewsFor(role).includes(parseHash().view);
+  if (!keep) history.replaceState(null, '', `#/${viewsFor(role)[0]}`);
   render();
   if (restoring) return;
   const n = role === 'owner' ? openRequests().length : 0;
@@ -501,6 +501,7 @@ async function cloudSignup(fd, form) {
       name: d.name.trim(), short: d.short, tagline: String(d.tagline || '').trim(), type: d.type || 'cafe',
       currency: d.currency || 'INR', tables: clamp(num(d.tables), 0, 99), tax: num(d.tax),
       openHour: 8, closeHour: 22, accent: 'clay', theme: 'light', look: 3, footer: 'Thank you, visit again!',
+      ...(d.answers ? profileSettings(d.answers, d.owner) : {}),
     };
     const moving = App.legacyChoice === 'move' && Cloud.legacy;
     const base = moving ? Object.assign(emptyState(), Cloud.legacy) : emptyState();

@@ -1,0 +1,1155 @@
+{
+  "version": "1.0",
+  "app": "Cafe Journal",
+  "coreFlags": [
+    "menu",
+    "billing",
+    "day_close",
+    "expenses",
+    "vendors",
+    "staff",
+    "auth",
+    "reports"
+  ],
+  "questions": [
+    {
+      "id": "q_preset",
+      "step": 1,
+      "type": "single",
+      "required": true,
+      "options": [
+        "darshini",
+        "qsr",
+        "cafe",
+        "casual_dining",
+        "fine_dining",
+        "meals_hotel",
+        "dhaba",
+        "bar",
+        "cloud_kitchen",
+        "bakery",
+        "kiosk_small",
+        "food_truck",
+        "buffet",
+        "canteen",
+        "mess_tiffin",
+        "hotel_rooms",
+        "catering"
+      ]
+    },
+    {
+      "id": "q_eat_where",
+      "step": 2,
+      "type": "multi",
+      "options": [
+        "tables",
+        "standing",
+        "takeaway",
+        "own_delivery",
+        "aggregator",
+        "rooms"
+      ]
+    },
+    {
+      "id": "q_table_count",
+      "step": 2,
+      "type": "object",
+      "showIf": "q_eat_where has tables",
+      "fields": {
+        "count": "number",
+        "areas": "string[]"
+      }
+    },
+    {
+      "id": "q_area_pricing",
+      "step": 2,
+      "type": "boolean",
+      "showIf": "q_table_count.areas.length > 1"
+    },
+    {
+      "id": "q_order_by",
+      "step": 2,
+      "type": "multi",
+      "options": [
+        "waiter",
+        "counter",
+        "qr",
+        "phone"
+      ]
+    },
+    {
+      "id": "q_pay_when",
+      "step": 2,
+      "type": "multi",
+      "options": [
+        "prepaid",
+        "postpaid",
+        "account",
+        "room",
+        "advance"
+      ]
+    },
+    {
+      "id": "q_handoff",
+      "step": 2,
+      "type": "single",
+      "showIf": "q_pay_when has prepaid",
+      "options": [
+        "serve",
+        "token",
+        "name",
+        "station_coupon",
+        "instant"
+      ]
+    },
+    {
+      "id": "q_kitchen",
+      "step": 2,
+      "type": "single",
+      "options": [
+        "none",
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "id": "q_stations",
+      "step": 2,
+      "type": "string[]",
+      "showIf": "q_kitchen == multi"
+    },
+    {
+      "id": "q_kitchen_device",
+      "step": 2,
+      "type": "single",
+      "showIf": "q_kitchen != none",
+      "options": [
+        "kds",
+        "print",
+        "both",
+        "verbal"
+      ]
+    },
+    {
+      "id": "q_menu_style",
+      "step": 2,
+      "type": "multi",
+      "options": [
+        "alacarte",
+        "variants",
+        "combos",
+        "meals",
+        "buffet",
+        "weight",
+        "mrp"
+      ]
+    },
+    {
+      "id": "q_time_menus",
+      "step": 2,
+      "type": "boolean"
+    },
+    {
+      "id": "q_alcohol",
+      "step": 2,
+      "type": "boolean"
+    },
+    {
+      "id": "q_rooms",
+      "step": 2,
+      "type": "object",
+      "fields": {
+        "has": "boolean",
+        "count": "number",
+        "maxTariff": "number"
+      }
+    },
+    {
+      "id": "q_bookings",
+      "step": 2,
+      "type": "multi",
+      "options": [
+        "tables",
+        "preorders",
+        "events",
+        "none"
+      ]
+    },
+    {
+      "id": "q_regulars",
+      "step": 2,
+      "type": "multi",
+      "options": [
+        "credit",
+        "wallet",
+        "subscription",
+        "loyalty",
+        "none"
+      ]
+    },
+    {
+      "id": "q_brands",
+      "step": 2,
+      "type": "object",
+      "showIf": "q_eat_where has aggregator or own_delivery",
+      "fields": {
+        "has": "boolean",
+        "names": "string[]"
+      }
+    },
+    {
+      "id": "q_hours",
+      "step": 2,
+      "type": "object",
+      "fields": {
+        "pastMidnight": "boolean",
+        "cutoff": "HH:mm"
+      }
+    },
+    {
+      "id": "q_internet",
+      "step": 2,
+      "type": "single",
+      "options": [
+        "yes",
+        "sometimes",
+        "often_no"
+      ]
+    },
+    {
+      "id": "q_gst",
+      "step": 3,
+      "type": "single",
+      "required": true,
+      "options": [
+        "regular",
+        "composition",
+        "none"
+      ]
+    },
+    {
+      "id": "q_gstin",
+      "step": 3,
+      "type": "text",
+      "showIf": "q_gst != none",
+      "pattern": "^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$"
+    },
+    {
+      "id": "q_fssai",
+      "step": 3,
+      "type": "text",
+      "required": true,
+      "pattern": "^[0-9]{14}$"
+    },
+    {
+      "id": "q_price_incl",
+      "step": 3,
+      "type": "boolean"
+    },
+    {
+      "id": "q_service_charge",
+      "step": 3,
+      "type": "single",
+      "options": [
+        "no",
+        "optional"
+      ],
+      "default": "no"
+    },
+    {
+      "id": "q_packing",
+      "step": 3,
+      "type": "single",
+      "options": [
+        "none",
+        "per_item",
+        "per_order"
+      ]
+    },
+    {
+      "id": "q_printer",
+      "step": 3,
+      "type": "single",
+      "options": [
+        "none",
+        "bt58",
+        "usb80"
+      ]
+    },
+    {
+      "id": "q_stock",
+      "step": 4,
+      "type": "single",
+      "options": [
+        "none",
+        "purchases",
+        "recipe"
+      ]
+    },
+    {
+      "id": "q_staff_roles",
+      "step": 4,
+      "type": "multi",
+      "options": [
+        "owner",
+        "manager",
+        "cashier",
+        "waiter",
+        "chef",
+        "bartender",
+        "delivery",
+        "housekeeping",
+        "front_desk"
+      ]
+    },
+    {
+      "id": "q_devices",
+      "step": 4,
+      "type": "multi",
+      "options": [
+        "owner_phone",
+        "counter",
+        "waiter_phones",
+        "kitchen_tablet",
+        "tv"
+      ]
+    },
+    {
+      "id": "q_language",
+      "step": 4,
+      "type": "multi",
+      "options": [
+        "en",
+        "kn",
+        "hi",
+        "te",
+        "ta",
+        "mr"
+      ]
+    }
+  ],
+  "presets": {
+    "darshini": {
+      "q_eat_where": [
+        "standing",
+        "takeaway"
+      ],
+      "q_order_by": [
+        "counter"
+      ],
+      "q_pay_when": [
+        "prepaid"
+      ],
+      "q_handoff": "station_coupon",
+      "q_kitchen": "multi",
+      "q_stations": [
+        "Dosa",
+        "Idli-Vada",
+        "Coffee"
+      ],
+      "q_kitchen_device": "print",
+      "q_menu_style": [
+        "alacarte",
+        "meals"
+      ],
+      "q_time_menus": true,
+      "q_alcohol": false,
+      "q_bookings": [
+        "none"
+      ],
+      "q_regulars": [
+        "none"
+      ],
+      "q_internet": "sometimes",
+      "q_stock": "purchases",
+      "q_devices": [
+        "counter"
+      ]
+    },
+    "qsr": {
+      "q_eat_where": [
+        "tables",
+        "takeaway",
+        "aggregator"
+      ],
+      "q_order_by": [
+        "counter",
+        "qr"
+      ],
+      "q_pay_when": [
+        "prepaid"
+      ],
+      "q_handoff": "token",
+      "q_kitchen": "single",
+      "q_kitchen_device": "kds",
+      "q_menu_style": [
+        "alacarte",
+        "variants",
+        "combos"
+      ],
+      "q_time_menus": false,
+      "q_alcohol": false,
+      "q_bookings": [
+        "none"
+      ],
+      "q_regulars": [
+        "loyalty"
+      ],
+      "q_stock": "recipe",
+      "q_devices": [
+        "counter",
+        "kitchen_tablet",
+        "tv"
+      ]
+    },
+    "cafe": {
+      "q_eat_where": [
+        "tables",
+        "takeaway"
+      ],
+      "q_order_by": [
+        "counter"
+      ],
+      "q_pay_when": [
+        "prepaid"
+      ],
+      "q_handoff": "name",
+      "q_kitchen": "multi",
+      "q_stations": [
+        "Coffee bar",
+        "Kitchen"
+      ],
+      "q_kitchen_device": "kds",
+      "q_menu_style": [
+        "alacarte",
+        "variants",
+        "mrp"
+      ],
+      "q_time_menus": false,
+      "q_alcohol": false,
+      "q_bookings": [
+        "preorders"
+      ],
+      "q_regulars": [
+        "loyalty"
+      ],
+      "q_stock": "recipe",
+      "q_devices": [
+        "counter",
+        "kitchen_tablet"
+      ]
+    },
+    "casual_dining": {
+      "q_eat_where": [
+        "tables",
+        "takeaway"
+      ],
+      "q_order_by": [
+        "waiter"
+      ],
+      "q_pay_when": [
+        "postpaid"
+      ],
+      "q_kitchen": "multi",
+      "q_stations": [
+        "Main kitchen",
+        "Tandoor",
+        "Chinese"
+      ],
+      "q_kitchen_device": "both",
+      "q_menu_style": [
+        "alacarte",
+        "variants"
+      ],
+      "q_time_menus": false,
+      "q_alcohol": false,
+      "q_bookings": [
+        "tables"
+      ],
+      "q_regulars": [
+        "none"
+      ],
+      "q_stock": "recipe",
+      "q_devices": [
+        "counter",
+        "waiter_phones",
+        "kitchen_tablet"
+      ]
+    },
+    "fine_dining": {
+      "q_eat_where": [
+        "tables"
+      ],
+      "q_order_by": [
+        "waiter"
+      ],
+      "q_pay_when": [
+        "postpaid"
+      ],
+      "q_kitchen": "multi",
+      "q_stations": [
+        "Kitchen",
+        "Pastry",
+        "Bar"
+      ],
+      "q_kitchen_device": "kds",
+      "q_menu_style": [
+        "alacarte"
+      ],
+      "q_alcohol": true,
+      "q_bookings": [
+        "tables",
+        "events"
+      ],
+      "q_regulars": [
+        "loyalty"
+      ],
+      "q_stock": "recipe",
+      "q_devices": [
+        "counter",
+        "waiter_phones",
+        "kitchen_tablet"
+      ]
+    },
+    "meals_hotel": {
+      "q_eat_where": [
+        "tables",
+        "takeaway"
+      ],
+      "q_order_by": [
+        "waiter",
+        "counter"
+      ],
+      "q_pay_when": [
+        "postpaid"
+      ],
+      "q_kitchen": "single",
+      "q_kitchen_device": "verbal",
+      "q_menu_style": [
+        "alacarte",
+        "meals"
+      ],
+      "q_time_menus": true,
+      "q_alcohol": false,
+      "q_bookings": [
+        "none"
+      ],
+      "q_regulars": [
+        "credit"
+      ],
+      "q_stock": "purchases",
+      "q_devices": [
+        "counter"
+      ]
+    },
+    "dhaba": {
+      "q_eat_where": [
+        "tables",
+        "takeaway"
+      ],
+      "q_order_by": [
+        "waiter"
+      ],
+      "q_pay_when": [
+        "postpaid"
+      ],
+      "q_kitchen": "single",
+      "q_kitchen_device": "print",
+      "q_menu_style": [
+        "alacarte",
+        "meals",
+        "mrp"
+      ],
+      "q_alcohol": false,
+      "q_bookings": [
+        "none"
+      ],
+      "q_regulars": [
+        "credit"
+      ],
+      "q_hours": {
+        "pastMidnight": true,
+        "cutoff": "04:00"
+      },
+      "q_internet": "often_no",
+      "q_stock": "purchases",
+      "q_devices": [
+        "counter",
+        "waiter_phones"
+      ]
+    },
+    "bar": {
+      "q_eat_where": [
+        "tables"
+      ],
+      "q_order_by": [
+        "waiter"
+      ],
+      "q_pay_when": [
+        "postpaid"
+      ],
+      "q_kitchen": "multi",
+      "q_stations": [
+        "Bar",
+        "Kitchen"
+      ],
+      "q_kitchen_device": "both",
+      "q_menu_style": [
+        "alacarte",
+        "variants",
+        "combos"
+      ],
+      "q_time_menus": true,
+      "q_alcohol": true,
+      "q_bookings": [
+        "tables"
+      ],
+      "q_regulars": [
+        "credit"
+      ],
+      "q_hours": {
+        "pastMidnight": true,
+        "cutoff": "03:00"
+      },
+      "q_stock": "recipe",
+      "q_devices": [
+        "counter",
+        "waiter_phones",
+        "kitchen_tablet"
+      ]
+    },
+    "cloud_kitchen": {
+      "q_eat_where": [
+        "aggregator",
+        "own_delivery"
+      ],
+      "q_order_by": [
+        "phone"
+      ],
+      "q_pay_when": [
+        "prepaid"
+      ],
+      "q_handoff": "instant",
+      "q_kitchen": "single",
+      "q_kitchen_device": "kds",
+      "q_menu_style": [
+        "alacarte",
+        "variants",
+        "combos"
+      ],
+      "q_alcohol": false,
+      "q_bookings": [
+        "none"
+      ],
+      "q_regulars": [
+        "none"
+      ],
+      "q_brands": {
+        "has": false,
+        "names": []
+      },
+      "q_stock": "recipe",
+      "q_devices": [
+        "counter",
+        "kitchen_tablet"
+      ]
+    },
+    "bakery": {
+      "q_eat_where": [
+        "takeaway"
+      ],
+      "q_order_by": [
+        "counter"
+      ],
+      "q_pay_when": [
+        "prepaid",
+        "advance"
+      ],
+      "q_handoff": "instant",
+      "q_kitchen": "none",
+      "q_menu_style": [
+        "alacarte",
+        "weight",
+        "mrp"
+      ],
+      "q_alcohol": false,
+      "q_bookings": [
+        "preorders"
+      ],
+      "q_regulars": [
+        "credit"
+      ],
+      "q_stock": "recipe",
+      "q_devices": [
+        "counter"
+      ]
+    },
+    "kiosk_small": {
+      "q_eat_where": [
+        "takeaway",
+        "standing"
+      ],
+      "q_order_by": [
+        "counter"
+      ],
+      "q_pay_when": [
+        "prepaid"
+      ],
+      "q_handoff": "instant",
+      "q_kitchen": "none",
+      "q_menu_style": [
+        "alacarte",
+        "variants"
+      ],
+      "q_alcohol": false,
+      "q_bookings": [
+        "none"
+      ],
+      "q_regulars": [
+        "none"
+      ],
+      "q_stock": "purchases",
+      "q_printer": "bt58",
+      "q_devices": [
+        "owner_phone"
+      ]
+    },
+    "food_truck": {
+      "q_eat_where": [
+        "standing",
+        "takeaway"
+      ],
+      "q_order_by": [
+        "counter"
+      ],
+      "q_pay_when": [
+        "prepaid"
+      ],
+      "q_handoff": "token",
+      "q_kitchen": "none",
+      "q_menu_style": [
+        "alacarte",
+        "combos"
+      ],
+      "q_alcohol": false,
+      "q_bookings": [
+        "none"
+      ],
+      "q_regulars": [
+        "none"
+      ],
+      "q_internet": "often_no",
+      "q_stock": "purchases",
+      "q_devices": [
+        "owner_phone"
+      ]
+    },
+    "buffet": {
+      "q_eat_where": [
+        "tables"
+      ],
+      "q_order_by": [
+        "waiter"
+      ],
+      "q_pay_when": [
+        "postpaid"
+      ],
+      "q_kitchen": "single",
+      "q_kitchen_device": "print",
+      "q_menu_style": [
+        "buffet",
+        "alacarte"
+      ],
+      "q_time_menus": true,
+      "q_alcohol": false,
+      "q_bookings": [
+        "tables",
+        "events"
+      ],
+      "q_regulars": [
+        "none"
+      ],
+      "q_stock": "recipe",
+      "q_devices": [
+        "counter",
+        "waiter_phones"
+      ]
+    },
+    "canteen": {
+      "q_eat_where": [
+        "standing",
+        "tables",
+        "takeaway"
+      ],
+      "q_order_by": [
+        "counter"
+      ],
+      "q_pay_when": [
+        "prepaid",
+        "account"
+      ],
+      "q_handoff": "token",
+      "q_kitchen": "multi",
+      "q_stations": [
+        "Meals",
+        "Snacks",
+        "Beverages"
+      ],
+      "q_kitchen_device": "kds",
+      "q_menu_style": [
+        "alacarte",
+        "meals",
+        "mrp"
+      ],
+      "q_time_menus": true,
+      "q_alcohol": false,
+      "q_bookings": [
+        "preorders"
+      ],
+      "q_regulars": [
+        "wallet",
+        "credit"
+      ],
+      "q_stock": "purchases",
+      "q_devices": [
+        "counter",
+        "kitchen_tablet",
+        "tv"
+      ]
+    },
+    "mess_tiffin": {
+      "q_eat_where": [
+        "own_delivery",
+        "tables"
+      ],
+      "q_order_by": [
+        "phone"
+      ],
+      "q_pay_when": [
+        "account"
+      ],
+      "q_kitchen": "single",
+      "q_kitchen_device": "verbal",
+      "q_menu_style": [
+        "meals"
+      ],
+      "q_time_menus": true,
+      "q_alcohol": false,
+      "q_bookings": [
+        "none"
+      ],
+      "q_regulars": [
+        "subscription",
+        "credit"
+      ],
+      "q_stock": "purchases",
+      "q_devices": [
+        "owner_phone"
+      ]
+    },
+    "hotel_rooms": {
+      "q_eat_where": [
+        "tables",
+        "rooms",
+        "takeaway"
+      ],
+      "q_order_by": [
+        "waiter",
+        "phone"
+      ],
+      "q_pay_when": [
+        "postpaid",
+        "room"
+      ],
+      "q_kitchen": "single",
+      "q_kitchen_device": "kds",
+      "q_menu_style": [
+        "alacarte",
+        "variants"
+      ],
+      "q_time_menus": true,
+      "q_alcohol": false,
+      "q_rooms": {
+        "has": true,
+        "count": 10,
+        "maxTariff": 2500
+      },
+      "q_bookings": [
+        "tables",
+        "events"
+      ],
+      "q_regulars": [
+        "credit"
+      ],
+      "q_stock": "recipe",
+      "q_devices": [
+        "counter",
+        "waiter_phones",
+        "kitchen_tablet"
+      ]
+    },
+    "catering": {
+      "q_eat_where": [
+        "own_delivery"
+      ],
+      "q_order_by": [
+        "phone"
+      ],
+      "q_pay_when": [
+        "advance"
+      ],
+      "q_kitchen": "single",
+      "q_kitchen_device": "verbal",
+      "q_menu_style": [
+        "buffet",
+        "alacarte"
+      ],
+      "q_alcohol": false,
+      "q_bookings": [
+        "events",
+        "preorders"
+      ],
+      "q_regulars": [
+        "credit"
+      ],
+      "q_stock": "recipe",
+      "q_devices": [
+        "owner_phone"
+      ]
+    }
+  },
+  "flags": [
+    "tables",
+    "floor_plan",
+    "area_pricing",
+    "waiter_app",
+    "counter_pos",
+    "qr_self_order",
+    "phone_orders",
+    "prepaid_flow",
+    "running_bill",
+    "handoff",
+    "token_display",
+    "station_coupons",
+    "kitchen",
+    "kds",
+    "kot_print",
+    "course_fire",
+    "seat_ordering",
+    "reservations",
+    "variants_addons",
+    "combos",
+    "time_menus",
+    "unlimited_meals",
+    "buffet_covers",
+    "weight_items",
+    "retail_mrp_items",
+    "preorders_advance",
+    "bar_liquor",
+    "takeaway",
+    "own_delivery",
+    "aggregator_inbox",
+    "multi_brand",
+    "customers",
+    "credit_khata",
+    "prepaid_wallet",
+    "subscriptions",
+    "loyalty",
+    "feedback",
+    "rooms_pms",
+    "events_banquet",
+    "stock_level",
+    "offline_mode",
+    "shift_cash",
+    "business_day_cutoff",
+    "multi_outlet",
+    "leakage_panel",
+    "kot_change_log",
+    "quick_search",
+    "own_brand_ebill",
+    "coupons",
+    "purchase_orders",
+    "aggregator_reconciliation",
+    "accounting_export",
+    "upsell_suggestions",
+    "campaigns",
+    "attendance",
+    "checklists",
+    "own_website",
+    "menu_import"
+  ],
+  "flagDefaults": {
+    "leakage_panel": "true",
+    "kot_change_log": "kitchen != 'none'",
+    "quick_search": "true",
+    "own_brand_ebill": "true",
+    "coupons": "optional",
+    "purchase_orders": "stock_level != 'none'",
+    "aggregator_reconciliation": "aggregator_inbox",
+    "accounting_export": "q_gst == 'regular'",
+    "upsell_suggestions": "waiter_app || qr_self_order",
+    "campaigns": "customers",
+    "attendance": "optional",
+    "checklists": "optional",
+    "own_website": "optional",
+    "menu_import": "true"
+  },
+  "competitorGapsToFix": [
+    {
+      "issue": "paid add-ons for basics",
+      "fix": "captain app, KDS, token display, leakage panel included in base plan; public pricing"
+    },
+    {
+      "issue": "inventory hard to use",
+      "fix": "3-level stock, 2-minute daily top-10 count, variance in rupees"
+    },
+    {
+      "issue": "UI not simple enough",
+      "fix": "role-based screens from flags, plain words, local languages"
+    },
+    {
+      "issue": "no initials search",
+      "fix": "quick_search with initials, short codes, transliteration"
+    },
+    {
+      "issue": "bill SMS shows vendor brand",
+      "fix": "own_brand_ebill via restaurant's WhatsApp"
+    },
+    {
+      "issue": "online item on/off unreliable",
+      "fix": "single inStock across channels with change log"
+    },
+    {
+      "issue": "setup effort, support delays",
+      "fix": "self-serve wizard, menu import from Excel/photo, in-app guides, WhatsApp support"
+    },
+    {
+      "issue": "no credit feature",
+      "fix": "credit_khata"
+    },
+    {
+      "issue": "weak coupons",
+      "fix": "coupons engine"
+    },
+    {
+      "issue": "desktop/Android-first",
+      "fix": "PWA on any phone incl. iPhone, phone-only mode"
+    }
+  ],
+  "tax": {
+    "food": {
+      "standalone": {
+        "rate": 5,
+        "itc": false
+      },
+      "hotelRoomTariffGte7500": {
+        "rate": 18,
+        "itc": true
+      },
+      "split": "CGST_SGST",
+      "sac": "996331"
+    },
+    "room": {
+      "sac": "996311",
+      "slabs": [
+        {
+          "max": 1000,
+          "rate": 0
+        },
+        {
+          "max": 7500,
+          "rate": 5
+        },
+        {
+          "max": null,
+          "rate": 18
+        }
+      ],
+      "effectiveFrom": "2025-09-22"
+    },
+    "liquor": {
+      "underGST": false,
+      "label": "VAT",
+      "rate": "owner_input"
+    },
+    "serviceCharge": {
+      "defaultOn": false,
+      "mustBeVoluntary": true,
+      "label": "Service charge (optional)"
+    },
+    "fssaiOnBill": true,
+    "note": "Research only. Keep all rates editable in Settings → Tax and confirm with a CA."
+  },
+  "goldenTests": [
+    {
+      "preset": "darshini",
+      "order": "2 dosa + 1 coffee, UPI",
+      "expect": [
+        "2 station coupons",
+        "token 1",
+        "no table prompt"
+      ]
+    },
+    {
+      "preset": "casual_dining",
+      "order": "table 4, 2 rounds, split cash/UPI",
+      "expect": [
+        "2 KOT rounds",
+        "1 bill",
+        "table cleaning->free"
+      ]
+    },
+    {
+      "preset": "cafe",
+      "order": "Large oat latte + croissant, name Asha",
+      "expect": [
+        "coffee bar ticket",
+        "kitchen ticket",
+        "name announced"
+      ]
+    },
+    {
+      "preset": "cloud_kitchen",
+      "order": "Zomato, Brand B, 22% commission",
+      "expect": [
+        "brand on label",
+        "net revenue in report"
+      ]
+    },
+    {
+      "preset": "bakery",
+      "order": "350g @800/kg + cake preorder 500 advance",
+      "expect": [
+        "line 280",
+        "due-date list",
+        "advance separate in day close"
+      ]
+    },
+    {
+      "preset": "bar",
+      "order": "2x60ml whisky happy hour + starter",
+      "expect": [
+        "BOT+KOT",
+        "happy hour price",
+        "VAT and GST separate",
+        "120ml deducted"
+      ]
+    },
+    {
+      "preset": "hotel_rooms",
+      "order": "room 204 @2000 x2 nights + dinner to room",
+      "expect": [
+        "folio room@5% + food@5%",
+        "room dirty on checkout"
+      ]
+    },
+    {
+      "preset": "dhaba",
+      "order": "offline 2h, 30 bills, 2 devices",
+      "expect": [
+        "no duplicate bill numbers",
+        "day close at 04:00"
+      ]
+    }
+  ]
+}

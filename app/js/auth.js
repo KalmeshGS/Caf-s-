@@ -290,7 +290,7 @@ Views.team = () => {
     </section>
     <div class="grid-2">
       <section class="card">${eyebrow('What each role can open')}
-        ${ROLE_ORDER.map((r) => `<div class="line-row"><span class="role-tag" style="--c:${ROLES[r].color}">${esc(ROLES[r].label)}</span><small class="muted right">${esc(ROLES[r].views.map((v) => VIEWS[v].label).join(' · '))}</small></div>`).join('')}
+        ${ROLE_ORDER.map((r) => `<div class="line-row"><span class="role-tag" style="--c:${ROLES[r].color}">${esc(ROLES[r].label)}</span><small class="muted right">${esc(viewsFor(r).map((v) => VIEWS[v].label).join(' · '))}</small></div>`).join('')}
       </section>
       <section class="card">${eyebrow('Security')}
         <ul class="sec-list">
@@ -324,7 +324,7 @@ function accessForm(u = {}, presetStaffId = '') {
       <label class="field"><span>Phone</span><input name="phone" type="tel" maxlength="20" value="${esc(u.staffId ? '' : u.phone || '')}"></label>
     </div>
     ${!options.length && isNew ? `<p class="muted sm">Tip: add people under <a class="link" href="#/staff" data-act="closeSheet">Staff</a> first — their details and employee ID are picked up here.</p>` : ''}
-    <div class="field"><span>Role — what they can open</span><div class="chip-row">${ROLE_ORDER.map((k) => `<label class="chip-radio"><input type="radio" name="role" value="${k}" ${(u.role || 'waiter') === k ? 'checked' : ''}><span>${esc(ROLES[k].label)}</span></label>`).join('')}</div></div>
+    <div class="field"><span>Role — what they can open</span><div class="chip-row">${ROLE_ORDER.filter((k) => rolesOffered().includes(k) || u.role === k).map((k) => `<label class="chip-radio"><input type="radio" name="role" value="${k}" ${(u.role || 'waiter') === k ? 'checked' : ''}><span>${esc(ROLES[k].label)}</span></label>`).join('')}</div></div>
     ${isNew ? `${pwField('pw1', `First password <em>(you type it, at least ${PW_MIN} characters)</em>`)}
       ${pwField('pw2', 'Repeat first password')}
       <p class="muted sm">Give this password to them privately. They must change it the first time they log in.</p>`
@@ -354,7 +354,7 @@ function loginAs(u) {
   u.lastLogin = Date.now(); u.failed = 0; persist();
   App.loginWho = '';
   closeSheet();
-  history.replaceState(null, '', `#/${ROLES[u.role].views[0]}`);
+  history.replaceState(null, '', `#/${viewsFor(u.role)[0]}`);
   render();
   const n = u.role === 'owner' ? openRequests().length : 0;
   toast(n ? `Welcome, ${u.name} — ${n} login request${n > 1 ? 's' : ''} waiting` : `Welcome, ${u.name}`);
