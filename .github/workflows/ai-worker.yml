@@ -26,8 +26,9 @@ jobs:
       run:
         working-directory: worker
     env:
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      # raw values; spaces or blank lines pasted by mistake are removed before use
+      CF_TOKEN_RAW: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CF_ACCOUNT_RAW: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
       - uses: actions/checkout@v5
 
@@ -35,8 +36,8 @@ jobs:
         id: check
         run: |
           missing=""
-          [ -n "$CLOUDFLARE_API_TOKEN" ] || missing="$missing CLOUDFLARE_API_TOKEN"
-          [ -n "$CLOUDFLARE_ACCOUNT_ID" ] || missing="$missing CLOUDFLARE_ACCOUNT_ID"
+          [ -n "$(printf %s "$CF_TOKEN_RAW" | tr -d '[:space:]')" ] || missing="$missing CLOUDFLARE_API_TOKEN"
+          [ -n "$(printf %s "$CF_ACCOUNT_RAW" | tr -d '[:space:]')" ] || missing="$missing CLOUDFLARE_ACCOUNT_ID"
           if [ -n "$missing" ]; then
             echo "::notice::AI helper not deployed — add these repository secrets first:$missing (see worker/README.md)"
             echo "ready=false" >> "$GITHUB_OUTPUT"
@@ -55,4 +56,8 @@ jobs:
 
       - name: Deploy the worker
         if: steps.check.outputs.ready == 'true'
-        run: npx wrangler deploy
+        run: |
+          export CLOUDFLARE_API_TOKEN="$(printf %s "$CF_TOKEN_RAW" | tr -d '[:space:]')"
+          export CLOUDFLARE_ACCOUNT_ID="$(printf %s "$CF_ACCOUNT_RAW" | tr -d '[:space:]' | sed 's#.*dash.cloudflare.com/##; s#/.*##')"
+          echo "::add-mask::$CLOUDFLARE_API_TOKEN"; echo "::add-mask::$CLOUDFLARE_ACCOUNT_ID"
+          npx wrangler deploy
