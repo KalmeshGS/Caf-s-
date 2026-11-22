@@ -73,17 +73,120 @@ function recipeText(recipe) {
   }).join(' · ');
 }
 
-/* ---------------- menu form: ingredients editor ---------------- */
+/* ---------------- menu form: ingredients editor ----------------
+   Each row: type an ingredient name OR pick it from the list. If it is not in
+   stock yet, the owner / a manager can add it to stock right there. */
+const ALL_UNITS = ['ml', 'L', 'g', 'kg', 'pcs'];
+const NEW_BASE = { ml: 'L', L: 'L', g: 'kg', kg: 'kg', pcs: 'pcs' };
+/** A sensible unit for a new stock item, from its name */
+function guessUnit(name) {
+  const n = String(name).toLowerCase();
+  if (/milk|oil|cream|syrup|sauce|juice|water|vinegar|ghee|honey|soda/.test(n)) return 'ml';
+  if (/lemon|lime|egg|bun|pav|bread|slice|bottle|can\b|packet|pack|sachet|banana|orange|apple|tea bag|patty|base|roll|sheet|cup|glass|straw/.test(n)) return 'pcs';
+  return 'g';
+}
+function unitOptions(s, chosen) {
+  const list = s ? unitChoices(s.unit) : ALL_UNITS;
+  const pick = chosen || (s ? handyUnit(s.unit) : '');
+  return list.map((u) => `<option ${u === pick ? 'selected' : ''}>${u}</option>`).join('');
+}
 function recipeRow(r = {}) {
   const s = byId(S.stock, r.stockId);
-  const unit = s ? handyUnit(s.unit) : '';
-  const shown = s && r.qty != null ? fmtAmount(convertUnit(r.qty, s.unit, unit) ?? r.qty) : '';
+  const unit = s ? handyUnit(s.unit) : (r.unit || '');
+  const shown = s && r.qty != null ? fmtAmount(convertUnit(r.qty, s.unit, unit) ?? r.qty) : (r.qty ?? '');
+  const name = s ? s.name : (r.name || '');
   return `<div class="rec-row">
-    <select name="r_stock" aria-label="Ingredient"><option value="">Choose ingredient…</option>${S.stock.map((x) => `<option value="${x.id}" ${x.id === r.stockId ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select>
-    <input name="r_qty" type="number" min="0" step="any" inputmode="decimal" value="${esc(shown)}" placeholder="How much" aria-label="Amount per serving">
-    <select name="r_unit" aria-label="Unit">${s ? unitChoices(s.unit).map((u) => `<option ${u === unit ? 'selected' : ''}>${u}</option>`).join('') : '<option value="">unit</option>'}</select>
-    <button type="button" class="icon-btn sm" data-act="recDel" aria-label="Remove ingredient">${icon('x')}</button></div>`;
+    <div class="combo">
+      <input class="rec-name" name="r_name" value="${esc(name)}" placeholder="Type or choose…" autocomplete="off" aria-label="Ingredient" role="combobox" aria-expanded="false">
+      <input type="hidden" name="r_stock" value="${s ? s.id : ''}">
+      <span class="combo-caret" aria-hidden="true">${icon('down')}</span>
+      <div class="combo-list" role="listbox" hidden></div>
+    </div>
+    <input name="r_qty" type="number" min="0" step="any" inputmode="decimal" value="${esc(String(shown))}" placeholder="How much" aria-label="Amount per serving">
+    <select name="r_unit" aria-label="Unit">${unitOptions(s, unit || (name ? guessUnit(name) : ''))}</select>
+    <button type="button" class="icon-btn sm" data-act="recDel" aria-label="Remove ingredient">${icon('x')}</button>
+    <small class="rec-hint"></small></div>`;
 }
+/** Hint under a row when the typed ingredient is not in stock yet */
+function rowHint(row) {
+  const name = row.querySelector('.rec-name').value.trim(), id = row.querySelector('[name=r_stock]').value;
+  const isNew = !!name && !id;
+  row.classList.toggle('is-new', isNew);
+  row.querySelector('.rec-hint').innerHTML = !isNew ? '' : canAddStock()
+    ? `<b>New stock item</b> — "${esc(name)}" is added to Stock when you save (at 0 — set the quantity in Stock).`
+    : `"${esc(name)}" is not in stock — ask the owner or a manager to add it.`;
+}
+function comboOptions(row) {
+  const typed = row.querySelector('.rec-name').value.trim(), q = typed.toLowerCase();
+  const items = S.stock.filter((x) => !q || x.name.toLowerCase().includes(q)).sort((a, b) => a.name.localeCompare(b.name)).slice(0, 50);
+  const exact = S.stock.some((x) => x.name.toLowerCase() === q);
+  let html = items.map((x) => `<button type="button" role="option" class="combo-opt" data-id="${x.id}"><span>${esc(x.name)}</span><small>${esc(x.unit)}</small></button>`).join('');
+  if (q && !exact) html += canAddStock()
+    ? `<button type="button" role="option" class="combo-opt add" data-new="1">${icon('plus')}<span>Add "${esc(typed)}" to stock</span></button>`
+    : '<p class="combo-empty">Not in stock — ask the owner or a manager to add it.</p>';
+  return html || `<p class="combo-empty">${S.stock.length ? 'No match.' : 'No stock items yet — type a name to add one.'}</p>`;
+}
+function openCombo(row) {
+  $$('.rec-row').forEach((r) => { if (r !== row) closeCombo(r); });
+  const list = row.querySelector('.combo-list'); list.innerHTML = comboOptions(row); list.hidden = false;
+  row.querySelector('.rec-name').setAttribute('aria-expanded', 'true');
+}
+function closeCombo(row) {
+  const l = row?.querySelector('.combo-list'); if (l) l.hidden = true;
+  row?.querySelector('.rec-name')?.setAttribute('aria-expanded', 'false');
+}
+function pickStock(row, s) {
+  row.querySelector('.rec-name').value = s.name; row.querySelector('[name=r_stock]').value = s.id;
+  row.querySelector('select[name=r_unit]').innerHTML = unitOptions(s);
+  closeCombo(row); rowHint(row); row.querySelector('input[name=r_qty]').focus();
+}
+function markNew(row) {
+  row.querySelector('[name=r_stock]').value = '';
+  row.querySelector('select[name=r_unit]').innerHTML = unitOptions(null, guessUnit(row.querySelector('.rec-name').value));
+  closeCombo(row); rowHint(row); row.querySelector('input[name=r_qty]').focus();
+}
+/** Typed text that exactly matches a stock name is linked to that item */
+function syncTyped(row) {
+  const t = row.querySelector('.rec-name').value.trim().toLowerCase(); const hid = row.querySelector('[name=r_stock]');
+  const cur = byId(S.stock, hid.value);
+  if (!(cur && cur.name.toLowerCase() === t)) {
+    const s = t ? S.stock.find((x) => x.name.toLowerCase() === t) : null;
+    const unitSel = row.querySelector('select[name=r_unit]');
+    if (s) { hid.value = s.id; unitSel.innerHTML = unitOptions(s); }
+    else { const wasLinked = !!hid.value; hid.value = ''; if (wasLinked || !row.dataset.unitSet) unitSel.innerHTML = unitOptions(null, guessUnit(t)); }
+  }
+  rowHint(row);
+}
+const recInput = (e) => e.target.classList && e.target.classList.contains('rec-name');
+document.addEventListener('focusin', (e) => { if (recInput(e)) openCombo(e.target.closest('.rec-row')); });
+document.addEventListener('input', (e) => { if (recInput(e)) { const row = e.target.closest('.rec-row'); syncTyped(row); openCombo(row); } });
+document.addEventListener('focusout', (e) => {
+  if (!recInput(e) && !e.target.closest?.('.combo-list')) return;
+  const row = e.target.closest('.rec-row');
+  setTimeout(() => { if (row && !row.querySelector('.combo').contains(document.activeElement)) { closeCombo(row); syncTyped(row); } }, 150);
+});
+document.addEventListener('mousedown', (e) => { if (e.target.closest('.combo-opt')) e.preventDefault(); }); // keep focus while choosing
+// once someone picks a unit by hand, typing the name no longer changes it
+document.addEventListener('change', (e) => { if (e.target.name === 'r_unit') { const row = e.target.closest('.rec-row'); if (row) row.dataset.unitSet = '1'; } });
+document.addEventListener('click', (e) => {
+  const opt = e.target.closest('.combo-opt'); if (!opt) return;
+  const row = opt.closest('.rec-row');
+  if (opt.dataset.new) markNew(row); else { const s = byId(S.stock, opt.dataset.id); if (s) pickStock(row, s); }
+});
+document.addEventListener('keydown', (e) => {
+  if (recInput(e)) {
+    const row = e.target.closest('.rec-row'); const first = row.querySelector('.combo-opt');
+    if (e.key === 'ArrowDown' && first) { e.preventDefault(); first.focus(); }
+    else if (e.key === 'Enter') { e.preventDefault(); if (first && !row.querySelector('.combo-list').hidden) first.click(); else closeCombo(row); }
+    else if (e.key === 'Escape') closeCombo(row);
+    return;
+  }
+  const opt = e.target.closest?.('.combo-opt'); if (!opt) return;
+  const opts = [...opt.parentNode.querySelectorAll('.combo-opt')]; const i = opts.indexOf(opt);
+  if (e.key === 'ArrowDown') { e.preventDefault(); (opts[i + 1] || opt).focus(); }
+  if (e.key === 'ArrowUp') { e.preventDefault(); (opts[i - 1] || opt.closest('.rec-row').querySelector('.rec-name')).focus(); }
+  if (e.key === 'Escape') { const row = opt.closest('.rec-row'); row.querySelector('.rec-name').focus(); closeCombo(row); }
+});
 function recipeEditor(m = {}) {
   const rows = m.recipe && m.recipe.length ? m.recipe : [];
   return `<div class="field recipe"><span>Ingredients for ONE serving <em>(set once — stock goes down by this each time it's served)</em></span>
@@ -96,16 +199,27 @@ function recipeEditor(m = {}) {
     <template id="rec-tpl">${recipeRow()}</template>
   </div>`;
 }
+/** Read the ingredient rows → { recipe, newStock, blocked }.
+    Names not in stock become new stock items (owner / manager) when the dish is saved. */
 function readRecipe(fd) {
-  const ids = fd.getAll('r_stock').map(String), q = fd.getAll('r_qty').map(Number), units = fd.getAll('r_unit').map(String);
-  const out = [];
-  ids.forEach((id, i) => {
-    const s = byId(S.stock, id); if (!s || !(q[i] > 0)) return;
+  const names = fd.getAll('r_name').map((x) => String(x).trim()), ids = fd.getAll('r_stock').map(String);
+  const q = fd.getAll('r_qty').map(Number), units = fd.getAll('r_unit').map(String);
+  const out = [], newStock = [], blocked = [];
+  names.forEach((nm, i) => {
+    let s = byId(S.stock, ids[i]) || (nm ? S.stock.find((x) => x.name.toLowerCase() === nm.toLowerCase()) : null)
+      || newStock.find((x) => x.name.toLowerCase() === nm.toLowerCase());
+    if ((!s && !nm) || !(q[i] > 0)) return;
+    if (!s) {
+      if (!canAddStock()) { blocked.push(nm); return; }
+      const unit = NEW_BASE[units[i]] || 'pcs';
+      s = { id: uid('s'), name: nm.replace(/^\w/, (c) => c.toUpperCase()).slice(0, 40), unit, qty: 0, max: unit === 'pcs' ? 50 : 5, low: 0, step: 1 };
+      newStock.push(s);
+    }
     const inStockUnit = convertUnit(q[i], units[i] || s.unit, s.unit) ?? q[i];
-    const e = out.find((x) => x.stockId === id);
-    if (e) e.qty = r6(e.qty + inStockUnit); else out.push({ stockId: id, qty: r6(inStockUnit) });
+    const e = out.find((x) => x.stockId === s.id);
+    if (e) e.qty = r6(e.qty + inStockUnit); else out.push({ stockId: s.id, qty: r6(inStockUnit) });
   });
-  return out;
+  return { recipe: out, newStock, blocked };
 }
 
 /* ---------------- using up stock ---------------- */
@@ -135,7 +249,7 @@ const usedBy = (stockId) => S.menu.filter((m) => (m.recipe || []).some((r) => r.
 /* ---------------- actions & forms ---------------- */
 Object.assign(Actions, {
   recAdd() { const t = $('#rec-tpl'), box = $('#rec-rows'); if (t && box) box.insertAdjacentHTML('beforeend', t.innerHTML); },
-  recDel(el) { const row = el.closest('.rec-row'); const box = $('#rec-rows'); if (row && box.children.length > 1) row.remove(); else if (row) { row.querySelector('select').value = ''; row.querySelector('input').value = ''; } },
+  recDel(el) { const row = el.closest('.rec-row'); const box = $('#rec-rows'); if (row && box.children.length > 1) row.remove(); else if (row) row.outerHTML = recipeRow(); },
   fillRecipes() {
     let n = 0;
     S.menu.forEach((m) => { if (!(m.recipe && m.recipe.length)) { const r = suggestRecipe(m.name); if (r.length) { m.recipe = r; n++; } } });
@@ -176,23 +290,19 @@ Actions.dishPhotoClear = (el) => {
   const form = el.closest('form'); form.photo.value = '';
   $('#dish-prev').innerHTML = dishImg({ name: form.name.value }); el.hidden = true;
 };
-// Choosing an ingredient offers the right units (ml / L, g / kg …)
-document.addEventListener('change', (e) => {
-  if (e.target.name !== 'r_stock') return;
-  const row = e.target.closest('.rec-row'); const s = byId(S.stock, e.target.value);
-  const sel = row?.querySelector('select[name=r_unit]'); if (!sel) return;
-  sel.innerHTML = s ? unitChoices(s.unit).map((u) => `<option ${u === handyUnit(s.unit) ? 'selected' : ''}>${u}</option>`).join('') : '<option value="">unit</option>';
-  row.querySelector('input[name=r_qty]').focus();
-});
 
 Object.assign(Forms, {
   menuItem(fd) {
     const photo = String(fd.get('photo') || '');
-    const d = { photo: /^data:image\/jpeg;base64,/.test(photo) && photo.length < 120000 ? photo : '', name: String(fd.get('name') || '').trim(), price: num(fd.get('price')), cat: String(fd.get('cat') || '').trim() || 'General', recipe: readRecipe(fd) };
+    const { recipe, newStock, blocked } = readRecipe(fd);
+    const d = { photo: /^data:image\/jpeg;base64,/.test(photo) && photo.length < 120000 ? photo : '', name: String(fd.get('name') || '').trim(), price: num(fd.get('price')), cat: String(fd.get('cat') || '').trim() || 'General', recipe };
     if (!d.name) return formError('Please enter the item name.');
+    if (blocked.length) return formError(`${blocked.join(', ')} ${blocked.length === 1 ? 'is' : 'are'} not in stock. Ask the owner or a manager to add ${blocked.length === 1 ? 'it' : 'them'} to Stock, or clear ${blocked.length === 1 ? 'that row' : 'those rows'}.`);
+    newStock.forEach((s) => S.stock.push(s));
     const m = byId(S.menu, fd.get('id'));
     if (m) Object.assign(m, d); else S.menu.push({ id: uid('m'), available: true, ...d });
     closeSheet(); save();
-    if (!d.recipe.length && S.stock.length) toast(`Saved. Tip: add ingredients so stock reduces automatically when ${d.name} is served.`);
+    if (newStock.length) toast(`Saved. Added to stock: ${newStock.map((s) => s.name).join(', ')} — set how much you have in Stock.`);
+    else if (!d.recipe.length && S.stock.length) toast(`Saved. Tip: add ingredients so stock reduces automatically when ${d.name} is served.`);
   },
 });

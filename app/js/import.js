@@ -225,27 +225,25 @@ Object.assign(Actions, {
     if (!rows.length) return toast('Tick at least one ingredient.');
     const box = $('#rec-rows'); let added = 0, created = 0;
     // remove the empty starter row
-    $$('#rec-rows .rec-row').forEach((r) => { if (!r.querySelector('select').value && !r.querySelector('input').value) r.remove(); });
+    $$('#rec-rows .rec-row').forEach((r) => { if (!r.querySelector('.rec-name').value.trim() && !r.querySelector('input[name=r_qty]').value) r.remove(); });
     rows.forEach((r) => {
-      let id = r.querySelector('.imp-stock').value; const q = +r.querySelector('.imp-qty').value;
+      const id = r.querySelector('.imp-stock').value; const q = +r.querySelector('.imp-qty').value;
       if (!id || !(q > 0)) return;
       if (id === '__new') {
+        // new stock item: added to Stock when the dish is saved
         if (!canAddStock()) return;
-        const unit = newStockUnit(r.dataset.kind);
         const name = r.dataset.name.replace(/^\w/, (c) => c.toUpperCase());
-        const s = { id: uid('s'), name, unit, qty: 0, max: unit === 'pcs' ? 50 : 5, low: 0, step: 1 };
-        S.stock.push(s); id = s.id; created++;
+        box.insertAdjacentHTML('beforeend', recipeRow({ name, qty: r3(q), unit: handyUnit(newStockUnit(r.dataset.kind)) }));
+        rowHint(box.lastElementChild); created++; added++;
+        return;
       }
       const st = byId(S.stock, id);
       const qty = convertUnit(q, handyUnit(st.unit), st.unit) ?? q;
       box.insertAdjacentHTML('beforeend', recipeRow({ stockId: id, qty: r6(qty) }));
       added++;
     });
-    if (created) { persist(); }
-    // refresh dropdowns in all recipe rows so new stock items appear
-    if (created) $$('#rec-rows .rec-row').forEach((row) => { const sel = row.querySelector('select[name=r_stock]'); const v = sel.value; sel.innerHTML = `<option value="">Choose ingredient…</option>${S.stock.map((x) => `<option value="${x.id}" ${x.id === v ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}`; });
     $('#imp-panel').hidden = true;
-    toast(`${pl(added, 'ingredient')} added${created ? ` · ${pl(created, 'new stock item')} created (set their quantity in Stock)` : ''} — tap Save`);
+    toast(`${pl(added, 'ingredient')} added${created ? ` · ${pl(created, 'new stock item')} will be added to Stock when you save` : ''} — tap Save`);
   },
 });
 document.addEventListener('change', (e) => { if (e.target.classList.contains('imp-stock')) refreshPreviewRow(e.target.closest('.imp-item')); });
