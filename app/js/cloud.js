@@ -90,7 +90,7 @@ const BAD_PASSWORD = ['auth/wrong-password', 'auth/invalid-credential', 'auth/in
   // Fresh start: online mode never uses data saved on the device by the old offline version.
   // When DATA_EPOCH changes (e.g. after the online database was reset), every device also
   // forgets its remembered café code, café name and sign-in once.
-  const DATA_EPOCH = '2026-11-21-fresh';
+  const DATA_EPOCH = '2026-11-22-fresh';
   let freshDevice = false;
   try {
     localStorage.removeItem(DB_KEY);
