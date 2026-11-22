@@ -2,13 +2,16 @@
 name = "cafe-journal-ai"
 main = "src/index.js"
 compatibility_date = "2026-11-01"
-compatibility_flags = ["nodejs_compat"]
+
+# Cloudflare's built-in AI (Workers AI) — free daily allowance, no AI key needed
+[ai]
+binding = "AI"
 
 [vars]
 # Only the website may call this helper
 ALLOWED_ORIGIN = "https://kalmeshgs.github.io"
-# Firebase project: only people logged in to your café can use it
+# Firebase project: only people logged in to a café can use it
 FIREBASE_PROJECT_ID = "cafe-journal-9ba5e"
-# Claude model. "claude-haiku-5-5" is much cheaper if you prefer.
-MODEL = "claude-opus-5-5"
-# The ANTHROPIC_API_KEY is a secret (never written here) — see worker/README.md
+# Free Workers AI models
+RECIPE_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
+CHAT_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast"

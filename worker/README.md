@@ -1,25 +1,25 @@
-# Cafe Journal AI helper
+# Cafe Journal AI helper (free)
 
-A tiny Cloudflare Worker that powers the **Ask AI** button in *Menu & recipes*.
-It sends the dish name (plus your stock item names) to Claude and returns the
-typical ingredients for **one serving**. You always check them before adding.
+A tiny Cloudflare Worker that powers two things in the app:
+- **Ask AI** in *Menu & recipes* — typical ingredients for one serving of any dish (you check them before adding).
+- **AI help** chat (✦ button at the top) — how to use the app, and everyday café questions.
 
-- The Anthropic API key is stored **only** as a Cloudflare secret — never in the website or in GitHub code.
+It uses **Cloudflare Workers AI**, which has a **free daily allowance** — no AI key, no card. If the day's free allowance is used up, the app says so and it works again the next day.
+
 - Only the website `https://kalmeshgs.github.io` can call it, and only people logged in to a café (Firebase login is checked).
-- Each person can ask about 40 times an hour.
-- Model: set in `wrangler.toml` (`MODEL`). `claude-haiku-5-5` is much cheaper if you prefer.
+- Each person can ask about 40 ingredient questions and 60 chat messages an hour.
+- Models are set in `wrangler.toml` (`RECIPE_MODEL`, `CHAT_MODEL`).
 
-## One-time setup
+## One-time setup (about 5 minutes, free)
 
-1. **Anthropic (the AI):** sign up at <https://console.anthropic.com> → *Billing* → add a payment method and a small credit → *API keys* → *Create key*. Copy it (it starts with `sk-ant-`). Set a monthly spend limit under *Limits*.
-2. **Cloudflare (free hosting):** sign up at <https://dash.cloudflare.com> → *Workers & Pages* → open it once so your free `workers.dev` address is created.
-   - Copy your **Account ID** (right side of the Workers & Pages page).
-   - *My Profile → API Tokens → Create Token →* template **Edit Cloudflare Workers** → *Create* → copy the token.
-3. **GitHub:** repo → *Settings → Secrets and variables → Actions → New repository secret*, add three secrets:
-   - `ANTHROPIC_API_KEY` — the Anthropic key
-   - `CLOUDFLARE_API_TOKEN` — the Cloudflare token
+1. **Cloudflare:** sign up free at <https://dash.cloudflare.com/sign-up> (Free plan, no card).
+2. Open **Workers & Pages** once, so your free `workers.dev` address is created (choose a subdomain name if asked).
+3. Copy your **Account ID** — it's on the right side of the Workers & Pages page (or in the browser address: `dash.cloudflare.com/<account id>/…`).
+4. Create a token: top-right profile icon → **My Profile → API Tokens → Create Token** → template **Edit Cloudflare Workers** → *Use template*. Under *Permissions* click **+ Add more** and add **Account · Workers AI · Read**. Choose your account under *Account Resources* → **Continue to summary → Create Token** → copy it (it is shown once).
+5. **GitHub:** repo → **Settings → Secrets and variables → Actions → New repository secret** — add two secrets:
+   - `CLOUDFLARE_API_TOKEN` — the token
    - `CLOUDFLARE_ACCOUNT_ID` — the account ID
-4. GitHub → *Actions → Deploy AI helper → Run workflow*. The log shows the address, e.g. `https://cafe-journal-ai.<you>.workers.dev`.
-5. Put that address in [`app/js/ai-config.js`](../app/js/ai-config.js): `window.AI_RECIPE_URL = 'https://cafe-journal-ai.<you>.workers.dev';` — the **Ask AI** button then appears.
+6. GitHub → **Actions → Deploy AI helper → Run workflow**. The log shows the address, e.g. `https://cafe-journal-ai.<your-subdomain>.workers.dev`.
+7. Put that address in [`app/js/ai-config.js`](../app/js/ai-config.js): `window.AI_URL = 'https://cafe-journal-ai.<your-subdomain>.workers.dev';` — the AI buttons then appear.
 
-Never paste any of these keys into a chat, an issue or the code.
+Never paste the token into a chat, an issue or the code — only into the GitHub secret.

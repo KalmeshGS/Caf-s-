@@ -84,12 +84,16 @@ function readyCard() {
 }
 const elapsedMin = (ts) => { const m = Math.max(0, Math.round((Date.now() - ts) / 60000)); return m < 60 ? `${m} min` : `${Math.floor(m / 60)}h ${m % 60}m`; };
 
+/** Round dish photo (or the first letter on a warm circle when there is no photo) */
+const dishImg = (m, cls = '') => (m.photo && /^data:image\/(jpeg|png|webp);base64,/.test(m.photo)
+  ? `<img class="dish-img ${cls}" src="${esc(m.photo)}" alt="" loading="lazy">`
+  : `<span class="dish-img ph ${cls}" aria-hidden="true">${esc((m.name || '?').trim()[0] || '?').toUpperCase()}</span>`);
 function menuGrid() {
   const q = App.ui.q.trim().toLowerCase();
   const items = S.menu.filter((m) => (App.ui.cat === 'All' || m.cat === App.ui.cat) && (!q || m.name.toLowerCase().includes(q)));
   if (!items.length) return empty(S.menu.length ? 'Nothing matches.' : 'Your menu is empty — add items in Settings → Menu.');
   return items.map((m) => `<button class="menu-item" data-act="addItem" data-id="${m.id}" ${m.available === false ? 'disabled' : ''}>
-      <span>${esc(m.name)}</span><small>${m.available === false ? 'Not available' : money(m.price)}</small></button>`).join('');
+      ${dishImg(m)}<span>${esc(m.name)}</span><small>${m.available === false ? 'Not available' : money(m.price)}</small></button>`).join('');
 }
 
 function orderEditor(p) {
@@ -435,8 +439,8 @@ Views.settings = () => {
         <label class="field"><span>Closes at (hour)</span><input name="closeHour" type="number" min="0" max="23" value="${esc(st.closeHour ?? 22)}"></label>
       </div>
       <label class="field"><span>Receipt footer</span><input name="footer" maxlength="80" value="${esc(st.footer || 'Thank you, visit again!')}"></label>
-      <div class="field"><span>Accent colour — match your brand</span><div class="swatches">${Object.entries(ACCENTS).map(([k, c]) => `<label><input type="radio" name="accent" value="${k}" ${k === (st.accent || 'green') ? 'checked' : ''}><i style="background:${c}" title="${k}"></i></label>`).join('')}</div></div>
-      <div class="field"><span>Appearance</span><div class="seg">${['auto', 'light', 'dark'].map((t) => `<label><input type="radio" name="theme" value="${t}" ${t === (st.theme || 'auto') ? 'checked' : ''}><span>${t[0].toUpperCase() + t.slice(1)}</span></label>`).join('')}</div></div>
+      <div class="field"><span>Accent colour — match your brand</span><div class="swatches">${Object.entries(ACCENTS).map(([k, c]) => `<label><input type="radio" name="accent" value="${k}" ${k === lookOf(st).accent ? 'checked' : ''}><i style="background:${c}" title="${k}"></i></label>`).join('')}</div></div>
+      <div class="field"><span>Appearance</span><div class="seg">${['auto', 'light', 'dark'].map((t) => `<label><input type="radio" name="theme" value="${t}" ${t === lookOf(st).theme ? 'checked' : ''}><span>${t[0].toUpperCase() + t.slice(1)}</span></label>`).join('')}</div></div>
       <div class="form-actions"><span></span><button class="btn primary" type="submit">Save changes</button></div>
     </form>`;
   } else {
@@ -474,7 +478,7 @@ Views.menu = () => {
     ${!S.stock.length ? `<div class="banner info">${icon('box')}<span>Add your stock items first (milk, sugar, tea powder…) so dishes can use them.</span>${can('stock') ? `<a class="btn primary sm" href="#/stock">Go to Stock</a>` : ''}</div>` : ''}
     ${noRecipe && S.stock.length ? `<div class="banner info">${icon('box')}<span>${pl(noRecipe, 'item')} ${noRecipe === 1 ? 'has' : 'have'} no ingredients yet, so stock won't reduce when ${noRecipe === 1 ? 'it is' : 'they are'} served. Tap an item to add them, or "Fill all from recipe library" (280+ common dishes built in).</span></div>` : ''}
     ${cats.map((c) => `<section class="card">${eyebrow(c)}${S.menu.filter((m) => m.cat === c).map((m) => `<div class="menu-row ${m.available === false ? 'off' : ''}">
-        <span>${esc(m.name)}${m.recipe && m.recipe.length ? `<small class="muted rec-sum">${esc(recipeText(m.recipe))}</small>` : `<small class="neg rec-sum">No ingredients set</small>`}</span><b>${money(m.price)}</b>
+        ${dishImg(m)}<span>${esc(m.name)}${m.recipe && m.recipe.length ? `<small class="muted rec-sum">${esc(recipeText(m.recipe))}</small>` : `<small class="neg rec-sum">No ingredients set</small>`}</span><b>${money(m.price)}</b>
         <label class="switch" title="Available today"><input type="checkbox" data-act="menuToggle" data-id="${m.id}" ${m.available !== false ? 'checked' : ''}><i></i></label>
         <button class="icon-btn sm" data-act="menuEdit" data-id="${m.id}" aria-label="Edit ${esc(m.name)}">${icon('edit')}</button></div>`).join('')}</section>`).join('') || empty('No menu yet.', btn('Add first item', 'menuAdd', { cls: 'ghost', ic: 'plus' }))}
     <p class="fine">The switch marks an item available / not available today (e.g. sold out).</p>`;
@@ -484,6 +488,13 @@ function menuForm(m = {}) {
   return `${sheetHead('Menu', m.id ? 'Edit item' : 'Add item')}
   <form data-form="menuItem" class="form">
     <input type="hidden" name="id" value="${esc(m.id || '')}">
+    <div class="field"><span>Photo of the dish <em>(optional — shown on the menu and order screens)</em></span>
+      <div class="dish-pick">
+        <span id="dish-prev">${dishImg(m)}</span>
+        <input type="hidden" name="photo" value="${esc(m.photo || '')}">
+        <label class="btn ghost sm">${icon('camera')}<span>${m.photo ? 'Change photo' : 'Add photo'}</span><input type="file" accept="image/*" data-change="dishPhoto" hidden></label>
+        <button type="button" class="link-btn" data-act="dishPhotoClear" ${m.photo ? '' : 'hidden'}>Remove</button>
+      </div></div>
     <label class="field"><span>Item name</span><input name="name" required maxlength="40" value="${esc(m.name || '')}"></label>
     <div class="row-2">
       <label class="field"><span>Price</span><input name="price" type="number" min="0" step="any" required value="${esc(m.price ?? '')}"></label>

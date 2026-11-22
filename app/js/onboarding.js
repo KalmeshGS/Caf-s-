@@ -289,7 +289,7 @@ Object.assign(Forms, {
     const st = {
       name: d.name.trim(), short: d.short, tagline: String(d.tagline || '').trim(), type: d.type || 'cafe',
       currency: d.currency || 'INR', tables: clamp(num(d.tables), 0, 99), tax: num(d.tax),
-      openHour: 8, closeHour: 22, accent: 'green', theme: 'auto', footer: 'Thank you, visit again!',
+      openHour: 8, closeHour: 22, accent: 'red', theme: 'dark', look: 2, footer: 'Thank you, visit again!',
     };
     S = emptyState(); S.settings = st;
     const owner = { id: uid('u'), name: d.owner.trim(), phone: String(d.phone).trim(), role: 'owner', staffId: null, active: true, mustChange: false, failed: 0, locked: false, createdAt: Date.now() };
