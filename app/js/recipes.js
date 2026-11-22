@@ -144,6 +144,38 @@ Object.assign(Actions, {
   },
 });
 Changes.recStock = () => {};
+/* ---------------- dish photo: small square JPEG (about 20–40 KB), stored with the menu item ---------------- */
+function readDishPhoto(file, size = 360) {
+  return new Promise((resolve, reject) => {
+    if (!file || !/^image\//.test(file.type)) return reject(new Error('Please choose a photo.'));
+    if (file.size > 20 * 1024 * 1024) return reject(new Error('That photo is too large.'));
+    const url = URL.createObjectURL(file); const img = new Image();
+    img.onload = () => {
+      const c = document.createElement('canvas'); c.width = c.height = size;
+      const s = Math.max(size / img.width, size / img.height), w = img.width * s, h = img.height * s;
+      const ctx = c.getContext('2d'); ctx.fillStyle = '#1c1c1e'; ctx.fillRect(0, 0, size, size);
+      ctx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h); URL.revokeObjectURL(url);
+      let q = 0.78, out = c.toDataURL('image/jpeg', q);
+      while (out.length > 110000 && q > 0.4) { q -= 0.1; out = c.toDataURL('image/jpeg', q); }
+      resolve(out);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Could not read that photo.')); };
+    img.src = url;
+  });
+}
+Changes.dishPhoto = (el) => {
+  const f = el.files[0]; el.value = '';
+  readDishPhoto(f).then((data) => {
+    const form = el.closest('form'); form.photo.value = data;
+    $('#dish-prev').innerHTML = dishImg({ photo: data, name: form.name.value });
+    const rm = form.querySelector('[data-act=dishPhotoClear]'); if (rm) rm.hidden = false;
+    el.previousElementSibling.textContent = 'Change photo';
+  }).catch((e) => toast(e.message));
+};
+Actions.dishPhotoClear = (el) => {
+  const form = el.closest('form'); form.photo.value = '';
+  $('#dish-prev').innerHTML = dishImg({ name: form.name.value }); el.hidden = true;
+};
 // Choosing an ingredient offers the right units (ml / L, g / kg …)
 document.addEventListener('change', (e) => {
   if (e.target.name !== 'r_stock') return;
@@ -155,7 +187,8 @@ document.addEventListener('change', (e) => {
 
 Object.assign(Forms, {
   menuItem(fd) {
-    const d = { name: String(fd.get('name') || '').trim(), price: num(fd.get('price')), cat: String(fd.get('cat') || '').trim() || 'General', recipe: readRecipe(fd) };
+    const photo = String(fd.get('photo') || '');
+    const d = { photo: /^data:image\/jpeg;base64,/.test(photo) && photo.length < 120000 ? photo : '', name: String(fd.get('name') || '').trim(), price: num(fd.get('price')), cat: String(fd.get('cat') || '').trim() || 'General', recipe: readRecipe(fd) };
     if (!d.name) return formError('Please enter the item name.');
     const m = byId(S.menu, fd.get('id'));
     if (m) Object.assign(m, d); else S.menu.push({ id: uid('m'), available: true, ...d });

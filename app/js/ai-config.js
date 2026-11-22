@@ -1,9 +1,8 @@
 'use strict';
 /* =========================================================
-   "Ask AI" for dish ingredients (optional).
-   Put the address of your Cafe Journal AI helper here (a small
-   Cloudflare Worker — see worker/README.md). Leave it null to hide
-   the "Ask AI" button. This address is NOT secret; the AI key
-   lives only inside the worker.
+   Free AI helper (optional): "Ask AI" for dish ingredients and
+   the "AI help" chat. Put the address of your Cafe Journal AI
+   helper here (a free Cloudflare Worker — see worker/README.md).
+   Leave it null to hide the AI buttons. This address is not secret.
    ========================================================= */
-window.AI_RECIPE_URL = null;
+window.AI_URL = null;

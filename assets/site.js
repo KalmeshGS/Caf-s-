@@ -17,3 +17,18 @@
   document.querySelectorAll('[data-login]').forEach((a) => a.classList.replace('ghost', 'primary'));
   document.querySelectorAll('a[href="app/index.html#/signup"]').forEach((a) => { if (!a.closest('.start-card')) a.classList.replace('primary', 'ghost'); });
 })();
+
+/* Filter chips in "Every screen your team needs" */
+(function () {
+  const chips = document.querySelectorAll('.fchip');
+  chips.forEach((c) => c.addEventListener('click', () => {
+    chips.forEach((x) => x.classList.toggle('on', x === c));
+    document.querySelectorAll('.dl').forEach((d) => { d.hidden = c.dataset.f !== 'all' && d.dataset.k !== c.dataset.f; });
+  }));
+  // underline the nav link of the section in view
+  const links = [...document.querySelectorAll('.nav nav a')];
+  const secs = links.map((a) => document.querySelector(a.getAttribute('href'))).filter(Boolean);
+  if (!('IntersectionObserver' in window)) return;
+  const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) links.forEach((a) => a.classList.toggle('on', a.getAttribute('href') === '#' + e.target.id)); }), { rootMargin: '-45% 0px -50% 0px' });
+  secs.forEach((s) => io.observe(s));
+})();

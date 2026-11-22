@@ -43,7 +43,9 @@ const CURRENCIES = [
   { code: 'BDT', symbol: '৳', locale: 'en-IN', dec: 0, scale: 1.4, wallet: 'bKash' },
   { code: 'PKR', symbol: 'Rs ', locale: 'en-IN', dec: 0, scale: 3.3, wallet: 'Wallet' },
 ];
-const ACCENTS = { green: '#1f7a4d', coffee: '#8a5a33', indigo: '#4f46e5', terracotta: '#c2410c', teal: '#0f766e', charcoal: '#3f3f46' };
+/** Older cafés kept the first default (green, auto) — they get the new house look until they choose one in Settings */
+const lookOf = (st = {}) => (st.look === 2 ? { accent: st.accent || 'red', theme: st.theme || 'dark' } : { accent: !st.accent || st.accent === 'green' ? 'red' : st.accent, theme: !st.theme || st.theme === 'auto' ? 'dark' : st.theme });
+const ACCENTS = { red: '#e5262f', green: '#1f7a4d', coffee: '#8a5a33', indigo: '#4f46e5', terracotta: '#c2410c', teal: '#0f766e', charcoal: '#3f3f46' };
 const EXPENSE_CATS = { Rent: '#6366f1', Utilities: '#eab308', Vendor: '#c2783c', Kitchen: '#16a34a', Salary: '#0ea5e9', Maintenance: '#a855f7', Marketing: '#ec4899', Other: '#94a3b8' };
 /** Common job titles for the Designation dropdown ("Other" lets you type your own) */
 const DESIGNATIONS = ['Manager', 'Assistant Manager', 'Head Chef', 'Chef', 'Cook', 'Kitchen Helper', 'Barista', 'Cashier', 'Captain', 'Waiter', 'Steward', 'Bartender', 'Baker', 'Housekeeping', 'Dishwasher', 'Delivery', 'Security', 'Accountant', 'Helper'];

@@ -334,6 +334,21 @@ function libraryRecipe(name, stock = S.stock) {
   return out;
 }
 
+/* ---------------- free AI helper (Cloudflare Worker, see worker/README.md) ---------------- */
+async function aiCall(route, body) {
+  if (!window.AI_URL) throw new Error('AI is not set up yet');
+  const user = typeof Cloud !== 'undefined' ? Cloud.auth?.currentUser : null;
+  if (!user) throw new Error('please log in online first');
+  const res = await fetch(`${String(window.AI_URL).replace(/\/+$/, '')}/${route}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await user.getIdToken()}` },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `error ${res.status}`);
+  return data;
+}
+
 /* ---------------- buttons in the dish form ---------------- */
 const dishName = (el) => el.closest('form')?.name?.value.trim() || '';
 Object.assign(Actions, {
@@ -343,7 +358,7 @@ Object.assign(Actions, {
     const d = findDish(name);
     if (!d) {
       showPanel(true);
-      $('#imp-status').textContent = `"${name}" is not in the recipe library yet.${window.AI_RECIPE_URL ? ' Try "Ask AI",' : ' Try'} "Search on Google" or "Paste ingredients".`;
+      $('#imp-status').textContent = `"${name}" is not in the recipe library yet.${window.AI_URL ? ' Try "Ask AI",' : ' Try'} "Search on Google" or "Paste ingredients".`;
       $('#imp-preview').innerHTML = '';
       return;
     }
@@ -354,21 +369,13 @@ Object.assign(Actions, {
   async aiFill(el) {
     const name = dishName(el);
     if (!name) return toast('Type the dish name first.');
-    if (!window.AI_RECIPE_URL) return toast('AI is not set up for this café yet.');
+    if (!window.AI_URL) return toast('AI is not set up for this café yet.');
     showPanel(true);
     const status = $('#imp-status'); $('#imp-preview').innerHTML = '';
     status.textContent = `Asking AI for the ingredients of one ${name}…`;
     el.disabled = true;
     try {
-      const user = typeof Cloud !== 'undefined' ? Cloud.auth?.currentUser : null;
-      if (!user) throw new Error('please log in online first');
-      const res = await fetch(window.AI_RECIPE_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await user.getIdToken()}` },
-        body: JSON.stringify({ dish: name.slice(0, 80), business: S.settings?.type || 'cafe', stock: S.stock.map((s) => s.name).slice(0, 200) }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || `error ${res.status}`);
+      const data = await aiCall('recipe', { dish: name.slice(0, 80), business: S.settings?.type || 'cafe', stock: S.stock.map((s) => s.name).slice(0, 200) });
       const KIND = { ml: 'vol', g: 'wt', pcs: 'count' };
       const items = (data.ingredients || []).filter((x) => x && x.name && KIND[x.unit] && x.amount > 0).slice(0, 25)
         .map((x) => ({ name: String(x.name).slice(0, 40), amount: +x.amount, kind: KIND[x.unit], raw: `${x.amount} ${x.unit} ${x.name}` }));

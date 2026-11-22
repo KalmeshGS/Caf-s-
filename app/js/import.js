@@ -119,7 +119,7 @@ function importTools() {
     <span class="muted sm">Add ingredients faster:</span>
     <div class="btn-row tight">
       ${btn('Recipe library', 'libFill', { cls: 'ghost sm', ic: 'book' })}
-      ${window.AI_RECIPE_URL ? btn('Ask AI', 'aiFill', { cls: 'ghost sm', ic: 'spark' }) : ''}
+      ${window.AI_URL ? btn('Ask AI', 'aiFill', { cls: 'ghost sm', ic: 'spark' }) : ''}
       ${btn('Search on Google', 'impGoogle', { cls: 'ghost sm', ic: 'search' })}
       ${btn('Paste ingredients', 'impPaste', { cls: 'ghost sm', ic: 'clipboard' })}
       ${btn('From a photo', 'impPhoto', { cls: 'ghost sm', ic: 'camera' })}
