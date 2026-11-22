@@ -3,133 +3,163 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Cafe Journal — run your café, restaurant or hotel</title>
-  <meta name="description" content="Orders, kitchen screen, billing, stock, recipes, expenses, vendors, staff and monthly reports — one app for any café, restaurant, hotel or bakery. Works on any phone, stored securely online.">
-  <meta name="theme-color" content="#262624">
+  <title>Cafe Journal — the calm way to run your café, restaurant or hotel</title>
+  <meta name="description" content="Orders, kitchen screen, billing, stock, recipes, staff and reports in one calm app for any café, restaurant, hotel or bakery. Works on any phone, stored securely online, with a free AI helper.">
+  <meta name="theme-color" content="#f3ece2">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'">
   <meta name="referrer" content="no-referrer">
   <link rel="icon" href="app/icons/icon.svg" type="image/svg+xml">
   <link rel="manifest" href="app/manifest.webmanifest">
-  <link rel="preload" href="assets/fonts/playfair-800.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="assets/fonts/marcellus-400.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="assets/site.css">
 </head>
 <body>
-  <!-- Dish illustrations (drawn, top-down plates) -->
-  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <!-- Flat dish illustrations, drawn in code -->
+  <svg width="0" height="0" class="defs" aria-hidden="true">
     <defs>
       <symbol id="d-curry" viewBox="0 0 100 100"><circle cx="50" cy="50" r="48" fill="#c99a4a"/><circle cx="50" cy="50" r="40" fill="#e07a2a"/><circle cx="38" cy="42" r="7" fill="#fbe7c4" opacity=".9"/><circle cx="58" cy="56" r="8" fill="#fbe7c4" opacity=".85"/><circle cx="55" cy="36" r="5" fill="#fbe7c4" opacity=".8"/><circle cx="40" cy="61" r="5" fill="#fbe7c4" opacity=".8"/><path d="M30 50c10-8 30 6 42-4" stroke="#fff6e4" stroke-width="2.5" fill="none" opacity=".7"/><circle cx="64" cy="44" r="2.5" fill="#2f7d32"/><circle cx="46" cy="52" r="2" fill="#2f7d32"/><circle cx="33" cy="55" r="2" fill="#2f7d32"/></symbol>
-      <symbol id="d-tikka" viewBox="0 0 100 100"><circle cx="50" cy="50" r="48" fill="#2b2b2b"/><circle cx="50" cy="50" r="41" fill="#232325"/><rect x="24" y="30" width="18" height="14" rx="5" fill="#d64a2a" transform="rotate(-18 33 37)"/><rect x="46" y="26" width="18" height="14" rx="5" fill="#d64a2a" transform="rotate(12 55 33)"/><rect x="36" y="48" width="18" height="14" rx="5" fill="#d64a2a" transform="rotate(-6 45 55)"/><rect x="58" y="50" width="16" height="13" rx="5" fill="#d64a2a" transform="rotate(20 66 56)"/><circle cx="30" cy="66" r="7" fill="#e6f0d8"/><circle cx="30" cy="66" r="4" fill="#8bc34a"/><path d="M60 72h16" stroke="#f5d061" stroke-width="5" stroke-linecap="round"/></symbol>
+      <symbol id="d-tikka" viewBox="0 0 100 100"><circle cx="50" cy="50" r="48" fill="#efe6d8"/><circle cx="50" cy="50" r="41" fill="#f8f2e9"/><rect x="24" y="30" width="18" height="14" rx="5" fill="#d64a2a" transform="rotate(-18 33 37)"/><rect x="46" y="26" width="18" height="14" rx="5" fill="#d64a2a" transform="rotate(12 55 33)"/><rect x="36" y="48" width="18" height="14" rx="5" fill="#d64a2a" transform="rotate(-6 45 55)"/><rect x="58" y="50" width="16" height="13" rx="5" fill="#d64a2a" transform="rotate(20 66 56)"/><circle cx="30" cy="66" r="7" fill="#e6f0d8"/><circle cx="30" cy="66" r="4" fill="#8bc34a"/><path d="M60 72h16" stroke="#f5d061" stroke-width="5" stroke-linecap="round"/></symbol>
       <symbol id="d-palak" viewBox="0 0 100 100"><circle cx="50" cy="50" r="48" fill="#c99a4a"/><circle cx="50" cy="50" r="40" fill="#6f9e35"/><rect x="33" y="36" width="11" height="11" rx="2" fill="#fff8e7"/><rect x="55" y="34" width="11" height="11" rx="2" fill="#fff8e7"/><rect x="44" y="54" width="11" height="11" rx="2" fill="#fff8e7"/><rect x="60" y="56" width="9" height="9" rx="2" fill="#fff8e7"/><path d="M32 60c8 4 14-6 22-2" stroke="#fffbe9" stroke-width="2.5" fill="none" opacity=".75"/></symbol>
-      <symbol id="d-biryani" viewBox="0 0 100 100"><circle cx="50" cy="50" r="48" fill="#2b2b2b"/><circle cx="50" cy="50" r="41" fill="#f1dfae"/><g fill="#d9822b"><circle cx="40" cy="38" r="3"/><circle cx="60" cy="44" r="3"/><circle cx="48" cy="60" r="3"/><circle cx="34" cy="54" r="2.5"/><circle cx="64" cy="60" r="2.5"/></g><circle cx="52" cy="46" r="9" fill="#a8461c"/><circle cx="38" cy="45" r="2" fill="#3f8a3a"/><circle cx="60" cy="54" r="2" fill="#3f8a3a"/><path d="M30 66c6-3 10 2 16-1" stroke="#7b3b14" stroke-width="2" fill="none"/></symbol>
-      <symbol id="d-chai" viewBox="0 0 100 100"><circle cx="50" cy="50" r="48" fill="#2b2b2b"/><circle cx="50" cy="50" r="30" fill="#f3ede4"/><circle cx="50" cy="50" r="24" fill="#b07a45"/><path d="M78 46h8a6 6 0 0 1 0 12h-8" stroke="#f3ede4" stroke-width="5" fill="none"/><path d="M42 46c4-4 12-4 16 2" stroke="#f2d2a8" stroke-width="2.5" fill="none" opacity=".8"/></symbol>
+      <symbol id="d-biryani" viewBox="0 0 100 100"><circle cx="50" cy="50" r="48" fill="#efe6d8"/><circle cx="50" cy="50" r="41" fill="#f1dfae"/><g fill="#d9822b"><circle cx="40" cy="38" r="3"/><circle cx="60" cy="44" r="3"/><circle cx="48" cy="60" r="3"/><circle cx="34" cy="54" r="2.5"/><circle cx="64" cy="60" r="2.5"/></g><circle cx="52" cy="46" r="9" fill="#a8461c"/><circle cx="38" cy="45" r="2" fill="#3f8a3a"/><circle cx="60" cy="54" r="2" fill="#3f8a3a"/><path d="M30 66c6-3 10 2 16-1" stroke="#7b3b14" stroke-width="2" fill="none"/></symbol>
+      <symbol id="d-chai" viewBox="0 0 100 100"><circle cx="50" cy="50" r="48" fill="#efe6d8"/><circle cx="50" cy="50" r="30" fill="#f3ede4"/><circle cx="50" cy="50" r="24" fill="#b07a45"/><path d="M78 46h8a6 6 0 0 1 0 12h-8" stroke="#f3ede4" stroke-width="5" fill="none"/><path d="M42 46c4-4 12-4 16 2" stroke="#f2d2a8" stroke-width="2.5" fill="none" opacity=".8"/></symbol>
       <symbol id="d-dosa" viewBox="0 0 100 100"><circle cx="50" cy="50" r="48" fill="#d9dcd2"/><circle cx="50" cy="50" r="44" fill="#cfd3c6"/><path d="M14 58c20-30 56-36 74-20-10 18-50 34-74 20z" fill="#e4a14a"/><path d="M20 56c20-20 48-26 62-16" stroke="#b56a22" stroke-width="2" fill="none" opacity=".6"/><circle cx="30" cy="76" r="8" fill="#f1efe4"/><circle cx="48" cy="80" r="8" fill="#e0632e"/><circle cx="66" cy="75" r="8" fill="#9ccf55"/></symbol>
+      <symbol id="d-cake" viewBox="0 0 100 100"><circle cx="50" cy="50" r="48" fill="#f6efe4"/><rect x="26" y="40" width="48" height="30" rx="6" fill="#e9b7a6"/><rect x="26" y="40" width="48" height="10" rx="5" fill="#f7e4d8"/><circle cx="50" cy="35" r="7" fill="#c94b4b"/><circle cx="36" cy="40" r="3" fill="#fff"/><circle cx="64" cy="40" r="3" fill="#fff"/></symbol>
+      <symbol id="d-drink" viewBox="0 0 100 100"><circle cx="50" cy="50" r="48" fill="#f6efe4"/><path d="M34 26h32l-4 50a6 6 0 0 1-6 5H44a6 6 0 0 1-6-5z" fill="#f08a4b" opacity=".9"/><path d="M36 40h28" stroke="#fff6ec" stroke-width="3"/><circle cx="66" cy="28" r="10" fill="#f6b04a"/><circle cx="66" cy="28" r="6" fill="#fbd27d"/><path d="M52 18l-4 30" stroke="#5b8c4a" stroke-width="2.5"/></symbol>
     </defs>
   </svg>
 
-  <div class="glow" aria-hidden="true"></div>
-
   <header class="nav wrap">
-    <a class="logo" href="./"><span class="logo-mark">CJ</span><span>Cafe <i>•</i> Journal</span></a>
-    <nav><a class="on" href="#top">Home</a><a href="#features">Features</a><a href="#menu">Menu &amp; stock</a><a href="#start">Get started</a></nav>
-    <div class="nav-cta"><a class="btn ghost sm" href="app/index.html#/login" data-login>Log in</a><a class="btn primary sm" href="app/index.html#/signup">Sign up</a></div>
+    <nav class="nav-l"><a href="#about">About</a><a href="#features">Features</a><a href="#ai">AI helper</a></nav>
+    <a class="logo" href="./" aria-label="Cafe Journal home">cafe journal</a>
+    <div class="nav-r"><a class="txt-link" href="app/index.html#/login" data-login>Log in</a><a class="btn sm" href="app/index.html#/signup">Sign up</a></div>
   </header>
 
-  <main id="top">
+  <main>
+    <!-- Hero -->
     <section class="hero wrap">
-      <div class="hero-text">
-        <p class="kicker">For cafés · restaurants · hotels · bakeries</p>
-        <h1>Run your kitchen<br>the <em>easy way.</em></h1>
-        <p class="lead">Orders, kitchen screen, billing, stock, recipes and staff — together in one app. Know your real profit at the end of every day.</p>
-        <div class="cta">
-          <a class="btn primary" href="app/index.html#/signup">Sign up free</a>
-          <a class="btn ghost" href="app/index.html#/login" data-login>Log in</a>
+      <p class="kicker">For cafés · restaurants · hotels · bakeries</p>
+      <h1>The calm way<br>to run your café</h1>
+      <p class="lead">Orders, kitchen, billing, stock, recipes and staff — one simple journal for your whole place, on every phone.</p>
+      <div class="cta"><a class="btn" href="app/index.html#/signup">Start free</a><a class="txt-link" href="app/index.html#/login" data-login>Log in</a></div>
+      <p class="fine" id="welcome-back"></p>
+      <span class="vline" aria-hidden="true"></span>
+    </section>
+
+    <!-- Arch collage -->
+    <section class="collage" aria-hidden="true">
+      <div class="arch">
+        <svg class="d d1"><use href="#d-cake"/></svg>
+        <svg class="d d2"><use href="#d-curry"/></svg>
+        <svg class="d d3"><use href="#d-drink"/></svg>
+        <svg class="d d4"><use href="#d-chai"/></svg>
+        <svg class="d d5"><use href="#d-dosa"/></svg>
+      </div>
+    </section>
+
+    <!-- About -->
+    <section class="about wrap" id="about">
+      <div class="about-text">
+        <p class="kicker">About us</p>
+        <h2>One journal<br>for your<br>whole place</h2>
+        <p>No more registers, Excel sheets and five different apps. Waiters take orders, the kitchen sees them live, the counter bills in one tap — and you see your real profit every evening.</p>
+        <a class="btn solid" href="#features">See what's inside</a>
+      </div>
+      <div class="about-art">
+        <div class="frame tall">
+          <div class="mock">
+            <p class="m-eye">Owner dashboard · Today</p>
+            <div class="m-row"><span>Sales</span><b>₹24,860</b></div>
+            <div class="m-row"><span>Expenses</span><b>₹6,420</b></div>
+            <div class="m-row hl"><span>Profit</span><b>₹18,440</b></div>
+            <div class="m-bars"><i style="--h:35%"></i><i style="--h:52%"></i><i style="--h:44%"></i><i style="--h:70%"></i><i style="--h:92%"></i><i style="--h:64%"></i><i style="--h:48%"></i></div>
+          </div>
         </div>
-        <div class="hero-meta">
-          <span class="dots"><i></i><i></i><i></i></span>
-          <span><b>Any phone</b> · installs as an app</span>
-          <span><b>Online</b> · safe, live sync</span>
+        <div class="frame small peach"><svg class="d"><use href="#d-drink"/></svg></div>
+      </div>
+    </section>
+
+    <!-- Three features -->
+    <section class="three wrap" id="features">
+      <article>
+        <svg class="line-ic" viewBox="0 0 48 48" aria-hidden="true"><path d="M10 40V14a4 4 0 0 1 4-4h20a4 4 0 0 1 4 4v26l-5-3-5 3-4-3-5 3-4-3z"/><path d="M17 19h14M17 25h14M17 31h8"/></svg>
+        <h3>Orders &amp;<br>kitchen</h3>
+        <p>Tables, takeaway and cooking notes go straight to the kitchen screen. Waiters hear when the food is ready.</p>
+      </article>
+      <article>
+        <svg class="line-ic" viewBox="0 0 48 48" aria-hidden="true"><path d="M14 8h20M16 8v8l-6 10v12a4 4 0 0 0 4 4h20a4 4 0 0 0 4-4V26l-6-10V8"/><path d="M10 28h28"/></svg>
+        <h3>Stock &amp;<br>recipes</h3>
+        <p>Set each dish's ingredients once — stock goes down by itself every time it's served. 280+ recipes built in.</p>
+      </article>
+      <article>
+        <svg class="line-ic" viewBox="0 0 48 48" aria-hidden="true"><path d="M8 40h32"/><path d="M13 40V26M22 40V16M31 40V22M40 40V10"/></svg>
+        <h3>Bills &amp;<br>reports</h3>
+        <p>Cash, UPI or card, printed bills, day closing in one tap and a month-end report with your real profit.</p>
+      </article>
+    </section>
+
+    <!-- Every role -->
+    <section class="roles wrap">
+      <p class="kicker center">Made for every role</p>
+      <h2 class="center">Each person sees<br>just their own work</h2>
+      <div class="roles-grid">
+        <div class="frame wide mint"><svg class="d"><use href="#d-tikka"/></svg><svg class="d sm"><use href="#d-palak"/></svg></div>
+        <div class="phone">
+          <p class="m-eye">Waiter · Table 6</p>
+          <div class="p-line"><span>Cold Coffee × 2</span><b>₹360</b></div>
+          <div class="p-line"><span>Paneer Tikka × 1</span><b>₹220</b></div>
+          <div class="p-line note"><span>“Less spicy”</span></div>
+          <div class="p-btn">Send to kitchen</div>
         </div>
-        <p class="fine" id="welcome-back"></p>
-      </div>
-      <div class="hero-art" aria-hidden="true">
-        <div class="plate-ring"><svg class="dish big"><use href="#d-curry"/></svg></div>
-        <div class="float-badge"><span class="dot-ok"></span><span><b>Order ready</b><small>Table 4 · 2 items</small></span></div>
-        <div class="float-badge b2"><b>₹24,860</b><small>Today's sales</small></div>
-      </div>
-    </section>
-
-    <section class="wrap popular" id="features">
-      <div class="sec-head"><h2>Popular right now</h2><span class="muted">What owners use every day</span></div>
-      <div class="pop-row">
-        <article class="pop"><svg class="dish"><use href="#d-tikka"/></svg><h3>Orders → Kitchen</h3><p>Waiter sends the order, the kitchen sees it with a timer and notes.</p><span class="tag">Live</span></article>
-        <article class="pop"><svg class="dish"><use href="#d-chai"/></svg><h3>Billing</h3><p>Cash, UPI or card. Print the bill, close the day in one tap.</p><span class="tag">Fast</span></article>
-        <article class="pop"><svg class="dish"><use href="#d-palak"/></svg><h3>Stock &amp; recipes</h3><p>Set each dish's ingredients once — stock goes down when it's served.</p><span class="tag">Auto</span></article>
-        <article class="pop"><svg class="dish"><use href="#d-biryani"/></svg><h3>Reports</h3><p>Best sellers, where the money went and your real profit.</p><span class="tag">Monthly</span></article>
-      </div>
-    </section>
-
-    <section class="wrap menu-sec" id="menu">
-      <p class="kicker center">Everything in one place</p>
-      <h2 class="center">Every screen your team needs.</h2>
-      <p class="lead center">Each person logs in with their own Employee ID and only sees their own work.</p>
-      <div class="filters" role="tablist">
-        <button class="fchip on" data-f="all">All</button><button class="fchip" data-f="floor">Floor</button><button class="fchip" data-f="kitchen">Kitchen</button><button class="fchip" data-f="money">Money</button><button class="fchip" data-f="team">Team</button>
-      </div>
-      <div class="dish-list">
-        <article class="dl" data-k="floor"><svg class="dish"><use href="#d-tikka"/></svg><div><h3>Orders &amp; tables <small>Waiter</small></h3><p>Tables, takeaway, notes like "less sugar", and edits until the chef starts cooking.</p></div><span class="price">01</span></article>
-        <article class="dl" data-k="floor"><svg class="dish"><use href="#d-chai"/></svg><div><h3>Reservations <small>Floor</small></h3><p>Guest, time and table. Mark tables Free, Running, Cleaning or Reserved.</p></div><span class="price">02</span></article>
-        <article class="dl" data-k="kitchen"><svg class="dish"><use href="#d-curry"/></svg><div><h3>Kitchen screen <small>Chef</small></h3><p>New → Cooking → Ready. Waiters get a ping when the food is ready.</p></div><span class="price">03</span></article>
-        <article class="dl" data-k="kitchen"><svg class="dish"><use href="#d-dosa"/></svg><div><h3>Menu &amp; recipes <small>Chef · Owner</small></h3><p>Dish photos, ingredients per serving from a 280-dish recipe library, Google, a photo or AI.</p></div><span class="price">04</span></article>
-        <article class="dl" data-k="money"><svg class="dish"><use href="#d-biryani"/></svg><div><h3>Billing &amp; day closing <small>Cashier</small></h3><p>Discounts, tax, printed bills, and the cash / UPI / card split saved to the journal.</p></div><span class="price">05</span></article>
-        <article class="dl" data-k="money"><svg class="dish"><use href="#d-palak"/></svg><div><h3>Expenses &amp; vendors <small>Owner</small></h3><p>Rent, gas, salaries and vendor bills — who you owe and how much.</p></div><span class="price">06</span></article>
-        <article class="dl" data-k="team"><svg class="dish"><use href="#d-chai"/></svg><div><h3>Staff &amp; ID cards <small>Owner · Manager</small></h3><p>Photo, KYC, blood group, auto employee IDs like KK26001 and printable ID cards.</p></div><span class="price">07</span></article>
-        <article class="dl" data-k="team"><svg class="dish"><use href="#d-curry"/></svg><div><h3>Secure logins <small>Everyone</small></h3><p>Own password for each person. Wrong passwords lock the account until the owner unlocks it.</p></div><span class="price">08</span></article>
-      </div>
-    </section>
-
-    <section id="start" class="wrap start">
-      <h2 class="center">Get started</h2>
-      <div class="start-grid">
-        <article class="start-card primary">
-          <p class="kicker">New here</p>
-          <h3>Sign up your place</h3>
-          <ol class="mini-steps">
-            <li><b>Your place</b><span>Name, short code (for employee IDs like KK26001), type of business</span></li>
-            <li><b>How you work</b><span>Currency, number of tables, tax on bills</span></li>
-            <li><b>Menu, stock &amp; staff</b><span>Your own items and people — or skip and add later</span></li>
-            <li><b>Owner account</b><span>Your name, mobile, email and a password</span></li>
-          </ol>
-          <a class="btn primary" href="app/index.html#/signup">Sign up — it's free</a>
-        </article>
-        <article class="start-card">
-          <p class="kicker">Already have an account</p>
-          <h3>Log in</h3>
-          <ul class="mini-list">
-            <li><b>Owner:</b> your email and password.</li>
-            <li><b>Staff:</b> café code, Employee ID and the password the owner gave you — you'll change it the first time.</li>
-            <li>Forgot it? Tap <em>Forgot password</em> and the owner can reset it.</li>
+        <div class="roles-text">
+          <ul class="role-list">
+            <li><b>Owner</b> everything, from any phone</li>
+            <li><b>Manager</b> staff, stock, menu and billing</li>
+            <li><b>Cashier</b> bills and day closing</li>
+            <li><b>Waiter</b> tables, orders, reservations</li>
+            <li><b>Kitchen</b> tickets and recipes</li>
           </ul>
-          <a class="btn ghost" href="app/index.html#/login" data-login>Log in</a>
-        </article>
+          <a class="btn solid" href="app/index.html#/signup">Get started</a>
+        </div>
       </div>
     </section>
 
-    <section class="wrap">
-      <div class="banner-cta">
-        <div><h2>Open today. Close the day in one tap.</h2><p>Install it on every phone in your place — Android, iPhone or laptop.</p></div>
-        <div class="nav-cta"><a class="btn light" href="app/index.html#/signup">Sign up</a><a class="btn ghost" href="app/index.html#/login" data-login>Log in</a></div>
+    <!-- AI -->
+    <section class="ai wrap" id="ai">
+      <p class="kicker center">Free AI helper</p>
+      <h2 class="center">Ask anything about<br>your kitchen</h2>
+      <p class="lead center">“What goes into one masala dosa?” “How do I give a waiter a login?” Ask in plain words — the answer comes in seconds, and ingredients drop straight into your recipes.</p>
+      <div class="center"><a class="btn solid" href="app/index.html#/signup">Try it free</a></div>
+      <div class="chat-band">
+        <div class="bubble me">What does one cup of masala chai use?</div>
+        <div class="bubble ai">Milk 100 ml · Sugar 10 g · Tea powder 5 g · Ginger 2 g. Add to the recipe?</div>
+        <div class="bubble me short">Yes, add it</div>
       </div>
-      <ul class="install-list">
-        <li><b>Android / Chrome:</b> menu ⋮ → <em>Install app</em></li>
-        <li><b>iPhone / Safari:</b> Share → <em>Add to Home Screen</em></li>
-        <li><b>Laptop:</b> install icon in the address bar</li>
-      </ul>
+    </section>
+
+    <!-- Three cards -->
+    <section class="cards wrap">
+      <article class="card"><div class="thumb blush"><svg class="d"><use href="#d-cake"/></svg></div><p class="kicker">Menu</p><h3>Dish photos</h3><p>Add a photo to every dish — your team taps pictures, not just names.</p></article>
+      <article class="card"><div class="thumb mint"><svg class="d"><use href="#d-biryani"/></svg></div><p class="kicker">Recipes</p><h3>280+ dishes built in</h3><p>Chai to biryani — typical amounts for one serving, matched to your stock.</p></article>
+      <article class="card"><div class="thumb peach"><svg class="d"><use href="#d-dosa"/></svg></div><p class="kicker">Team</p><h3>Staff &amp; ID cards</h3><p>Records, KYC, auto employee IDs like KK26001 and printable ID cards.</p></article>
+    </section>
+
+    <!-- Olive call to action -->
+    <section class="wrap">
+      <div class="olive">
+        <h2>Start your journal today</h2>
+        <p>Free to start. Installs on Android, iPhone and laptops.</p>
+        <div class="cta"><a class="btn light" href="app/index.html#/signup">Sign up</a><a class="btn ghost-light" href="app/index.html#/login" data-login>Log in</a></div>
+      </div>
     </section>
   </main>
 
-  <footer class="wrap foot">
-    <span>Cafe <i>•</i> Journal</span>
-    <span>Your café's data is stored securely online.</span>
+  <footer class="foot">
+    <div class="wrap foot-grid">
+      <div><a class="logo" href="./">cafe journal</a><p>The calm way to run your café, restaurant or hotel.</p></div>
+      <div><p class="kicker">App</p><a href="app/index.html#/signup">Sign up</a><a href="app/index.html#/login">Log in</a><a href="#features">Features</a></div>
+      <div><p class="kicker">Install</p><span>Android: menu ⋮ → Install app</span><span>iPhone: Share → Add to Home Screen</span><span>Laptop: install icon in the address bar</span></div>
+    </div>
+    <p class="wrap copy">Your café's data is stored securely online.</p>
   </footer>
   <script src="assets/site.js"></script>
 </body>
