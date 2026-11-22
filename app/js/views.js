@@ -469,10 +469,10 @@ function setupCards() {
 Views.menu = () => {
   const cats = [...new Set(S.menu.map((m) => m.cat))];
   const noRecipe = S.menu.filter((m) => !(m.recipe && m.recipe.length)).length;
-  return `${pageHead('Menu & recipes', 'Menu', `<div class="btn-row tight">${noRecipe && S.stock.length ? btn('Fill typical recipes', 'fillRecipes', { cls: 'ghost sm' }) : ''}${btn('Menu item', 'menuAdd', { cls: 'primary', ic: 'plus' })}</div>`)}
+  return `${pageHead('Menu & recipes', 'Menu', `<div class="btn-row tight">${noRecipe && S.stock.length ? btn('Fill all from recipe library', 'fillRecipes', { cls: 'ghost sm' }) : ''}${btn('Menu item', 'menuAdd', { cls: 'primary', ic: 'plus' })}</div>`)}
     <p class="muted sm">${pl(S.menu.length, 'item')} · ${pl(cats.length, 'category', 'categories')}. Set the ingredients of each dish once — stock then goes down automatically every time it is served.</p>
     ${!S.stock.length ? `<div class="banner info">${icon('box')}<span>Add your stock items first (milk, sugar, tea powder…) so dishes can use them.</span>${can('stock') ? `<a class="btn primary sm" href="#/stock">Go to Stock</a>` : ''}</div>` : ''}
-    ${noRecipe && S.stock.length ? `<div class="banner info">${icon('box')}<span>${pl(noRecipe, 'item')} ${noRecipe === 1 ? 'has' : 'have'} no ingredients yet, so stock won't reduce when ${noRecipe === 1 ? 'it is' : 'they are'} served. Tap an item to add them, or "Fill typical recipes".</span></div>` : ''}
+    ${noRecipe && S.stock.length ? `<div class="banner info">${icon('box')}<span>${pl(noRecipe, 'item')} ${noRecipe === 1 ? 'has' : 'have'} no ingredients yet, so stock won't reduce when ${noRecipe === 1 ? 'it is' : 'they are'} served. Tap an item to add them, or "Fill all from recipe library" (280+ common dishes built in).</span></div>` : ''}
     ${cats.map((c) => `<section class="card">${eyebrow(c)}${S.menu.filter((m) => m.cat === c).map((m) => `<div class="menu-row ${m.available === false ? 'off' : ''}">
         <span>${esc(m.name)}${m.recipe && m.recipe.length ? `<small class="muted rec-sum">${esc(recipeText(m.recipe))}</small>` : `<small class="neg rec-sum">No ingredients set</small>`}</span><b>${money(m.price)}</b>
         <label class="switch" title="Available today"><input type="checkbox" data-act="menuToggle" data-id="${m.id}" ${m.available !== false ? 'checked' : ''}><i></i></label>

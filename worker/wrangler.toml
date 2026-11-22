@@ -1,0 +1,14 @@
+# Cafe Journal AI helper (Cloudflare Worker). Deployed by .github/workflows/ai-worker.yml
+name = "cafe-journal-ai"
+main = "src/index.js"
+compatibility_date = "2026-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+# Only the website may call this helper
+ALLOWED_ORIGIN = "https://kalmeshgs.github.io"
+# Firebase project: only people logged in to your café can use it
+FIREBASE_PROJECT_ID = "cafe-journal-9ba5e"
+# Claude model. "claude-haiku-5-5" is much cheaper if you prefer.
+MODEL = "claude-opus-5-5"
+# The ANTHROPIC_API_KEY is a secret (never written here) — see worker/README.md
