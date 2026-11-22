@@ -383,7 +383,7 @@ const Forms = {
       name: fd.get('name').trim(), tagline: fd.get('tagline').trim(), type: fd.get('type'), currency: fd.get('currency'),
       tables: clamp(num(fd.get('tables')), 0, 99), tax: num(fd.get('tax')),
       openHour: clamp(num(fd.get('openHour')), 0, 23), closeHour: clamp(num(fd.get('closeHour')), 0, 23),
-      footer: fd.get('footer').trim(), accent: fd.get('accent'), theme: fd.get('theme'), look: 2,
+      footer: fd.get('footer').trim(), accent: fd.get('accent'), theme: fd.get('theme'), look: 3,
       short: shortCode(fd.get('short') || fd.get('name')),
     });
     save(); toast('Saved');

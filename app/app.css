@@ -884,3 +884,30 @@ input:not([type=checkbox]):not([type=radio]), select, textarea { border-radius: 
 .brand .icon-btn.bell { margin-left: 0; }
 @media (min-width: 900px) { .layout { grid-template-columns: 256px 1fr; } }
 @media (max-width: 899px) { .home-hi { flex-direction: column; gap: 8px; } }
+
+/* =========================================================
+   Editorial look (default): cream paper, clay accent, Marcellus
+   headings — matches the website. Contrast (WCAG AA): ink #3b2f2a on
+   #f3ece2 11:1 · muted #6f625a 5:1 · white on clay #b5562a 4.85:1
+   ========================================================= */
+@font-face { font-family: "Marcellus"; src: url("../assets/fonts/marcellus-400.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+:root { --serif: "Marcellus", "Cormorant Garamond", Georgia, serif;
+  --bg: #f3ece2; --surface: #fffdf9; --surface-2: #f6efe5; --ink: #3b2f2a; --ink-2: #5a4c44; --muted: #6f625a; --line: #e2d8ca; --side: #ede4d7;
+  --ok: #3f7d4e; --danger: #b3412b; --amber: #a86a12; --warm: #c99a68; }
+h1, .page-head h1, .onb h2, .center-screen h2, .sheet-head h2, .ticket h2, .home-hi, .kpi-v, .brand strong, .menu-row b { font-family: var(--serif); font-weight: 400; }
+.page-head h1 { text-transform: uppercase; letter-spacing: .03em; font-size: 32px; }
+.eyebrow, .crumb { letter-spacing: .18em; font-size: 10.5px; }
+.kpi-v { font-size: 26px; }
+.home-hi { letter-spacing: .01em; font-size: clamp(32px, 4.6vw, 48px); }
+.btn { font-weight: 600; }
+.btn.primary { letter-spacing: .02em; }
+.brand strong { font-size: 18px; letter-spacing: .01em; }
+.dish-img.ph { font-weight: 400; }
+:root[data-theme="light"] .card, :root[data-theme="light"] .kpi { border-color: var(--line); }
+:root[data-theme="light"] .nav-i.on { background: var(--surface); }
+:root[data-theme="light"] .home-box { background: var(--surface); }
+:root[data-theme="light"] .msg.ai { background: var(--surface); border: 1px solid var(--line); }
+:root[data-theme="light"] .msg.me { background: var(--ink); color: var(--bg); }
+/* numbers stay in the clear sans font (Marcellus' 0 looks like an O) */
+.kpi-v, .menu-row b { font-family: var(--font); font-weight: 700; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+.kpi-v { font-size: 24px; }

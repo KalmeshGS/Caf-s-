@@ -500,7 +500,7 @@ async function cloudSignup(fd, form) {
     const st = {
       name: d.name.trim(), short: d.short, tagline: String(d.tagline || '').trim(), type: d.type || 'cafe',
       currency: d.currency || 'INR', tables: clamp(num(d.tables), 0, 99), tax: num(d.tax),
-      openHour: 8, closeHour: 22, accent: 'red', theme: 'dark', look: 2, footer: 'Thank you, visit again!',
+      openHour: 8, closeHour: 22, accent: 'clay', theme: 'light', look: 3, footer: 'Thank you, visit again!',
     };
     const moving = App.legacyChoice === 'move' && Cloud.legacy;
     const base = moving ? Object.assign(emptyState(), Cloud.legacy) : emptyState();
