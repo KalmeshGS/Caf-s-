@@ -21,6 +21,17 @@ The design is minimalist and neutral, so it fits any food business. You choose y
 | ✎ | **Journal (daybook)** | A page per day with notes, tags, that day's numbers and the closing summary |
 | ⚙ | **Settings** | Business profile, menu editor, PINs, backup and restore (JSON), sample data, and light or dark mode |
 
+## Adaptive business setup (Phase 1 of the spec)
+
+Cafe Journal asks **how your place works** and shows only what you need.
+- **Sign-up:** Place (pick one of 17 types: darshini, café, family restaurant, meals hotel, dhaba, bar, cloud kitchen, bakery, canteen, hotel with rooms…) → **How you work** (10 short screens, pre-filled for your type, with a live "Your app will have" preview) → **Tax & bills** (GST, GSTIN, FSSAI, prices incl. GST, service charge, packing, printer) → Menu (with **import from Excel / CSV / a photo**) → Stock → Staff → Owner.
+- **Settings → Business setup** (owner): change the answers any time. You see what turns on and what gets hidden before saving. **Nothing is ever deleted**, only hidden.
+- Screens follow the answers. For example, a counter-only place has no table grid, a place without a kitchen screen has no Kitchen tab, and the cashier opens straight on counter billing.
+- Cafés created before this keep every screen (treated as a family restaurant) until the owner runs Business setup.
+- **Dashboard → Money received today:** cash / UPI / card (and any other method) with bills and % for each.
+- Spec data: [`docs/businessProfile.config.json`](docs/businessProfile.config.json) · decisions: [`docs/DECISIONS.md`](docs/DECISIONS.md). Tax rates are research only, so confirm them with your CA.
+- Restore point: the version before this change is saved on the branch `backup-before-adaptive-setup`.
+
 ## Project structure
 
 ```

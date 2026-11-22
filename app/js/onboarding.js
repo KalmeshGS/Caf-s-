@@ -3,16 +3,18 @@
    Sign-up wizard (no sample data) — and the same Menu / Stock /
    Staff steps reused later from Settings → "Set up café details".
 
-   Sign-up:  1 Place · 2 How you work · 3 Menu · 4 Stock · 5 Staff & logins · 6 Owner account
+   Sign-up:  1 Place (type) · 2 How you work (short questions) · 3 Tax & bills · 4 Menu · 5 Stock · 6 Staff & logins · 7 Owner account
    Later:    1 Menu · 2 Stock · 3 Staff & logins           (adds to the current café)
+   Profile:  Settings → Business setup: 1 Type · 2 How you work · 3 Tax & bills · 4 Review changes
    ========================================================= */
 
 const ONLINE = () => typeof Cloud !== 'undefined' && Cloud.on;
-const SIGNUP_STEPS = ['place', 'work', 'menu', 'stock', 'staff', 'owner'];
+const SIGNUP_STEPS = ['place', 'how', 'tax', 'menu', 'stock', 'staff', 'owner'];
+const PROFILE_STEPS = ['preset', 'how', 'tax', 'review'];
 const LATER_STEPS = ['menu', 'stock', 'staff'];
-const newDraft = () => ({ type: 'cafe', currency: 'INR', tables: 8, tax: 5, menu: [{}], stock: [{}], staff: [{}] });
+const newDraft = () => ({ type: 'cafe', currency: 'INR', tables: 8, tax: 5, menu: [{}], stock: [{}], staff: [{}], answers: presetAnswers('cafe') });
 App.setup = { step: 0, mode: 'signup', d: newDraft() };
-const stepList = () => (App.setup.mode === 'later' ? LATER_STEPS : SIGNUP_STEPS);
+const stepList = () => (App.setup.mode === 'later' ? LATER_STEPS : App.setup.mode === 'profile' ? PROFILE_STEPS : SIGNUP_STEPS);
 const stepName = () => stepList()[App.setup.step - 1];
 const SETUP_TYPES = [
   ['cafe', 'Café', 'cup'], ['restaurant', 'Restaurant', 'flame'], ['hotel', 'Hotel / Dhaba', 'grid'],
@@ -40,6 +42,7 @@ function rowsEditor(list) {
       <datalist id="cat-sugg">${cats.map((c) => `<option value="${esc(c)}">`).join('')}</datalist>
     </div>
     <div class="btn-row">${btn('Add item', 'rowAdd', { cls: 'ghost sm', ic: 'plus', data: 'data-list="menu"' })}${btn(`Fill with a typical ${typeLabel} menu`, 'rowStarter', { cls: 'ghost sm', data: 'data-list="menu"' })}</div>
+    ${menuImportHtml()}
     <p class="muted sm">Optional — skip it now and add items any time in Settings → Menu. Starter lists are only added if you tap the button, and you can edit every row.</p>`;
   }
   if (list === 'stock') {
@@ -69,7 +72,7 @@ function rowsEditor(list) {
       <div class="row-2">
         <label class="field"><span>Login access</span><select name="p_access">
           <option value="">No login (staff record only)</option>
-          ${ACCESS_ROLES.map((k) => `<option value="${k}" ${r.access === k ? 'selected' : ''}>${esc(ROLES[k].label)} — ${esc(ROLES[k].desc)}</option>`).join('')}</select></label>
+          ${ACCESS_ROLES.filter((k) => !App.setup.d.answers || rolesOfferedFor(App.setup.d.answers).includes(k) || r.access === k).map((k) => `<option value="${k}" ${r.access === k ? 'selected' : ''}>${esc(ROLES[k].label)} — ${esc(ROLES[k].desc)}</option>`).join('')}</select></label>
         <label class="field"><span>First password <em>(if login)</em></span>
           <span class="pw-wrap"><input name="p_pw" type="password" maxlength="64" autocomplete="new-password" value="${esc(r.pw || '')}" placeholder="you type it"><button type="button" class="pw-eye" data-act="togglePw" aria-label="Show password">${icon('eye')}</button></span></label>
       </div>
@@ -97,7 +100,7 @@ Views.setup = () => {
       <p class="fine center version">Cafe Journal v${APP_VERSION}</p></main>`;
   }
   const steps = stepList(), name = stepName(), total = steps.length;
-  const titles = { place: 'About your place', work: 'How you work', menu: 'Your menu', stock: 'Your stock', staff: 'Your staff & their logins', owner: 'Your owner account' };
+  const titles = { place: 'About your place', how: 'How you work', tax: 'Tax & bills', preset: 'Your kind of place', review: 'Check the changes', menu: 'Your menu', stock: 'Your stock', staff: 'Your staff & their logins', owner: 'Your owner account' };
   const v = (k) => esc(d[k] ?? '');
   let body = '';
   if (name === 'place') {
@@ -107,16 +110,16 @@ Views.setup = () => {
         <label class="field"><span>Short code <em>(for employee IDs)</em></span><input name="short" required maxlength="4" value="${v('short')}" placeholder="CC" style="text-transform:uppercase" data-input="setupShort"></label>
         <div class="field"><span>Employee IDs will look like</span><div class="emp-sample" id="emp-sample">${esc(((d.short || 'CC') + String(new Date().getFullYear()).slice(-2) + '001').toUpperCase())}</div></div>
       </div>
-      <div class="field"><span>What kind of place is it?</span>
-        <div class="type-grid">${SETUP_TYPES.map(([k, label, ic]) => `<label class="type-card"><input type="radio" name="type" value="${k}" ${d.type === k ? 'checked' : ''}><span>${icon(ic)}<b>${esc(label)}</b></span></label>`).join('')}</div></div>
+      ${presetPicker(d.answers || presetAnswers('cafe'))}
       <label class="field"><span>Tagline <em>(optional — shows on login & receipts)</em></span><input name="tagline" maxlength="60" placeholder="e.g. Chai · Coffee · Sandwiches" value="${v('tagline')}"></label>`;
-  } else if (name === 'work') {
-    body = `
-      <label class="field"><span>Currency</span><select name="currency">${CURRENCIES.map((c) => `<option value="${c.code}" ${c.code === d.currency ? 'selected' : ''}>${esc(c.code)} · ${esc(c.symbol.trim())}</option>`).join('')}</select></label>
-      <div class="row-2">
-        <label class="field"><span>Number of tables</span><input name="tables" type="number" min="0" max="99" required value="${v('tables')}"><small class="muted">0 if you only do takeaway</small></label>
-        <label class="field"><span>Tax on bills (%)</span><input name="tax" type="number" min="0" max="40" step="0.5" value="${v('tax')}"><small class="muted">e.g. 5 for GST 5%</small></label>
-      </div>`;
+  } else if (name === 'preset') {
+    body = presetPicker(d.answers, false) + `<p class="muted sm">Changing the type fills in its typical answers on the next screens — you can still change each one.</p>`;
+  } else if (name === 'how') {
+    body = howScreen(d.answers, App.setup.qi || 0);
+  } else if (name === 'tax') {
+    body = taxScreen(d.answers, mode === 'profile' ? null : d);
+  } else if (name === 'review') {
+    body = reviewScreen(d.before || legacyAnswers(S.settings), d.answers);
   } else if (name === 'menu' || name === 'stock' || name === 'staff') {
     body = rowsEditor(name);
   } else {
@@ -133,18 +136,19 @@ Views.setup = () => {
       <p class="muted sm">${icon('lock')} ${ONLINE() ? "Your café's data is stored securely online, not on this phone. You'll get a café code for your staff." : "You'll log in with your name or mobile and this password. Next you'll get a recovery code in case you ever forget it."}</p>`;
   }
   const last = App.setup.step === total;
-  const lastLabel = mode === 'later' ? 'Save details' : 'Create my café';
+  const lastLabel = mode === 'later' ? 'Save details' : mode === 'profile' ? 'Save changes' : 'Create my café';
   return `<main class="center-screen onboard">
-    <form class="card onb ${['menu', 'stock', 'staff'].includes(name) ? 'wide' : ''}" data-form="setupStep" autocomplete="off" novalidate>
+    <form class="card onb ${['menu', 'stock', 'staff', 'place', 'preset', 'how', 'review'].includes(name) ? 'wide' : ''}" data-form="setupStep" autocomplete="off" novalidate>
       <div class="steps-bar" style="grid-template-columns:repeat(${total},1fr)" aria-label="Step ${step} of ${total}">${steps.map((_, i) => `<i class="${i < step ? 'on' : ''}"></i>`).join('')}</div>
-      <p class="eyebrow">${mode === 'later' ? 'Set up café details' : 'Sign up'} · step ${step} of ${total}</p>
+      <p class="eyebrow">${mode === 'later' ? 'Set up café details' : mode === 'profile' ? 'Business setup' : 'Sign up'} · step ${step} of ${total}</p>
       <h1>${titles[name]}</h1>
       ${body}
       <p class="neg sm" id="form-err" role="alert"></p>
       <div class="form-actions">
-        <button type="button" class="btn ghost" data-act="setupBack">${icon('left')}<span>${step === 1 && mode === 'later' ? 'Cancel' : 'Back'}</span></button>
+        <button type="button" class="btn ghost" data-act="setupBack">${icon('left')}<span>${step === 1 && (mode === 'later' || mode === 'profile') ? 'Cancel' : 'Back'}</span></button>
         <div class="btn-row tight">
           ${['menu', 'stock', 'staff'].includes(name) && !last ? `<button type="button" class="btn ghost" data-act="setupSkip">Skip</button>` : ''}
+          ${name === 'how' && (App.setup.qi || 0) < HOW_SCREENS.length - 1 ? `<button type="button" class="btn ghost" data-act="howFinish">Looks right — skip the rest</button>` : ''}
           <button type="submit" class="btn primary">${last ? `${icon('check')}<span>${lastLabel}</span>` : `<span>Continue</span>${icon('right')}`}</button>
         </div>
       </div>
@@ -156,7 +160,11 @@ function keepSetupFields(form) {
   if (!form) return;
   const fd = new FormData(form);
   const d = App.setup.d;
-  for (const [k, val] of fd.entries()) if (!/^(pw|m_|s_|p_)/.test(k)) d[k] = val;
+  for (const [k, val] of fd.entries()) if (!/^(pw|m_|s_|p_|a_)/.test(k)) d[k] = val;
+  if (d.answers) {
+    const pre = fd.get('a_q_preset'); if (pre && PRESETS[pre]) { d.answers.q_preset = String(pre); d.type = PRESETS[pre].type; }
+    readAnswers(form, d.answers);
+  }
   const name = stepName();
   const col = (k) => fd.getAll(k).map(String);
   if (name === 'menu') { const n = col('m_name'), c = col('m_cat'), p = col('m_price'); d.menu = n.map((x, i) => ({ name: x, cat: c[i], price: p[i] })); }
@@ -164,6 +172,7 @@ function keepSetupFields(form) {
   if (name === 'staff') { const n = col('p_name'), r0 = col('p_role'), ro = col('p_role_other'), r = r0.map((x, i) => designationValue(x, ro[i])), ph = col('p_phone'), j = col('p_join'), a = col('p_access'), pw = col('p_pw'); d.staff = n.map((x, i) => ({ name: x, role: r[i], phone: ph[i], join: j[i], access: a[i], pw: pw[i] })); }
 }
 function stepError(name, d) {
+  if (d.answers) { const ae = answersError(name, d.answers); if (ae) return ae; }
   if (name === 'place') {
     if (!String(d.name || '').trim()) return 'Please enter the name of your place.';
     d.short = String(d.short || shortCode(d.name)).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4);
@@ -221,11 +230,14 @@ function loginsSummary(results) {
 
 /* ---------------- actions ---------------- */
 Object.assign(Actions, {
-  setupStart() { App.setup = { step: 1, mode: 'signup', d: { ...newDraft(), ...App.setup.d } }; render(); },
+  setupStart() { App.setup = { step: 1, mode: 'signup', qi: 0, d: { ...newDraft(), ...App.setup.d } }; render(); },
+  howFinish(el) { keepSetupFields(el.closest('form')); App.setup.qi = HOW_SCREENS.length - 1; Forms.setupStep(new FormData(el.closest('form')), el.closest('form')); },
   setupBack(el) {
     keepSetupFields(el.closest('form'));
+    if (stepName() === 'how' && (App.setup.qi || 0) > 0) { App.setup.qi -= 1; render(); window.scrollTo(0, 0); return; }
+    if (App.setup.mode === 'profile' && App.setup.step <= 1) { App.setup = { step: 0, mode: 'signup', d: newDraft() }; history.replaceState(null, '', '#/settings'); return render(); }
     if (App.setup.mode === 'later' && App.setup.step <= 1) { App.setup = { step: 0, mode: 'signup', d: newDraft() }; return render(); }
-    App.setup.step = Math.max(0, App.setup.step - 1); render(); window.scrollTo(0, 0);
+    App.setup.step = Math.max(0, App.setup.step - 1); if (stepName() === 'how') App.setup.qi = HOW_SCREENS.length - 1; render(); window.scrollTo(0, 0);
   },
   setupSkip(el) { keepSetupFields(el.closest('form')); App.setup.d[stepName()] = [{}]; App.setup.step += 1; render(); window.scrollTo(0, 0); },
   rowAdd(el) { keepSetupFields(el.closest('form')); App.setup.d[el.dataset.list].push({}); render(); },
@@ -275,10 +287,12 @@ Object.assign(Forms, {
     keepSetupFields(form);
     const d = App.setup.d, name = stepName();
     const err = stepError(name, d); if (err) return formError(err);
+    if (name === 'how' && (App.setup.qi || 0) < HOW_SCREENS.length - 1) { App.setup.qi = (App.setup.qi || 0) + 1; render(); window.scrollTo(0, 0); return; }
     const last = App.setup.step === stepList().length;
-    if (!last) { App.setup.step += 1; render(); window.scrollTo(0, 0); return; }
+    if (!last) { App.setup.step += 1; if (stepName() === 'how') App.setup.qi = 0; render(); window.scrollTo(0, 0); return; }
 
     if (App.setup.mode === 'later') return finishLater(form);
+    if (App.setup.mode === 'profile') return saveProfile(form);
 
     // Offline (on-device) sign-up
     const perr = passwordError(fd.get('pw1'), fd.get('pw2'), { name: d.owner });
@@ -290,6 +304,7 @@ Object.assign(Forms, {
       name: d.name.trim(), short: d.short, tagline: String(d.tagline || '').trim(), type: d.type || 'cafe',
       currency: d.currency || 'INR', tables: clamp(num(d.tables), 0, 99), tax: num(d.tax),
       openHour: 8, closeHour: 22, accent: 'clay', theme: 'light', look: 3, footer: 'Thank you, visit again!',
+      ...profileSettings(d.answers, d.owner),
     };
     S = emptyState(); S.settings = st;
     const owner = { id: uid('u'), name: d.owner.trim(), phone: String(d.phone).trim(), role: 'owner', staffId: null, active: true, mustChange: false, failed: 0, locked: false, createdAt: Date.now() };

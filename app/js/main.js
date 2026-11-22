@@ -17,15 +17,16 @@ function applyTheme() {
 function shell(view, content) {
   const role = Session.role();
   const r = ROLES[role];
+  const rv = viewsFor(role);
   const me = Session.user();
   const st = S.settings;
   const navItem = (v, cls = '') => `<a href="#/${v}" class="nav-i ${cls} ${v === view ? 'on' : ''}" ${v === view ? 'aria-current="page"' : ''}>${icon(VIEWS[v].icon)}<span>${VIEWS[v].label}</span>${badgeFor(v)}</a>`;
-  const tabs = r.views.length > MOBILE_TABS + 1 ? r.views.slice(0, MOBILE_TABS) : r.views;
-  const moreActive = r.views.length > MOBILE_TABS + 1 && !tabs.includes(view);
+  const tabs = rv.length > MOBILE_TABS + 1 ? rv.slice(0, MOBILE_TABS) : rv;
+  const moreActive = rv.length > MOBILE_TABS + 1 && !tabs.includes(view);
   return `<div class="layout">
     <aside class="sidebar">
       <div class="brand"><span class="brand-mark">${esc(initials(st.name))}</span><span><strong>${esc(st.name)}</strong><small>${esc(st.tagline || BUSINESS_TYPES[st.type] || '')}</small></span>${aiBtn()}${bellBtn(view)}</div>
-      <nav class="nav">${r.views.map((v) => navItem(v)).join('')}</nav>
+      <nav class="nav">${rv.map((v) => navItem(v)).join('')}</nav>
       <div class="me"><span class="avatar sm" style="background:${r.color}">${esc(initials(me.name))}</span><span><strong>${esc(me.name)}</strong><small>${esc(r.label)}</small></span>
         <button class="icon-btn" data-act="myPin" title="Change my password" aria-label="Change my password">${icon('lock')}</button>
         <button class="icon-btn" data-act="logout" title="Log out" aria-label="Log out">${icon('logout')}</button></div>
@@ -34,8 +35,8 @@ function shell(view, content) {
       <button class="role-pill" style="--c:${r.color}" data-act="myPin" title="Change my password">${esc(me.name.split(' ')[0])} · ${esc(r.label)}</button>
       <button class="icon-btn" data-act="logout" aria-label="Log out">${icon('logout')}</button></div>
     <main class="main" id="main">${content}</main>
-    ${r.views.length > 1 ? `<nav class="tabbar">${tabs.map((v) => navItem(v)).join('')}
-      ${r.views.length > MOBILE_TABS + 1 ? `<button class="nav-i ${moreActive ? 'on' : ''}" data-act="moreNav">${icon('more')}<span>More</span></button>` : ''}</nav>` : ''}
+    ${rv.length > 1 ? `<nav class="tabbar">${tabs.map((v) => navItem(v)).join('')}
+      ${rv.length > MOBILE_TABS + 1 ? `<button class="nav-i ${moreActive ? 'on' : ''}" data-act="moreNav">${icon('more')}<span>More</span></button>` : ''}</nav>` : ''}
   </div>`;
 }
 function bellBtn(view) {
@@ -66,9 +67,9 @@ function render() {
   const role = Session.role();
   if (!role) { root.innerHTML = Session.locked && Session.account() ? Views.lockScreen() : Views.login(); return; }
   checkReady(); checkNotices();
-  if (App.setup.mode === 'later' && App.setup.step > 0 && role === 'owner') { root.innerHTML = Views.setup(); return; }
+  if ((App.setup.mode === 'later' || App.setup.mode === 'profile') && App.setup.step > 0 && role === 'owner') { root.innerHTML = Views.setup(); return; }
   let { view, params } = parseHash();
-  const allowed = ROLES[role].views.concat('inbox'); // everyone has the notifications inbox
+  const allowed = viewsFor(role).concat('inbox'); // everyone has the notifications inbox
   if (!allowed.includes(view)) {
     view = allowed[0]; params = {};
     history.replaceState(null, '', `#/${view}`);
@@ -100,7 +101,7 @@ const Actions = {
   logout() { Session.set(null); closeSheet(); history.replaceState(null, '', location.pathname); render(); },
   moreNav() {
     const r = ROLES[Session.role()];
-    openSheet(`${sheetHead(r.label, 'More')}<div class="more-grid">${r.views.slice(MOBILE_TABS).map((v) => `<a class="card more-i" href="#/${v}" data-act="closeSheet">${icon(VIEWS[v].icon)}<span>${VIEWS[v].label}</span>${badgeFor(v)}</a>`).join('')}</div>`);
+    openSheet(`${sheetHead(r.label, 'More')}<div class="more-grid">${viewsFor(Session.role()).slice(MOBILE_TABS).map((v) => `<a class="card more-i" href="#/${v}" data-act="closeSheet">${icon(VIEWS[v].icon)}<span>${VIEWS[v].label}</span>${badgeFor(v)}</a>`).join('')}</div>`);
   },
 
   /* orders */

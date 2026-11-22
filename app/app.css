@@ -911,3 +911,42 @@ h1, .page-head h1, .onb h2, .center-screen h2, .sheet-head h2, .ticket h2, .home
 /* numbers stay in the clear sans font (Marcellus' 0 looks like an O) */
 .kpi-v, .menu-row b { font-family: var(--font); font-weight: 700; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
 .kpi-v { font-size: 24px; }
+
+/* Dashboard: money received today by payment method */
+.money-in .money-total { font-size: 22px; font-variant-numeric: tabular-nums; }
+.pay-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 8px; }
+.pay-tile { display: grid; gap: 4px; padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface-2); }
+.pay-ic { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; color: var(--c); background: color-mix(in srgb, var(--c) 14%, transparent); }
+.pay-ic .ic { width: 17px; height: 17px; }
+.pay-name { font-size: 13px; font-weight: 600; color: var(--ink-2); margin-top: 4px; }
+.pay-amt { font-size: 20px; font-variant-numeric: tabular-nums; }
+.pay-tile .meter { margin-top: 6px; }
+/* Business setup */
+.chip.soon { opacity: .6; border-style: dashed; }
+.preview { margin-top: 6px; padding: 14px; border: 1px dashed var(--line); border-radius: 14px; background: var(--surface-2); }
+.preset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; }
+.preset-card { position: relative; cursor: pointer; }
+.preset-card input { position: absolute; opacity: 0; pointer-events: none; }
+.preset-card > span { display: grid; gap: 2px; height: 100%; padding: 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.preset-card > span .ic { color: var(--accent-text, var(--accent)); margin-bottom: 4px; }
+.preset-card b { font-size: 14px; } .preset-card small { color: var(--muted); font-size: 12px; line-height: 1.35; }
+.preset-card input:checked + span { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.preset-card input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+.q-block { display: grid; gap: 8px; padding: 12px 0; border-top: 1px solid var(--line); }
+.q-block:first-of-type { border-top: 0; }
+.q-block > b { font-size: 15px; } .q-block > small { color: var(--muted); }
+.q-opts { display: flex; flex-wrap: wrap; gap: 8px; }
+.q-opts label { position: relative; cursor: pointer; }
+.q-opts input { position: absolute; opacity: 0; pointer-events: none; }
+.q-opts span { display: inline-flex; padding: 9px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); font-size: 14px; font-weight: 500; }
+.q-opts input:checked + span { background: var(--accent); border-color: var(--accent); color: #fff; }
+.q-opts input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+.q-sub { display: grid; gap: 8px; padding-left: 12px; border-left: 2px solid var(--line); }
+.q-progress { display: flex; gap: 4px; } .q-progress i { flex: 1; height: 4px; border-radius: 4px; background: var(--line); } .q-progress i.on { background: var(--accent); }
+.diff-on { color: var(--ok); } .diff-off { color: var(--danger); }
+.preview .eyebrow { margin: 0 0 10px; }
+.preview > .eyebrow { display: block; line-height: 1.3; }
+.preview > .chip-row { margin-top: 10px; }
+.onb .form-actions { flex-wrap: wrap; }
+.onb .form-actions .btn-row { flex-wrap: wrap; justify-content: flex-end; }
+@media (max-width: 480px) { .onb .form-actions .btn-row { width: 100%; } .onb .form-actions .btn-row .btn { flex: 1; } }
