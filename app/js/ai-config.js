@@ -5,4 +5,4 @@
    helper here (a free Cloudflare Worker — see worker/README.md).
    Leave it null to hide the AI buttons. This address is not secret.
    ========================================================= */
-window.AI_URL = null;
+window.AI_URL = 'https://cafe-journal-ai.kalmeshsutagatti39.workers.dev';
