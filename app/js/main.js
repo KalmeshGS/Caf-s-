@@ -83,7 +83,13 @@ function render() {
     App.lastNewKots = n; App.lastKotChange = ch;
   } else App.lastNewKots = null;
 
+  // keep what is being typed in the home AI box across refreshes
+  const q = $('#home-q'), typed = q ? q.value : '', hadFocus = q && document.activeElement === q;
   root.innerHTML = shell(view, Views[view](params));
+  const q2 = $('#home-q');
+  if (q2 && typed) q2.value = typed;
+  if (q2 && hadFocus) q2.focus();
+  if (typeof redrawChat === 'function' && App.chat?.length) redrawChat();
 }
 
 /* ---------------- actions (data-act) ---------------- */

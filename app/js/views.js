@@ -31,7 +31,7 @@ Views.dashboard = () => {
   const yday = sum(paidOn(shiftDay(today, -1)), (o) => o.total);
   const diff = yday ? Math.round(((sales - yday) / yday) * 100) : null;
 
-  return `${pageHead(Session.role() === 'owner' ? 'Owner dashboard' : 'Dashboard', `Today · ${fmtDate(new Date(), { weekday: 'short', day: 'numeric', month: 'short' })}`, live())}
+  return `${typeof homeHero === 'function' ? homeHero() : ''}${pageHead(Session.role() === 'owner' ? 'Owner dashboard' : 'Dashboard', `Today · ${fmtDate(new Date(), { weekday: 'short', day: 'numeric', month: 'short' })}`, live())}
   ${requestsCard()}
   <div class="kpis">
     ${kpi("Today's sales", money(sales), `${pl(paid.length, 'bill')}${diff !== null && sales ? ` · ${diff >= 0 ? '+' : ''}${diff}% vs yesterday` : ''}`)}

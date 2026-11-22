@@ -21,7 +21,45 @@ function chatSheet() {
   </form>
   <p class="fine">Free AI — answers can be wrong; check important things. Don't type passwords or customer details.</p>`;
 }
-const redrawChat = () => { const log = $('#chat-log'); if (log) { log.innerHTML = chatBody(); log.scrollTop = log.scrollHeight; } };
+const msgsHtml = () => App.chat.map((m) => `<div class="msg ${m.role === 'user' ? 'me' : 'ai'}${m.err ? ' err' : ''}${m.pending ? ' pending' : ''}">${esc(m.content).replace(/\n/g, '<br>')}</div>`).join('');
+const redrawChat = () => {
+  const log = $('#chat-log'); if (log) { log.innerHTML = chatBody(); log.scrollTop = log.scrollHeight; }
+  const home = $('#home-chat');
+  if (home) {
+    home.innerHTML = msgsHtml(); home.hidden = !App.chat.length;
+    $('.home-ai')?.classList.toggle('talking', !!App.chat.length);
+    home.scrollTop = home.scrollHeight;
+  }
+};
+
+/* ---------------- Home: AI chat first, dashboard below (like opening an AI app) ---------------- */
+function greeting() {
+  const h = new Date().getHours();
+  const part = h < 5 ? 'Good night' : h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+  const first = String(Session.user()?.name || '').trim().split(/\s+/)[0];
+  return first ? `${part}, ${first}` : part;
+}
+function homeHero() {
+  if (!window.AI_URL) return '';
+  return `<section class="home-ai${App.chat.length ? ' talking' : ''}">
+    <h1 class="home-hi"><span class="home-mark">${icon('spark')}</span>${esc(greeting())}</h1>
+    <div class="home-thread" id="home-chat" aria-live="polite" ${App.chat.length ? '' : 'hidden'}>${msgsHtml()}</div>
+    <form data-form="aiAsk" class="home-box">
+      <textarea id="home-q" name="q" rows="2" maxlength="800" placeholder="How can I help you today?" aria-label="Ask the AI"></textarea>
+      <div class="home-box-bar">
+        <span class="muted sm">Free AI · ask about the app, recipes, prices…</span>
+        <button class="btn primary home-send" type="submit" aria-label="Send">${icon('send')}</button>
+      </div>
+    </form>
+    <div class="chip-row home-ideas">${CHAT_IDEAS.map((q) => `<button type="button" class="chip" data-act="aiIdea" data-q="${esc(q)}">${esc(q)}</button>`).join('')}</div>
+    <a class="home-down" href="#home-dash" data-act="toDash">Today at a glance ${icon('down')}</a>
+  </section><div id="home-dash"></div>`;
+}
+// Enter sends, Shift+Enter makes a new line
+document.addEventListener('keydown', (e) => {
+  if (e.target.id !== 'home-q' || e.key !== 'Enter' || e.shiftKey || e.isComposing) return;
+  e.preventDefault(); e.target.form.requestSubmit();
+});
 async function askAi(q) {
   q = String(q || '').trim().slice(0, 800); if (!q || App.chatBusy) return;
   App.chat.push({ role: 'user', content: q });
@@ -41,5 +79,6 @@ async function askAi(q) {
 Object.assign(Actions, {
   aiChat() { openSheet(chatSheet()); redrawChat(); },
   aiIdea(el) { askAi(el.dataset.q); },
+  toDash(el, e) { e?.preventDefault?.(); $('#home-dash')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); },
 });
 Forms.aiAsk = (fd, form) => { const q = fd.get('q'); if (form) form.q.value = ''; askAi(q); };
