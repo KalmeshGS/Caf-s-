@@ -74,12 +74,29 @@ function friendly(e) {
 }
 const BAD_PASSWORD = ['auth/wrong-password', 'auth/invalid-credential', 'auth/invalid-login-credentials', 'auth/user-not-found'];
 
+/* ---------------- App Check ----------------
+   Proves each request really comes from this website (Google Cloud Fraud Defense /
+   reCAPTCHA Enterprise score key — invisible to users). Registered in Firebase console →
+   App Check → Apps → cafe-journal-web.
+   With App Check ENFORCED in the Firebase console, scripts that call Firebase directly
+   (e.g. to guess staff passwords without the 4-try lock) are refused.
+   Off when no site key is set (js/firebase-config.js) and on the local emulators. */
+function startAppCheck(app) {
+  const key = window.APPCHECK_SITE_KEY;
+  if (!key || window.FIREBASE_EMULATOR || !FB.initializeAppCheck) return;
+  try {
+    if (window.APPCHECK_DEBUG_TOKEN) self.FIREBASE_APPCHECK_DEBUG_TOKEN = window.APPCHECK_DEBUG_TOKEN; // testing from localhost only
+    FB.initializeAppCheck(app, { provider: new FB.ReCaptchaEnterpriseProvider(key), isTokenAutoRefreshEnabled: true });
+  } catch (e) { console.warn('App Check could not start', e); }
+}
+
 /* ---------------- start-up ---------------- */
 (function initCloud() {
   const cfg = window.FIREBASE_CONFIG;
   if (!cfg || !cfg.apiKey || !window.FB) return;
   Cloud.on = true;
   Cloud.app = FB.initializeApp(cfg);
+  startAppCheck(Cloud.app); // must run before Auth / Firestore are used
   // Sign-in is remembered on this device (only the login token — café data is never stored here)
   Cloud.auth = FB.initializeAuth(Cloud.app, { persistence: [FB.indexedDBLocalPersistence, FB.browserLocalPersistence] });
   Cloud.db = FB.initializeFirestore(Cloud.app, { localCache: FB.memoryLocalCache() });
@@ -431,14 +448,19 @@ async function createRequest(code, loginId) {
   const ls = await FB.getDoc(FB.doc(Cloud.db, 'cafes', code, 'logins', loginId));
   if (!ls.exists()) return false;
   const L = ls.data();
-  const id = uid('rq');
-  await FB.setDoc(FB.doc(Cloud.db, 'cafes', code, 'requests', id), { id, loginId, userId: L.uid, type: L.locked ? 'unlock' : 'reset', status: 'open', createdAt: Date.now() });
+  // One request per login (document id = login ID): asking again while one is open changes nothing,
+  // so nobody can flood the owner's dashboard.
+  const id = loginId;
+  try {
+    await FB.setDoc(FB.doc(Cloud.db, 'cafes', code, 'requests', id), { id, loginId, userId: L.uid, type: L.locked ? 'unlock' : 'reset', status: 'open', createdAt: Date.now() });
+  } catch (e) { if (e.code !== 'permission-denied') throw e; /* already open — the owner can see it */ }
   return L.locked ? 'locked' : true;
 }
 /** A second Firebase app, used by the owner to create staff accounts without being signed out */
 function secondaryAuth() {
   if (!Cloud.sec) {
     Cloud.sec = FB.initializeApp(window.FIREBASE_CONFIG, 'staff-admin');
+    startAppCheck(Cloud.sec); // creating staff logins is an Auth call too
     Cloud.secAuth = FB.initializeAuth(Cloud.sec, { persistence: FB.inMemoryPersistence });
     if (window.FIREBASE_EMULATOR) FB.connectAuthEmulator(Cloud.secAuth, 'http://127.0.0.1:9099', { disableWarnings: true });
   }
@@ -491,12 +513,20 @@ async function cloudSignup(fd, form) {
   const email = String(d.email || '').trim().toLowerCase();
   if (!String(d.owner || '').trim()) return formError('Please enter your name.');
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return formError('Please enter a valid email address — you log in with it.');
-  if (!/^[+\d][\d\s-]{6,}$/.test(String(d.phone || '').trim())) return formError('Please enter a valid mobile number.');
-  const err = passwordError(fd.get('pw1'), fd.get('pw2'), { name: d.owner }); if (err) return formError(err);
+  if (!validPhone(d.phone)) return formError('Please enter a valid mobile number (10 digits, e.g. 98765 43210).');
+  const err = passwordError(fd.get('pw1'), fd.get('pw2'), { name: d.owner, phone: d.phone }); if (err) return formError(err);
   busy(form, true);
+  let user = null, createdNow = false, profileSaved = false;
   try {
-    const cred = await FB.createUserWithEmailAndPassword(Cloud.auth, email, fd.get('pw1'));
-    const user = cred.user;
+    try {
+      user = (await FB.createUserWithEmailAndPassword(Cloud.auth, email, fd.get('pw1'))).user; createdNow = true;
+    } catch (e) {
+      if (e.code !== 'auth/email-already-in-use') throw e;
+      // An earlier sign-up may have stopped half-way (account made, café not saved). If the same
+      // password works and this email has no café yet, finish that sign-up instead of getting stuck.
+      try { user = (await FB.signInWithEmailAndPassword(Cloud.auth, email, fd.get('pw1'))).user; } catch (e2) { throw e; }
+      if ((await FB.getDoc(FB.doc(Cloud.db, 'profiles', user.uid))).exists()) { await FB.signOut(Cloud.auth); throw e; }
+    }
     const st = {
       name: d.name.trim(), short: d.short, tagline: String(d.tagline || '').trim(), type: d.type || 'cafe',
       currency: d.currency || 'INR', tables: clamp(num(d.tables), 0, 99), tax: num(d.tax),
@@ -510,10 +540,12 @@ async function cloudSignup(fd, form) {
     const logins = applyDraft(base, d); // the menu, stock and staff typed during sign-up — no sample data
     let cid = '';
     for (let i = 0; i < 5 && !cid; i++) { const c = `${st.short.toLowerCase()}-${randomCode(5)}`; if (!(await FB.getDoc(FB.doc(Cloud.db, 'cafes', c))).exists()) cid = c; }
+    if (!cid) throw new Error("Couldn't create a café code just now. Please tap Create my café again.");
     await FB.setDoc(FB.doc(Cloud.db, 'cafes', cid), { name: st.name, short: st.short, tagline: st.tagline, ownerUid: user.uid, createdAt: Date.now() });
     const member = { name: d.owner.trim(), phone: String(d.phone).trim(), email, role: 'owner', staffId: null, loginId: null, active: true, mustChange: false, createdAt: Date.now() };
     await FB.setDoc(FB.doc(Cloud.db, 'cafes', cid, 'members', user.uid), member);
     await FB.setDoc(FB.doc(Cloud.db, 'profiles', user.uid), { cafeId: cid });
+    profileSaved = true;
     // Upload everything
     S = Object.assign(emptyState(), plain(base)); S.users = []; S.requests = []; delete S.recovery;
     S.seq = Object.assign({ day: '', n: 0, emp: 0 }, S.seq);
@@ -531,7 +563,11 @@ async function cloudSignup(fd, form) {
       <p class="muted sm">You log in with <b>${esc(email)}</b>. Forgot your password? Use "Forgot password" on the login page and a reset link is emailed to you.</p>
       ${loginsSummary(results)}
       ${btn('Got it', 'closeSheet', { cls: 'primary block' })}`);
-  } catch (e) { formError(friendly(e)); } finally { busy(form, false); }
+  } catch (e) {
+    // Sign-up stopped before the café was saved: remove the half-made login so the same email can sign up again
+    if (user && !profileSaved) { if (createdNow) await user.delete().catch(() => {}); await FB.signOut(Cloud.auth).catch(() => {}); }
+    formError(e.code ? friendly(e) : (e.message || friendly(e)));
+  } finally { busy(form, false); }
 }
 
 /* ---------------- overrides (only in online mode) ---------------- */
@@ -645,7 +681,7 @@ function installOverrides() {
         if (who.includes('@')) {
           const cred = await FB.signInWithEmailAndPassword(Cloud.auth, who, pw);
           const prof = await FB.getDoc(FB.doc(Cloud.db, 'profiles', cred.user.uid));
-          if (!prof.exists()) { await FB.signOut(Cloud.auth); return formError('This email is not an owner of any café. Staff: log in with your Employee ID.'); }
+          if (!prof.exists()) { await FB.signOut(Cloud.auth); return formError('This email has no café yet — if sign-up stopped half-way, tap Sign up and use the same email and password to finish it. Staff: log in with your Employee ID.'); }
           return await afterSignIn(prof.data().cafeId, cred.user);
         }
         if (!code) return formError('Enter your café code (ask the owner).');

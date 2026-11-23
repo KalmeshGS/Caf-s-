@@ -18,6 +18,16 @@
   document.querySelectorAll('a[href="app/index.html#/signup"]').forEach((a) => { if (!a.closest('.start-card')) a.classList.replace('primary', 'ghost'); });
 })();
 
+/* Mobile menu button */
+(function () {
+  const nav = document.querySelector('.nav'), btn = document.querySelector('.nav-toggle');
+  if (!nav || !btn) return;
+  const set = (open) => { nav.classList.toggle('open', open); btn.setAttribute('aria-expanded', String(open)); btn.setAttribute('aria-label', open ? 'Close menu' : 'Open menu'); };
+  btn.addEventListener('click', () => set(!nav.classList.contains('open')));
+  nav.querySelectorAll('nav a').forEach((a) => a.addEventListener('click', () => set(false)));
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') set(false); });
+})();
+
 /* Filter chips in "Every screen your team needs" */
 (function () {
   const chips = document.querySelectorAll('.fchip');

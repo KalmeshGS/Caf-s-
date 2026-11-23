@@ -245,13 +245,27 @@ try { localStorage.removeItem(SESSION_KEY); } catch (e) { /* remove sign-in save
 
 /* ---------- selectors ---------- */
 const cur = () => CURRENCIES.find((c) => c.code === S.settings?.currency) || CURRENCIES[0];
-function money(n) {
+/** `exact`: show paise / cents when the amount has them (tax and round-off lines must add up on a bill) */
+function money(n, exact) {
   const c = cur(); n = Number(n) || 0;
-  const s = Math.abs(n).toLocaleString(c.locale, { minimumFractionDigits: 0, maximumFractionDigits: c.dec });
+  const dec = exact && Math.round(n * 100) % 100 !== 0 ? 2 : c.dec;
+  const s = Math.abs(n).toLocaleString(c.locale, { minimumFractionDigits: dec === 2 && exact ? 2 : 0, maximumFractionDigits: Math.max(dec, c.dec) });
   return (n < 0 ? '−' : '') + c.symbol + s;
 }
 const walletLabel = () => cur().wallet;
 const payMethods = () => ({ cash: { label: 'Cash', color: '#c58b4c' }, upi: { label: walletLabel(), color: '#22a06b' }, card: { label: 'Card', color: '#6366f1' } });
+
+/* ---------- shared input checks ---------- */
+const MAX_TABLES = 99;
+/** A phone/mobile number: digits with optional +, spaces, dashes or brackets; 10–15 real digits, not all the same */
+function validPhone(p) {
+  const s = String(p || '').trim();
+  if (!/^\+?[\d\s()-]+$/.test(s)) return false;
+  const d = s.replace(/\D/g, '');
+  return d.length >= 10 && d.length <= 15 && !/^(\d)\1+$/.test(d);
+}
+/** Max price / quantity typed anywhere (protects totals and reports from typos) */
+const MAX_AMOUNT = 1000000;
 
 const byId = (list, id) => list.find((x) => x.id === id);
 const paidOrders = () => S.orders.filter((o) => o.status === 'paid');
@@ -271,6 +285,34 @@ function orderTotals(o, discount = o.discount || 0) {
   const taxable = sub - disc;
   const tax = round2((taxable * (Number(S.settings?.tax) || 0)) / 100);
   return { sub, discount: disc, tax, total: round2(taxable + tax) };
+}
+/** Money as shown on screen/bills (rounded to the currency's decimals, e.g. whole rupees) */
+const roundShown = (n) => { const f = 10 ** cur().dec; return Math.round((Number(n) || 0) * f) / f; };
+/** Lines printed under the items: subtotal, discount, tax (CGST + SGST when GST is split), round-off. [label, amount] */
+function billRows(t, st = S.settings || {}) {
+  const rows = [['Subtotal', t.sub]];
+  if (t.discount) rows.push(['Discount', -t.discount]);
+  const rate = Number(st.tax) || 0;
+  if (t.tax) {
+    if (st.taxProfile?.food?.split === 'CGST_SGST') {
+      const half = round2(t.tax / 2);
+      rows.push([`CGST (${rate / 2}%)`, half], [`SGST (${rate / 2}%)`, round2(t.tax - half)]);
+    } else rows.push([`Tax (${rate}%)`, t.tax]);
+  }
+  const ro = round2(roundShown(t.total) - t.total);
+  if (ro) rows.push(['Round off', ro]);
+  return rows;
+}
+/** Tax + round-off lines for the open bill (updated live as the discount changes) */
+const billTaxRowsHtml = (t) => billRows(t).filter(([k]) => k !== 'Subtotal' && k !== 'Discount')
+  .map(([k, v]) => `<div class="line-row"><span>${esc(k)}</span><span>${money(v, true)}</span></div>`).join('');
+/** Check a typed discount against the bill. Returns an error message or '' */
+function discountError(raw, sub) {
+  const s = String(raw ?? '').trim(); if (s === '') return '';
+  const d = Number(s);
+  if (!Number.isFinite(d) || d < 0) return 'Discount can’t be negative.';
+  if (d > sub) return `Discount can’t be more than the subtotal (${money(sub)}).`;
+  return '';
 }
 function topItems(orders) {
   const m = {};

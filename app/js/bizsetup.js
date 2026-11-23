@@ -38,7 +38,7 @@ function questionHtml(qid, a) {
   if (!shown(qid, a)) return '';
   const block = (title, inner, hint = '') => `<div class="q-block"><b>${esc(title)}</b>${hint ? `<small>${esc(hint)}</small>` : ''}${inner}</div>`;
   switch (qid) {
-    case 'q_table_count': return `<div class="q-sub">${block('How many tables?', `<input name="a_q_table_count_n" type="number" min="0" max="300" value="${esc(a.q_table_count?.count ?? 8)}" inputmode="numeric">`)}
+    case 'q_table_count': return `<div class="q-sub">${block('How many tables?', `<input name="a_q_table_count_n" type="number" min="1" max="${MAX_TABLES}" step="1" value="${esc(a.q_table_count?.count ?? 8)}" inputmode="numeric">`, `1 to ${MAX_TABLES} tables.`)}
       ${block('Any separate areas?', `<input name="a_q_table_count_areas" maxlength="120" value="${esc(listText(a.q_table_count?.areas))}" placeholder="e.g. AC hall, Rooftop, Family section" data-blur-live="1">`, 'Separate with commas. Leave empty if it’s one room.')}</div>`;
     case 'q_area_pricing': return `<div class="q-sub">${block('Are prices different in some areas?', yesNo('a_q_area_pricing', a.q_area_pricing === true))}</div>`;
     case 'q_brands': return `<div class="q-sub">${block('Do you run more than one brand from this kitchen?', yesNo('a_q_brands_has', a.q_brands?.has === true))}
@@ -70,7 +70,8 @@ function readAnswers(form, a) {
   MULTI_QS.forEach((q) => { if (has(`a_${q}`)) a[q] = fd.getAll(`a_${q}`).map(String); });
   ['q_handoff', 'q_kitchen', 'q_kitchen_device', 'q_internet', 'q_stock', 'q_gst', 'q_service_charge', 'q_packing', 'q_printer'].forEach((q) => { if (has(`a_${q}`)) a[q] = fd.get(`a_${q}`) || a[q]; });
   BOOL_QS.forEach((q) => { if (has(`a_${q}`)) a[q] = fd.get(`a_${q}`) === 'yes'; });
-  if (has('a_q_table_count_n')) a.q_table_count = { count: clamp(num(fd.get('a_q_table_count_n')), 0, 300), areas: textList(fd.get('a_q_table_count_areas')) };
+  // Keep exactly what was typed (checked in answersError) — never change it silently
+  if (has('a_q_table_count_n')) { const raw = String(fd.get('a_q_table_count_n') ?? '').trim(); a.q_table_count = { count: raw === '' ? NaN : Number(raw), areas: textList(fd.get('a_q_table_count_areas')) }; }
   if (has('a_q_stations')) a.q_stations = textList(fd.get('a_q_stations'));
   if (has('a_q_brands_has')) a.q_brands = { has: fd.get('a_q_brands_has') === 'yes', names: has('a_q_brands_names') ? textList(fd.get('a_q_brands_names')) : (a.q_brands?.names || []) };
   if (has('a_q_rooms_has')) a.q_rooms = { has: fd.get('a_q_rooms_has') === 'yes', count: has('a_q_rooms_count') ? num(fd.get('a_q_rooms_count')) : (a.q_rooms?.count || 0), maxTariff: has('a_q_rooms_tariff') ? num(fd.get('a_q_rooms_tariff')) : (a.q_rooms?.maxTariff || 0) };
@@ -81,10 +82,19 @@ function readAnswers(form, a) {
 }
 function answersError(name, a) {
   if (name === 'tax') {
-    if ((a.q_gst || 'regular') !== 'none' && a.q_gstin && !GSTIN_RE.test(a.q_gstin)) return 'GSTIN should be 15 characters, like 29ABCDE1234F1Z5.';
+    if ((a.q_gst || 'regular') !== 'none') {
+      const g = a.q_gstin || '';
+      if (!g) return 'Enter your GSTIN — it must be printed on GST bills. Not registered? Choose “Not registered”.';
+      if (g.length !== 15) return `GSTIN must be exactly 15 characters (you typed ${g.length}), like 29ABCDE1234F1Z5.`;
+      if (!GSTIN_RE.test(g)) return 'That GSTIN doesn’t look right — check it: 2-digit state code, 10-character PAN, then 3 more characters (e.g. 29ABCDE1234F1Z5).';
+    }
     if (!a.q_fssai_later && !FSSAI_RE.test(a.q_fssai || '')) return 'Please enter your 14-digit FSSAI number, or tick “I’ll add it later”.';
   }
   if (name === 'how' && asArr(a.q_eat_where).length === 0) return 'Pick at least one place where customers eat (or take a parcel).';
+  if (name === 'how' && shown('q_table_count', a)) {
+    const n = a.q_table_count?.count;
+    if (!Number.isInteger(n) || n < 1 || n > MAX_TABLES) return `Number of tables must be a whole number from 1 to ${MAX_TABLES}.`;
+  }
   return '';
 }
 

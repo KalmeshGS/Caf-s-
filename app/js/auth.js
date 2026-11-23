@@ -13,7 +13,7 @@
 
 App.loginFails = {}; // rate-limit for unknown login names (memory only)
 const ROLE_ORDER = ['owner', 'manager', 'cashier', 'waiter', 'kitchen'];
-const PW_MIN = 6;
+const PW_MIN = 8;
 const WARN_AFTER = 3;
 const LOCK_AFTER = 4;
 const KDF_ROUNDS = 150000;
@@ -49,16 +49,25 @@ async function checkPassword(u, pw) {
   if (u.pin != null) return pw === String(u.pin); // account from an older version; must set a password next
   return false;
 }
+const COMMON_PW = ['12345678', '123456789', '1234567890', '87654321', '11111111', '00000000', '12341234', '11223344', 'password', 'password1', 'password12', 'password123', 'passw0rd', 'qwerty12', 'qwerty123', 'qwertyui', 'asdfghjk', 'zxcvbnm1', 'abcd1234', 'abc12345', 'abcdefgh', 'iloveyou', 'welcome1', 'welcome123', 'admin123', 'letmein1', 'sunshine', 'princess', 'football', 'baseball', 'monkey12', 'india123', 'india@123', 'bharat123', 'cafe1234', 'cafe@123', 'hotel123', 'hotel@123', 'restaurant', 'changeme', 'test1234'];
+/** Only letters in alphabet order or only digits counting up / down, e.g. "abcdefgh", "23456789" */
+const isSequence = (s) => s.length > 3 && [...s].every((c, i) => i === 0 || Math.abs(s.charCodeAt(i) - s.charCodeAt(i - 1)) === 1 && Math.sign(s.charCodeAt(i) - s.charCodeAt(i - 1)) === Math.sign(s.charCodeAt(1) - s.charCodeAt(0)));
 function passwordError(pw, pw2, u) {
   pw = String(pw || '');
   if (pw.length < PW_MIN) return `Use at least ${PW_MIN} characters.`;
   if (pw.length > 64) return 'Keep it under 64 characters.';
   if (pw !== pw2) return "The two passwords don't match.";
-  if (/^(.)\1+$/.test(pw)) return "Too easy — don't repeat one character.";
-  if (['123456', '1234567', '12345678', '123456789', 'password', 'qwerty', '111111', '000000', 'abc123', '654321', 'password1', '123123'].includes(pw.toLowerCase())) return 'That password is too common — pick something harder to guess.';
   const low = pw.toLowerCase();
-  if (u && u.name && low === String(u.name).toLowerCase()) return "Don't use your name as the password.";
-  if (S.settings && low === String(S.settings.name).toLowerCase()) return "Don't use the café name as the password.";
+  if (/^(.)\1+$/.test(pw) || new Set(low).size < 4) return "Too easy — use at least 4 different characters.";
+  if (COMMON_PW.includes(low) || isSequence(low)) return 'That password is too common — pick something harder to guess.';
+  if (!/[a-z]/i.test(pw) || !/[^a-z]/i.test(pw)) return 'Mix letters with at least one number or symbol.';
+  const word = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const lowW = word(pw);
+  const name = word(u && u.name), cafe = word(S.settings && S.settings.name);
+  if (name && name.length >= 3 && (lowW === name || lowW.includes(name))) return "Don't use your name in the password.";
+  if (cafe && cafe.length >= 3 && (lowW === cafe || lowW.includes(cafe))) return "Don't use the café name in the password.";
+  const ph = digits(u && u.phone);
+  if (ph.length >= 6 && pw.replace(/\D/g, '').includes(ph.slice(-6))) return "Don't use your phone number in the password.";
   return '';
 }
 async function newRecoveryCode() {

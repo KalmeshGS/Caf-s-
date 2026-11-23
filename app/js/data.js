@@ -43,8 +43,22 @@ const TEMPLATES = {
     ],
     stock: [['Flour', 'kg', 50, 10, 1], ['Butter', 'kg', 15, 3, 0.5], ['Eggs', 'dozen', 30, 6, 1], ['Sugar', 'kg', 25, 5, 1], ['Cocoa', 'kg', 5, 1, 0.5], ['Cream cheese', 'kg', 6, 1, 0.5], ['Milk', 'L', 20, 4, 1], ['Yeast', 'packs', 20, 4, 1]],
   },
+  // Bar / pub (business type stays "restaurant"; picked by the Bar / pub preset)
+  bar: {
+    label: 'bar / pub',
+    menu: [
+      ['Beer', 'Draught Beer (pint)', 280], ['Beer', 'Bottled Beer (650 ml)', 320],
+      ['Spirits', 'Whisky (30 ml peg)', 220], ['Spirits', 'Rum (30 ml peg)', 160], ['Spirits', 'Vodka (30 ml peg)', 180],
+      ['Cocktails', 'Mojito', 380], ['Cocktails', 'Long Island Iced Tea', 520],
+      ['Mocktails', 'Virgin Mojito', 220], ['Soft drinks', 'Soda / Tonic', 60],
+      ['Bar snacks', 'Masala Peanuts', 150], ['Bar snacks', 'Chilli Chicken', 340], ['Bar snacks', 'French Fries', 180],
+    ],
+    stock: [['Draught beer', 'L', 100, 20, 1], ['Beer bottles', 'bottles', 120, 24, 1], ['Whisky', 'bottles', 24, 4, 1], ['Rum', 'bottles', 18, 3, 1], ['Vodka', 'bottles', 18, 3, 1], ['Soda', 'bottles', 96, 24, 1], ['Ice', 'kg', 50, 10, 1], ['Peanuts', 'kg', 10, 2, 0.5], ['Chicken', 'kg', 15, 3, 0.5], ['Potatoes', 'kg', 20, 4, 1]],
+  },
   other: { menu: [['General', 'Item one', 100], ['General', 'Item two', 150]], stock: [] },
 };
+/** Which starter list fits: a preset with its own list (e.g. Bar / pub) wins over the general business type */
+const starterKey = (type, preset) => (preset && TEMPLATES[preset] ? preset : type);
 
 /** Round a scaled price to something a person would actually write on a menu */
 function nice(v) {

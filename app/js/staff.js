@@ -264,7 +264,7 @@ Object.assign(Forms, {
       idType: g('idType'), idNumber: g('idNumber'), pan: g('pan').toUpperCase(), photo: g('photo'),
     };
     if (!d.name) return formError('Please enter the full name.');
-    if (!/^[+\d][\d\s-]{6,}$/.test(d.phone)) return formError('Please enter a valid mobile number.');
+    if (!validPhone(d.phone)) return formError('Please enter a valid mobile number (10 digits, e.g. 98765 43210).');
     if (d.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email)) return formError('That email address looks wrong.');
     if (d.pan && !/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(d.pan)) return formError('PAN should look like ABCDE1234F.');
     if (d.idType === 'Aadhaar' && d.idNumber && !/^\d{12}$/.test(d.idNumber.replace(/\s/g, ''))) return formError('Aadhaar number should be 12 digits.');

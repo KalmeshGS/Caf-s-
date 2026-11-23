@@ -203,7 +203,9 @@ const Actions = {
   noteClear() { const i = $('#sheet input[name=note]'); if (i) { i.value = ''; i.form.requestSubmit(); } },
   printBill(el) {
     const o = byId(S.orders, el.dataset.id); if (!o) return;
-    const disc = num($('form.bill input[name=discount]')?.value);
+    const raw = $('form.bill input[name=discount]')?.value;
+    const derr = discountError(raw, orderSubtotal(o)); if (derr) return formError(derr);
+    const disc = num(raw);
     $('#print').innerHTML = receiptHtml(o, orderTotals(o, disc)); window.print();
   },
   payPrint(el) { App.printAfterPay = true; el.closest('form').requestSubmit(); },
@@ -343,6 +345,8 @@ const Forms = {
   },
   pay(fd) {
     const o = byId(S.orders, App.params.o); if (!o || o.status !== 'open') return;
+    const derr = discountError(fd.get('discount'), orderSubtotal(o));
+    if (derr) { App.printAfterPay = false; return formError(derr); }
     const t = orderTotals(o, num(fd.get('discount')));
     Object.assign(o, { status: 'paid', paidAt: Date.now(), method: fd.get('method') || 'cash', subtotal: t.sub, discount: t.discount, tax: t.tax, total: t.total });
     S.kots.forEach((k) => { if (k.orderId === o.id && k.status === 'ready') { k.status = 'served'; k.updatedAt = Date.now(); useStockFor(k); } });
@@ -380,6 +384,9 @@ const Forms = {
     save(); openSheet(vendorSheet(v), { wide: true }); toast('Payment recorded');
   },
   business(fd) {
+    const tRaw = String(fd.get('tables') ?? '').trim(), tN = Number(tRaw);
+    if (tRaw !== '' && (!Number.isInteger(tN) || tN < 0 || tN > MAX_TABLES)) return formError(`Tables must be a whole number from 0 to ${MAX_TABLES}.`);
+    if (!String(fd.get('name') || '').trim()) return formError('Please enter the name of your place.');
     Object.assign(S.settings, {
       name: fd.get('name').trim(), tagline: fd.get('tagline').trim(), type: fd.get('type'), currency: fd.get('currency'),
       tables: clamp(num(fd.get('tables')), 0, 99), tax: num(fd.get('tax')),
@@ -402,8 +409,12 @@ const Inputs = {
   menuSearch(el) { App.ui.q = el.value; const g = $('#menu-grid'); if (g) g.innerHTML = menuGrid(); },
   billDiscount(el) {
     const o = byId(S.orders, App.params.o); if (!o) return;
+    const err = discountError(el.value, orderSubtotal(o));
+    const e = el.form?.querySelector('#form-err'); if (e) e.textContent = err;
+    el.setAttribute('aria-invalid', err ? 'true' : 'false');
+    if (err) return;
     const t = orderTotals(o, num(el.value));
-    $('#bill-total').textContent = `Total ${money(t.total)}`; $('#bill-tax').textContent = money(t.tax);
+    $('#bill-total').textContent = `Total ${money(t.total)}`; $('#bill-tax').innerHTML = billTaxRowsHtml(t);
   },
   journalNote(el) {
     const dk = App.ui.day, e = S.journal[dk] || { note: '', tags: [] };
@@ -511,7 +522,11 @@ function notifyReady(list) {
 /* ---------------- boot (after every script, incl. auth.js, has loaded) ---------------- */
 document.addEventListener('DOMContentLoaded', render);
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
-  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').then((r) => r.update()).catch(() => {}));
+  // Register once; only ask for an update when a worker is already running (calling update() while the
+  // first install is still in progress is what logged "An unknown error occurred when fetching the script")
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })
+    .then((r) => { if (r.active && !r.installing && !r.waiting) return r.update(); })
+    .catch((e) => console.info('Offline mode not available:', e && e.message)));
   // When a new version takes over, reload once so nobody keeps using old screens
   const hadController = !!navigator.serviceWorker.controller;
   let reloaded = false;

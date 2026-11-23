@@ -204,8 +204,9 @@ Views.billing = (p) => {
       <h2 id="bill-total">Total ${money(t.total)}</h2>
       <div class="bill-lines">${sel.items.map((l) => `<div class="line-row"><span>${esc(l.name)} × ${l.qty}</span><span>${money(l.qty * l.price)}</span></div>`).join('')}</div>
       <div class="line-row"><span>Subtotal</span><span>${money(t.sub)}</span></div>
-      <label class="line-row"><span>Discount</span><input class="inline-input" name="discount" type="number" min="0" step="any" value="${sel.discount || ''}" placeholder="0" data-input="billDiscount"></label>
-      <div class="line-row"><span>Tax (${Number(S.settings.tax) || 0}%)</span><span id="bill-tax">${money(t.tax)}</span></div>
+      <label class="line-row"><span>Discount</span><input class="inline-input" name="discount" type="number" min="0" max="${t.sub}" step="any" value="${sel.discount || ''}" placeholder="0" data-input="billDiscount"></label>
+      <div id="bill-tax">${billTaxRowsHtml(t)}</div>
+      <p class="neg sm" id="form-err" role="alert"></p>
       <div class="seg">${Object.entries(pm).map(([k, m], i) => `<label><input type="radio" name="method" value="${k}" ${i === 1 ? 'checked' : ''}><span>${esc(m.label)}</span></label>`).join('')}</div>
       <button class="btn primary block" type="submit">${icon('check')}<span>Mark as paid</span></button>
       <div class="row-2">${btn('Print bill', 'printBill', { cls: 'ghost', ic: 'printer', data: `data-id="${sel.id}"` })}${btn('Paid & print', 'payPrint', { cls: 'ghost', ic: 'receipt' })}</div>
@@ -215,6 +216,8 @@ Views.billing = (p) => {
       <div class="card-head">${eyebrow(`Billing · ${orderLabel(sel)} · #${sel.no}`)}<span class="badge ok">${icon('check')} Paid</span></div>
       <h2>Total ${money(sel.total)}</h2>
       ${sel.items.map((l) => `<div class="line-row"><span>${esc(l.name)} × ${l.qty}</span><span>${money(l.qty * l.price)}</span></div>`).join('')}
+      ${billRows({ sub: sel.subtotal ?? orderSubtotal(sel), discount: sel.discount || 0, tax: sel.tax || 0, total: sel.total }).map(([k, v]) => `<div class="line-row"><span>${esc(k)}</span><span>${money(v, true)}</span></div>`).join('')}
+      <div class="line-row"><b>Total</b><b>${money(sel.total)}</b></div>
       <div class="line-row"><span>Paid by</span><b>${esc(pm[sel.method]?.label || sel.method)} · ${fmtTime(sel.paidAt)}</b></div>
       <div class="row-2">${btn('Print receipt', 'printReceipt', { cls: 'ghost', ic: 'printer', data: `data-id="${sel.id}"` })}${btn('Done', 'closeBill', { cls: 'primary' })}</div>
     </div>`;
@@ -543,9 +546,7 @@ function receiptHtml(o, draft) {
     ${st.gstin ? `<p>GSTIN: ${esc(st.gstin)}</p>` : ''}${st.fssai ? `<p>FSSAI: ${esc(st.fssai)}</p>` : ''}${st.taxProfile ? `<p><b>${esc(st.taxProfile.billTitle || 'Tax Invoice')}</b></p>` : ''}
     <p>${draft ? '<b>BILL</b><br>' : '<b>RECEIPT</b><br>'}${esc(orderLabel(o))} · Bill #${o.no}<br>${new Date(draft ? Date.now() : o.paidAt).toLocaleString()}</p><hr>
     ${o.items.map((l) => `<div class="r"><span>${esc(l.name)} × ${l.qty}</span><span>${money(l.qty * l.price)}</span></div>`).join('')}<hr>
-    <div class="r"><span>Subtotal</span><span>${money(t.sub)}</span></div>
-    ${t.discount ? `<div class="r"><span>Discount</span><span>−${money(t.discount)}</span></div>` : ''}
-    ${t.tax ? `<div class="r"><span>Tax (${Number(st.tax) || 0}%)</span><span>${money(t.tax)}</span></div>` : ''}
+    ${billRows(t, st).map(([k, v]) => `<div class="r"><span>${esc(k)}</span><span>${money(v, true)}</span></div>`).join('')}
     <div class="r b"><span>Total</span><span>${money(t.total)}</span></div>
     <p>${draft ? 'Payment pending' : `Paid by ${esc(pm[o.method]?.label || o.method)}`}</p><hr><p>${esc(st.footer || 'Thank you, visit again!')}</p></div>`;
 }

@@ -19,6 +19,10 @@ window.FIREBASE_CONFIG = {
   messagingSenderId: '935495834232',
   appId: '1:935495834232:web:a4a5d6417b1429b83eeb8d',
 };
+
+/* App Check site key (Google Cloud Fraud Defense / reCAPTCHA Enterprise, score based) — public, safe to commit. It only works on kalmeshgs.github.io.
+   Set to '' to switch App Check off in the app. The SECRET key is never put in code. */
+window.APPCHECK_SITE_KEY = '6Ld8Oi4uAAAAAOOV6jpZkGMGnWGgMwnWA_CBeFi4';
 /* Example:
 window.FIREBASE_CONFIG = {
   apiKey: 'AIza…',

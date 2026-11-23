@@ -30,7 +30,8 @@ function rowsEditor(list) {
   const d = App.setup.d;
   const rows = d[list] && d[list].length ? d[list] : [{}];
   const del = (i) => `<button type="button" class="icon-btn sm" data-act="rowDel" data-list="${list}" data-i="${i}" aria-label="Remove row">${icon('x')}</button>`;
-  const typeLabel = (BUSINESS_TYPES[d.type || S.settings?.type] || 'café').toLowerCase();
+  const preset = d.answers?.q_preset || S.settings?.profile?.preset;
+  const typeLabel = (TEMPLATES[preset]?.label || BUSINESS_TYPES[d.type || S.settings?.type] || 'café').toLowerCase();
   if (list === 'menu') {
     const cats = [...new Set(rows.map((r) => r.cat).filter(Boolean).concat(S.menu.map((m) => m.cat)))];
     return `<div class="rows menu-rows">
@@ -105,7 +106,7 @@ Views.setup = () => {
   let body = '';
   if (name === 'place') {
     body = `
-      <label class="field"><span>Name of your place</span><input name="name" required maxlength="40" placeholder="e.g. Corner Café" value="${v('name')}" data-input="setupName" autofocus></label>
+      <label class="field"><span>Name of your place <em id="name-count">${String(d.name || '').length}/40</em></span><input name="name" required maxlength="40" placeholder="e.g. Corner Café" value="${v('name')}" data-input="setupName" autofocus aria-describedby="name-count"></label>
       <div class="row-2">
         <label class="field"><span>Short code <em>(for employee IDs)</em></span><input name="short" required maxlength="4" value="${v('short')}" placeholder="CC" style="text-transform:uppercase" data-input="setupShort"></label>
         <div class="field"><span>Employee IDs will look like</span><div class="emp-sample" id="emp-sample">${esc(((d.short || 'CC') + String(new Date().getFullYear()).slice(-2) + '001').toUpperCase())}</div></div>
@@ -178,17 +179,54 @@ function stepError(name, d) {
     d.short = String(d.short || shortCode(d.name)).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4);
     if (d.short.length < 2) return 'Short code needs 2–4 letters, e.g. KK.';
   }
-  if (name === 'menu') for (const r of filled(d.menu)) if (r.price === '' || isNaN(Number(r.price)) || Number(r.price) < 0) return `Please enter a price for "${r.name}".`;
-  if (name === 'stock') for (const r of filled(d.stock)) if (r.qty !== '' && isNaN(Number(r.qty))) return `"${r.name}": stock should be a number.`;
+  const blank = (x) => x == null || String(x).trim() === '';
+  if (name === 'menu') {
+    const rows = d.menu || [];
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i];
+      if (!String(r.name || '').trim() && (!blank(r.price) || !blank(r.cat))) return `Row ${i + 1}: please type the item name (or remove the row).`;
+    }
+    for (const r of filled(rows)) {
+      const p = Number(r.price);
+      if (blank(r.price) || !Number.isFinite(p)) return `Please enter a price for "${r.name}".`;
+      if (p < 0) return `"${r.name}": the price can’t be negative.`;
+      if (p === 0) return `"${r.name}": the price can’t be 0 — enter what you charge.`;
+      if (p > MAX_AMOUNT) return `"${r.name}": that price looks too high — check for an extra zero.`;
+    }
+  }
+  if (name === 'stock') {
+    const rows = d.stock || [];
+    for (let i = 0; i < rows.length; i++) {
+      if (!String(rows[i].name || '').trim() && (!blank(rows[i].qty) || !blank(rows[i].low))) return `Row ${i + 1}: please type the stock item name (or remove the row).`;
+    }
+    for (const r of filled(d.stock)) {
+      for (const [v, what] of [[r.qty, 'stock now'], [r.low, '“alert below”']]) {
+        if (blank(v)) continue;
+        const n = Number(v);
+        if (!Number.isFinite(n)) return `"${r.name}": ${what} should be a number.`;
+        if (n < 0) return `"${r.name}": ${what} can’t be negative.`;
+        if (n > MAX_AMOUNT) return `"${r.name}": ${what} looks too high — check for an extra zero.`;
+      }
+    }
+  }
   if (name === 'staff') {
     const seen = new Set(S.users.map((u) => u.name.toLowerCase()));
+    const maxJoin = shiftDay(dayKey(), 60);
+    const rows = d.staff || [];
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i];
+      if (!String(r.name || '').trim() && (!blank(r.phone) || r.access || !blank(r.pw))) return `Person ${i + 1}: please type their full name (or remove the row).`;
+    }
     for (const r of filled(d.staff)) {
       const nm = r.name.trim();
-      if (r.phone && !/^[+\d][\d\s-]{6,}$/.test(r.phone.trim())) return `${nm}: please check the mobile number.`;
+      if (r.join && !/^\d{4}-\d{2}-\d{2}$/.test(r.join)) return `${nm}: please pick a valid joining date.`;
+      if (r.join && r.join > maxJoin) return `${nm}: the joining date can’t be more than 60 days from today.`;
+      if (r.join && r.join < '1950-01-01') return `${nm}: please check the joining date.`;
+      if (r.phone && !validPhone(r.phone)) return `${nm}: please check the mobile number.`;
       if (r.access) {
         if (seen.has(nm.toLowerCase())) return `Two logins can't have the same name — add a surname or initial for ${nm}.`;
         seen.add(nm.toLowerCase());
-        const e = passwordError(r.pw, r.pw, { name: nm });
+        const e = passwordError(r.pw, r.pw, { name: nm, phone: r.phone });
         if (e) return `${nm}'s first password: ${e}`;
       }
     }
@@ -249,7 +287,7 @@ Object.assign(Actions, {
   rowStarter(el) {
     keepSetupFields(el.closest('form'));
     const d = App.setup.d, list = el.dataset.list;
-    const type = d.type || S.settings?.type || 'cafe', currency = d.currency || S.settings?.currency || 'INR';
+    const type = starterKey(d.type || S.settings?.type || 'cafe', d.answers?.q_preset || S.settings?.profile?.preset), currency = d.currency || S.settings?.currency || 'INR';
     const keep = filled(d[list]);
     const extra = list === 'menu'
       ? starterMenu(type, currency).map((m) => ({ name: m.name, cat: m.cat, price: m.price }))
@@ -272,6 +310,8 @@ Object.assign(Actions, {
   },
 });
 Inputs.setupName = (el) => {
+  const c = $('#name-count');
+  if (c) { c.textContent = `${el.value.length}/40${el.value.length >= 40 ? ' — maximum reached' : ''}`; c.classList.toggle('neg', el.value.length >= 40); }
   const s = el.form.short;
   if (s && !s.dataset.touched) { s.value = shortCode(el.value); Inputs.setupShort(s, true); }
 };
@@ -295,9 +335,9 @@ Object.assign(Forms, {
     if (App.setup.mode === 'profile') return saveProfile(form);
 
     // Offline (on-device) sign-up
-    const perr = passwordError(fd.get('pw1'), fd.get('pw2'), { name: d.owner });
+    const perr = passwordError(fd.get('pw1'), fd.get('pw2'), { name: d.owner, phone: d.phone });
     if (!String(d.owner || '').trim()) return formError('Please enter your name.');
-    if (!/^[+\d][\d\s-]{6,}$/.test(String(d.phone || '').trim())) return formError('Please enter a valid mobile number.');
+    if (!validPhone(d.phone)) return formError('Please enter a valid mobile number (10 digits, e.g. 98765 43210).');
     if (perr) return formError(perr);
     busy(form, true);
     const st = {

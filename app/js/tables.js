@@ -188,7 +188,7 @@ Object.assign(Forms, {
     const d = { name: g('name'), phone: g('phone'), date: g('date'), time: g('time'), guests: Math.max(1, num(fd.get('guests'))), table: g('table'), note: g('note') };
     if (!d.name) return formError('Please enter the guest name.');
     if (!d.date || !d.time) return formError('Please choose a date and time.');
-    if (d.phone && !/^[+\d][\d\s-]{6,}$/.test(d.phone)) return formError('Please check the phone number.');
+    if (d.phone && !validPhone(d.phone)) return formError('Please check the phone number.');
     const id = fd.get('id');
     if (!id && resWhen(d) < Date.now() - 15 * 60000) return formError('That time has already passed.');
     if (d.table) {

@@ -8,10 +8,28 @@
   <meta name="theme-color" content="#f3ece2">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'">
   <meta name="referrer" content="no-referrer">
+  <link rel="canonical" href="https://kalmeshgs.github.io/cafe/">
+  <!-- Link previews (WhatsApp, Facebook, LinkedIn, X) -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Cafe Journal">
+  <meta property="og:title" content="Cafe Journal — run your café, restaurant or hotel">
+  <meta property="og:description" content="Orders, kitchen screen, billing, stock, recipes and staff in one app. Know your real profit at the end of every day.">
+  <meta property="og:url" content="https://kalmeshgs.github.io/cafe/">
+  <meta property="og:image" content="https://kalmeshgs.github.io/cafe/app/icons/icon-512.png">
+  <meta property="og:image:width" content="512">
+  <meta property="og:image:height" content="512">
+  <meta property="og:image:alt" content="Cafe Journal logo">
+  <meta property="og:locale" content="en_IN">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Cafe Journal — run your café, restaurant or hotel">
+  <meta name="twitter:description" content="Orders, kitchen screen, billing, stock, recipes and staff in one app.">
+  <meta name="twitter:image" content="https://kalmeshgs.github.io/cafe/app/icons/icon-512.png">
   <link rel="icon" href="app/icons/icon.svg" type="image/svg+xml">
+  <link rel="icon" href="favicon.ico" sizes="any">
+  <link rel="apple-touch-icon" href="app/icons/icon-192.png">
   <link rel="manifest" href="app/manifest.webmanifest">
   <link rel="preload" href="assets/fonts/marcellus-400.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="assets/site.css?v=20261122c">
+  <link rel="stylesheet" href="assets/site.css?v=20261123a">
 </head>
 <body>
   <!-- Dish illustrations (drawn, top-down plates) -->
@@ -30,7 +48,8 @@
 
   <header class="nav wrap">
     <a class="logo" href="./"><span class="logo-mark">CJ</span><span>Cafe <i>•</i> Journal</span></a>
-    <nav><a class="on" href="#top">Home</a><a href="#features">Features</a><a href="#menu">Menu &amp; stock</a><a href="#start">Get started</a></nav>
+    <button class="nav-toggle" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="site-nav"><span></span><span></span><span></span></button>
+    <nav id="site-nav"><a class="on" href="#top">Home</a><a href="#features">Features</a><a href="#menu">Menu &amp; stock</a><a href="#start">Get started</a></nav>
     <div class="nav-cta"><a class="btn ghost sm" href="app/index.html#/login" data-login>Log in</a><a class="btn primary sm" href="app/index.html#/signup">Sign up</a></div>
   </header>
 
@@ -131,6 +150,6 @@
     <span>Cafe <i>•</i> Journal</span>
     <span>Your café's data is stored securely online.</span>
   </footer>
-  <script src="assets/site.js?v=20261122d"></script>
+  <script src="assets/site.js?v=20261123a"></script>
 </body>
 </html>

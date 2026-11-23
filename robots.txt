@@ -1,0 +1,8 @@
+# Cafe Journal (project site under /cafe/)
+# Note: search engines only read robots.txt at the domain root
+# (https://kalmeshgs.github.io/robots.txt). Copy these lines there if you have a
+# kalmeshgs.github.io repository; this file documents the intended rules.
+User-agent: *
+Allow: /cafe/
+Disallow: /cafe/app/
+Sitemap: https://kalmeshgs.github.io/cafe/sitemap.xml
