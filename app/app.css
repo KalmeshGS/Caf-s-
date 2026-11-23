@@ -984,3 +984,11 @@ h1, .page-head h1, .onb h2, .center-screen h2, .sheet-head h2, .ticket h2, .home
 .tt-clean svg { width: 14px; height: 14px; }
 .clean-row { padding: 10px 0; gap: 10px; }
 .clean-row b { font-size: 17px; }
+
+/* Guest demo */
+.guest-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 14px; border-radius: 14px; border: 1px dashed var(--accent); background: var(--accent-soft); font-size: 13.5px; }
+.guest-bar > span { flex: 1; min-width: 180px; }
+.guest-bar .ic { color: var(--accent-text, var(--accent)); }
+.guest-link { margin-top: 14px; }
+.guest-link .link-btn { font-size: 13.5px; display: inline-flex; align-items: center; gap: 6px; }
+.guest-link .ic { width: 15px; height: 15px; }

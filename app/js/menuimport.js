@@ -55,9 +55,10 @@ function rowsToItems(rows) {
 /** Plain lines (typed, pasted from WhatsApp, or OCR text) → items. A line can hold several "name price" pairs. */
 function linesToItems(text) {
   const out = []; let cat = '', pending = '';
-  const pair = /([A-Za-zऀ-෿(][^₹\d\n]{0,60}?)\s*[.·…:\-–—_|]*\s*(?:₹|rs\.?|inr)?\s*(\d{1,5}(?:\.\d{1,2})?)\s*(?:\/-|-)?(?=\s|$|[,;|])/gi;
+  const pair = /([A-Za-zऀ-෿(][^₹\d\n]{0,60}?)\s*[.·…:\-–—_|,]*\s*(?:₹|rs\.?|inr)?\s*(\d{1,5}(?:\.\d{1,2})?)\s*(?:\/-|-)?(?=\s|$|[,;|])/gi;
   for (const raw of String(text || '').split(/\r?\n/)) {
     const line = raw.replace(/\t+/g, '  ').trim(); if (!line) continue;
+    { const cells = line.split(/[,;|]|\s{2,}/).map((c) => c.trim()); if (cells.length > 1 && HEAD_RE.name.test(cells[0]) && cells.slice(1).some((c) => HEAD_RE.price.test(c))) continue; } // a column-header row, not a category
     if (isPrice(line) && pending) { out.push({ name: cleanName(pending), cat: cat || 'General', price: priceOf(line), available: true }); pending = ''; continue; }
     let m; const hits = []; pair.lastIndex = 0;
     while ((m = pair.exec(line))) {
