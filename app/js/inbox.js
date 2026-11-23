@@ -18,7 +18,7 @@ const readKey = () => `cj.read.${Session.user()?.id || 'x'}`;
 function readSet() { try { return new Set(JSON.parse(localStorage.getItem(readKey()) || '[]')); } catch (e) { return new Set(); } }
 function saveRead(set) { try { localStorage.setItem(readKey(), JSON.stringify([...set].slice(-400))); } catch (e) { /* ignore */ } }
 const ago = (t) => { const m = Math.round((Date.now() - t) / 60000); return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.floor(m / 60)} h ago` : fmtDate(t, { day: 'numeric', month: 'short' }); };
-const tableTxt = (k) => (k.table === 'Takeaway' ? `Takeaway #${k.no}` : k.table);
+const tableTxt = (k) => (k.token ? `Token ${k.token}${k.custName ? ' · ' + k.custName : ''}` : k.table === 'Takeaway' ? `Takeaway #${k.no}` : k.table);
 
 /** Every notification for the signed-in person, newest first */
 function notifications() {

@@ -69,7 +69,7 @@ function render() {
   checkReady(); checkNotices();
   if ((App.setup.mode === 'later' || App.setup.mode === 'profile') && App.setup.step > 0 && role === 'owner') { root.innerHTML = Views.setup(); return; }
   let { view, params } = parseHash();
-  const allowed = viewsFor(role).concat('inbox'); // everyone has the notifications inbox
+  const allowed = viewsFor(role).concat('inbox', canTokens() ? ['tokens'] : []); // everyone has the notifications inbox
   if (!allowed.includes(view)) {
     view = allowed[0]; params = {};
     history.replaceState(null, '', `#/${view}`);
@@ -86,6 +86,8 @@ function render() {
 
   // keep what is being typed in the home AI box across refreshes
   const q = $('#home-q'), typed = q ? q.value : '', hadFocus = q && document.activeElement === q;
+  tokenChime();
+  if (view === 'tokens') { root.innerHTML = Views.tokens(); return; } // full-screen token TV
   root.innerHTML = shell(view, Views[view](params));
   const q2 = $('#home-q');
   if (q2 && typed) q2.value = typed;
@@ -349,13 +351,16 @@ const Forms = {
     if (derr) { App.printAfterPay = false; return formError(derr); }
     const t = orderTotals(o, num(fd.get('discount')));
     Object.assign(o, { status: 'paid', paidAt: Date.now(), method: fd.get('method') || 'cash', subtotal: t.sub, discount: t.discount, tax: t.tax, total: t.total });
-    S.kots.forEach((k) => { if (k.orderId === o.id && k.status === 'ready') { k.status = 'served'; k.updatedAt = Date.now(); useStockFor(k); } });
+    // Pay-first orders (self-service, takeaway): the bill gets a token and the order goes to the kitchen now
+    const token = tokenAfterPay(o, fd);
+    if (!token) S.kots.forEach((k) => { if (k.orderId === o.id && k.status === 'ready') { k.status = 'served'; k.updatedAt = Date.now(); useStockFor(k); } });
     // Guests have paid and will leave: the table needs cleaning (alerts housekeeping, captain, waiters…)
     if (o.table && o.table !== 'Takeaway' && tableNames().includes(o.table) && !openOrders().some((x) => x.table === o.table && x !== o)) {
       S.tableState = S.tableState || {};
       if (S.tableState[o.table]?.status !== 'blocked') S.tableState[o.table] = { status: 'cleaning', note: 'Bill paid — guests leaving', by: 'Auto (bill paid)', at: Date.now() };
     }
-    save(); toast(`Paid ${money(t.total)} ✓`);
+    save(); toast(token ? `Paid ${money(t.total)} ✓ Token ${token}` : `Paid ${money(t.total)} ✓`);
+    if (token) openSheet(tokenSheet(o));
     if (App.printAfterPay) { App.printAfterPay = false; setTimeout(() => printBill(receiptHtml(o)), 50); }
   },
   stockItem(fd) {
@@ -516,7 +521,7 @@ function checkReady() {
   if (mine.length) notifyReady(mine);
 }
 function notifyReady(list) {
-  const what = list.map((k) => (k.table === 'Takeaway' ? `Takeaway #${k.no}` : k.table)).join(', ');
+  const what = list.map((k) => (k.token ? `Token ${k.token}` : k.table === 'Takeaway' ? `Takeaway #${k.no}` : k.table)).join(', ');
   const body = list.map((k) => k.items.map((i) => `${i.qty}× ${i.name}`).join(', ')).join(' · ');
   beep(); setTimeout(beep, 700);
   try { navigator.vibrate && navigator.vibrate([250, 120, 250]); } catch (e) { /* ignore */ }
