@@ -277,7 +277,7 @@ const expensesOn = (dk) => S.expenses.filter((e) => e.date === dk);
 const expensesInMonth = (mk) => S.expenses.filter((e) => e.date.startsWith(mk));
 const openOrders = () => S.orders.filter((o) => o.status === 'open');
 const orderSubtotal = (o) => sum(o.items, (l) => l.qty * l.price);
-const orderLabel = (o) => (o.table === 'Takeaway' ? `Takeaway #${o.no}` : o.table);
+const orderLabel = (o) => (o.token ? `Token ${o.token}${o.parcel ? ' · Parcel' : ''}${o.custName ? ' · ' + o.custName : ''}` : o.table === 'Takeaway' ? `Takeaway #${o.no}` : o.table);
 const isLow = (s) => Number(s.qty) <= Number(s.low);
 const tableNames = () => Array.from({ length: Number(S.settings?.tables) || 0 }, (_, i) => `T${i + 1}`);
 
@@ -361,7 +361,7 @@ function byMethod(orders) {
 }
 function nextBillNo() {
   const today = dayKey();
-  if (S.seq.day !== today) S.seq = { day: today, n: 0 };
+  if (S.seq.day !== today) S.seq = { ...S.seq, day: today, n: 0 }; // keep the employee-ID and token counters
   S.seq.n += 1;
   return S.seq.n;
 }

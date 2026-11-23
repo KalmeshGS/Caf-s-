@@ -103,7 +103,7 @@ function readyCard() {
   if (!list.length) return alertsOff ? `<div class="banner info">${icon('alert')}<span>Get an alert when food is ready to serve.</span>${btn('Turn on alerts', 'enableAlerts', { cls: 'primary sm' })}</div>` : '';
   return `<section class="card ready-card">
     <div class="card-head">${eyebrow('Ready to serve')}<span class="badge ok">${list.length}</span></div>
-    ${list.map((k) => `<div class="ready-row"><div><strong>${esc(k.table === 'Takeaway' ? 'Takeaway #' + k.no : k.table)}</strong>
+    ${list.map((k) => `<div class="ready-row"><div><strong>${k.token ? `Token ${esc(k.token)}${k.custName ? ' · ' + esc(k.custName) : ''}` : esc(k.table === 'Takeaway' ? 'Takeaway #' + k.no : k.table)}</strong>
       <small>${esc(k.items.map((i) => `${i.qty}× ${i.name}`).join(', '))}</small></div>
       ${btn('Served', 'kotNext', { cls: 'primary sm', ic: 'check', data: `data-id="${k.id}"` })}</div>`).join('')}
     ${alertsOff ? `<div class="btn-row">${btn('Turn on alerts', 'enableAlerts', { cls: 'ghost sm', ic: 'alert' })}</div>` : ''}
@@ -133,6 +133,7 @@ function orderEditor(p) {
   const unsent = sum(lines, (l) => Math.max(0, l.qty - l.sent));
   const sub = o ? orderSubtotal(o) : 0;
   const role = Session.role();
+  const prepaid = isPrepaid(o || { table: p.t || 'Takeaway' });
 
   return `<div class="crumb"><button class="icon-btn" data-act="toTables" aria-label="Back">${icon('left')}</button><span>${esc(ROLES[role].label)} · Order</span></div>
   <div class="order-layout">
@@ -159,14 +160,18 @@ function orderEditor(p) {
       }).join('') : `<p class="muted">Tap items on the menu to add them.</p>`}
       </div>
       <div class="line-row total"><span>Subtotal</span><b>${money(sub)}</b></div>
+      ${prepaid ? `<p class="muted sm prepaid-note">${icon('receipt')} Pay first: the token number is printed on the bill and the same token goes to the kitchen.</p>` : ''}
       <div class="ticket-actions">
-        <button class="btn primary block" data-act="sendKitchen" ${unsent ? '' : 'disabled'}>${icon(unsent ? 'send' : 'check')}<span>${unsent ? `Send to kitchen (${unsent})` : o && lines.length ? 'Sent to kitchen' : 'Send to kitchen'}</span></button>
-        ${o && can('billing') && lines.length ? btn('Go to bill', 'toBill', { cls: 'ghost block', ic: 'receipt', data: `data-id="${o.id}"` }) : ''}
+        ${prepaid
+          ? `<button class="btn primary block" data-act="payFirst" ${o && lines.length ? '' : 'disabled'}>${icon('receipt')}<span>${can('billing') ? 'Take payment & get token' : 'Send to counter for payment'}</span></button>`
+          : `<button class="btn primary block" data-act="sendKitchen" ${unsent ? '' : 'disabled'}>${icon(unsent ? 'send' : 'check')}<span>${unsent ? `Send to kitchen (${unsent})` : o && lines.length ? 'Sent to kitchen' : 'Send to kitchen'}</span></button>
+        ${o && can('billing') && lines.length ? btn('Go to bill', 'toBill', { cls: 'ghost block', ic: 'receipt', data: `data-id="${o.id}"` }) : ''}`}
       </div>
     </aside>
   </div>
   <div class="mobile-bar"><span>${pl(sum(lines, (l) => l.qty), 'item')} · <b>${money(sub)}</b></span>
-    <button class="btn primary" data-act="sendKitchen" ${unsent ? '' : 'disabled'}>${unsent ? `Send (${unsent})` : 'Sent'}</button></div>`;
+    ${prepaid ? `<button class="btn primary" data-act="payFirst" ${o && lines.length ? '' : 'disabled'}>${can('billing') ? 'Pay & token' : 'To counter'}</button>`
+      : `<button class="btn primary" data-act="sendKitchen" ${unsent ? '' : 'disabled'}>${unsent ? `Send (${unsent})` : 'Sent'}</button>`}</div>`;
 }
 
 /* ---------------- Kitchen screen ---------------- */
@@ -176,13 +181,13 @@ Views.kitchen = () => {
     const list = active.filter((k) => k.status === status);
     return `<section class="k-col"><div class="k-col-h"><span>${esc(title)}</span><b>${list.length}</b></div>
       ${list.length ? list.map((k) => `<article class="kot card ${status}">
-        <div class="kot-h"><strong>${esc(k.table === 'Takeaway' ? 'TA #' + k.no : k.table)}</strong>${status === 'new' ? (k.changedAt ? '<span class="badge changed">Changed</span>' : '<span class="badge warm">New</span>') : `<small class="muted">#${k.no}</small>`}</div>
+        <div class="kot-h"><strong>${k.token ? `<span class="tok">Token ${esc(k.token)}</span>` : esc(k.table === 'Takeaway' ? 'TA #' + k.no : k.table)}</strong>${k.parcel ? '<span class="badge">Parcel</span>' : ''}${k.custName ? `<small class="muted">${esc(k.custName)}</small>` : ''}${status === 'new' ? (k.changedAt ? '<span class="badge changed">Changed</span>' : '<span class="badge warm">New</span>') : `<small class="muted">#${k.no}</small>`}</div>
         <ul>${k.items.map((i) => `<li><b>${i.qty}×</b> ${esc(i.name)}${i.note ? `<span class="knote">${esc(i.note)}</span>` : ''}</li>`).join('')}</ul>
         <div class="kot-f"><span class="timer" data-since="${k.createdAt}">${icon('clock')}<span>${elapsed(k.createdAt)}</span></span>
-        <button class="btn ${status === 'ready' ? 'ghost' : 'primary'} sm" data-act="kotNext" data-id="${k.id}">${esc(next)}</button></div>
+        <button class="btn ${status === 'ready' ? 'ghost' : 'primary'} sm" data-act="kotNext" data-id="${k.id}">${esc(status === 'ready' && k.token ? 'Collected' : next)}</button></div>
       </article>`).join('') : `<p class="muted k-empty">—</p>`}</section>`;
   };
-  return `${pageHead('Kitchen', 'Kitchen screen', live())}
+  return `${pageHead('Kitchen', 'Kitchen screen', `<div class="btn-row tight">${btn('Token TV screen', 'openTokens', { cls: 'ghost sm', ic: 'grid' })}${live()}</div>`)}
     <div class="kitchen">${col('new', 'New', 'Start cooking')}${col('cooking', 'Cooking', 'Mark ready')}${col('ready', 'Ready to serve', 'Served')}</div>
     <p class="fine">Tip: open this screen on the kitchen tablet. New tickets ping and the timer turns amber after 10 min, red after 20.</p>`;
 };
@@ -207,13 +212,18 @@ Views.billing = (p) => {
       <label class="line-row"><span>Discount</span><input class="inline-input" name="discount" type="number" min="0" max="${t.sub}" step="any" value="${sel.discount || ''}" placeholder="0" data-input="billDiscount"></label>
       <div id="bill-tax">${billTaxRowsHtml(t)}</div>
       <p class="neg sm" id="form-err" role="alert"></p>
+      ${isPrepaid(sel) ? `<div class="prepaid-box">
+        <div class="seg">${[['0', 'Eat here'], ['1', 'Parcel']].map(([v, l]) => `<label><input type="radio" name="parcel" value="${v}" ${(sel.table === 'Takeaway' && !feat('prepaid_flow')) === (v === '1') ? 'checked' : ''}><span>${l}</span></label>`).join('')}</div>
+        <label class="field"><span>Customer name <em>(optional — shown with the token)</em></span><input name="custName" maxlength="24" value="${esc(sel.custName || '')}" autocomplete="off"></label>
+        <p class="muted sm">${icon('receipt')} After payment the bill gets <b>token ${S.seq?.tday === dayKey() ? (Number(S.seq.token) || 0) + 1 : 1}</b> and the order goes to the kitchen with the same token.</p></div>` : ''}
       <div class="seg">${Object.entries(pm).map(([k, m], i) => `<label><input type="radio" name="method" value="${k}" ${i === 1 ? 'checked' : ''}><span>${esc(m.label)}</span></label>`).join('')}</div>
-      <button class="btn primary block" type="submit">${icon('check')}<span>Mark as paid</span></button>
+      <button class="btn primary block" type="submit">${icon('check')}<span>${isPrepaid(sel) ? (feat('kitchen') === 'none' ? 'Paid — give token' : 'Paid — send to kitchen') : 'Mark as paid'}</span></button>
       <div class="row-2">${btn('Print bill', 'printBill', { cls: 'ghost', ic: 'printer', data: `data-id="${sel.id}"` })}${btn('Paid & print', 'payPrint', { cls: 'ghost', ic: 'receipt' })}</div>
     </form>`;
   } else if (sel && sel.status === 'paid') {
     bill = `<div class="card bill paid">
       <div class="card-head">${eyebrow(`Billing · ${orderLabel(sel)} · #${sel.no}`)}<span class="badge ok">${icon('check')} Paid</span></div>
+      ${sel.token ? `<div class="token-big"><small>Token</small><b>${esc(sel.token)}</b>${sel.parcel ? '<em>Parcel</em>' : ''}</div>` : ''}
       <h2>Total ${money(sel.total)}</h2>
       ${sel.items.map((l) => `<div class="line-row"><span>${esc(l.name)} × ${l.qty}</span><span>${money(l.qty * l.price)}</span></div>`).join('')}
       ${billRows({ sub: sel.subtotal ?? orderSubtotal(sel), discount: sel.discount || 0, tax: sel.tax || 0, total: sel.total }).map(([k, v]) => `<div class="line-row"><span>${esc(k)}</span><span>${money(v, true)}</span></div>`).join('')}
@@ -545,7 +555,8 @@ function receiptHtml(o, draft) {
   return `<div class="receipt">
     <h2>${esc(st.name)}</h2>${st.tagline ? `<p>${esc(st.tagline)}</p>` : ''}
     ${st.gstin ? `<p>GSTIN: ${esc(st.gstin)}</p>` : ''}${st.fssai ? `<p>FSSAI: ${esc(st.fssai)}</p>` : ''}${st.taxProfile ? `<p><b>${esc(st.taxProfile.billTitle || 'Tax Invoice')}</b></p>` : ''}
-    <p>${draft ? '<b>BILL</b><br>' : '<b>RECEIPT</b><br>'}${esc(orderLabel(o))} · Bill #${o.no}<br>${new Date(draft ? Date.now() : o.paidAt).toLocaleString()}</p><hr>
+    <p>${draft ? '<b>BILL</b><br>' : '<b>RECEIPT</b><br>'}${esc(orderLabel(o))} · Bill #${o.no}<br>${new Date(draft ? Date.now() : o.paidAt).toLocaleString()}</p>
+    ${o.token && !draft ? `<div class="r-token"><small>TOKEN</small><b>${esc(o.token)}</b>${o.parcel ? '<small>PARCEL</small>' : ''}${o.custName ? `<small>${esc(o.custName)}</small>` : ''}</div><p>Please collect your order when this token is called.</p>` : ''}<hr>
     ${o.items.map((l) => `<div class="r"><span>${esc(l.name)} × ${l.qty}</span><span>${money(l.qty * l.price)}</span></div>`).join('')}<hr>
     ${billRows(t, st).map(([k, v]) => `<div class="r"><span>${esc(k)}</span><span>${money(v, true)}</span></div>`).join('')}
     <div class="r b"><span>Total</span><span>${money(t.total)}</span></div>

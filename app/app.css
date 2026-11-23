@@ -992,3 +992,37 @@ h1, .page-head h1, .onb h2, .center-screen h2, .sheet-head h2, .ticket h2, .home
 .guest-link { margin-top: 14px; }
 .guest-link .link-btn { font-size: 13.5px; display: inline-flex; align-items: center; gap: 6px; }
 .guest-link .ic { width: 15px; height: 15px; }
+
+/* Pay first → token */
+.prepaid-note { display: flex; gap: 6px; align-items: flex-start; margin: 6px 0 2px; }
+.prepaid-note .ic { width: 15px; height: 15px; flex: none; margin-top: 2px; }
+.prepaid-box { display: grid; gap: 8px; padding: 12px; border: 1px dashed var(--line); border-radius: 12px; background: var(--surface-2); }
+.token-big { display: grid; justify-items: center; gap: 2px; padding: 14px; border-radius: 14px; background: var(--accent-soft); color: var(--ink); }
+.token-big small { font-size: 11px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; color: var(--muted); }
+.token-big b { font-size: 44px; line-height: 1; font-variant-numeric: tabular-nums; color: var(--accent-text, var(--accent)); }
+.token-big em { font-style: normal; font-size: 13px; font-weight: 600; }
+.token-big.xl b { font-size: 72px; }
+.kot-h .tok { font-size: 18px; }
+.kot-h .badge { margin-left: 6px; }
+@media print { .receipt .r-token { text-align: center; border: 2px solid #000; margin: 6px 0; padding: 4px; } .receipt .r-token b { display: block; font-size: 34px; line-height: 1.1; } .receipt .r-token small { display: block; font-size: 11px; letter-spacing: .15em; } }
+.r-token { text-align: center; } .r-token b { display: block; font-size: 30px; }
+
+/* Token TV screen */
+.tv { min-height: 100vh; display: grid; grid-template-rows: auto 1fr; background: var(--bg); padding: 16px max(16px, env(safe-area-inset-left, 0px)); gap: 16px; }
+.tv-h { display: flex; align-items: center; gap: 16px; font-size: 20px; }
+.tv-h strong { flex: 1; font-family: var(--serif); font-weight: 400; font-size: 28px; }
+.tv-h > span { font-variant-numeric: tabular-nums; color: var(--muted); }
+.tv-cols { display: grid; grid-template-columns: 1fr 1.3fr; gap: 16px; }
+@media (max-width: 700px) { .tv-cols { grid-template-columns: 1fr; } }
+.tv-cols section { border: 1px solid var(--line); border-radius: 20px; padding: 18px; background: var(--surface); }
+.tv-cols section.ready { border-color: var(--ok); }
+.tv-cols h2 { font-family: var(--serif); font-weight: 400; font-size: 26px; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 14px; }
+.tv-cols .ready h2 { color: var(--ok); }
+.tv-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; }
+.tv-tok { display: grid; justify-items: center; padding: 16px 8px; border-radius: 16px; background: var(--surface-2); }
+.tv-tok b { font-size: clamp(44px, 7vw, 84px); line-height: 1; font-variant-numeric: tabular-nums; }
+.tv-tok small { font-size: 14px; color: var(--muted); margin-top: 4px; }
+.tv-tok.ready { background: color-mix(in srgb, var(--ok) 14%, var(--surface)); color: var(--ok); animation: tvpulse 1.6s ease-in-out 3; }
+@keyframes tvpulse { 50% { transform: scale(1.05); } }
+@media (prefers-reduced-motion: reduce) { .tv-tok.ready { animation: none; } }
+.tv-empty { color: var(--muted); font-size: 22px; }
