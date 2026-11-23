@@ -45,7 +45,7 @@ const Q = {
   q_gst: { label: 'GST registration', opts: { regular: 'Regular GST', composition: 'Composition scheme', none: 'Not registered' } },
   q_service_charge: { label: 'Offer a service charge?', opts: { no: 'No', optional: 'Yes — optional for the customer (off on every bill until the cashier ticks it with the customer’s OK)' } },
   q_packing: { label: 'Packing charge for parcels?', opts: { none: 'None', per_item: 'Per item', per_order: 'Per order' } },
-  q_printer: { label: 'Printer', opts: { none: 'None — e-bill on WhatsApp / SMS', bt58: '58 mm Bluetooth', usb80: '80 mm USB / LAN' } },
+  q_printer: { label: 'Printers you use', hint: 'Pick all that apply — the bill is sized for the printer you print on', opts: { none: 'None — e-bill on WhatsApp / SMS', bt58: '58 mm Bluetooth / thermal', usb80: '80 mm USB / LAN thermal', a4: 'A4 / normal office printer' } },
   q_stock: { label: 'How closely do you want to track stock?', opts: { none: 'Not now', purchases: 'Just purchases & bills', recipe: 'Full recipe-based — reduces automatically when sold' } },
   q_staff_roles: { label: 'Who works here?', hint: 'Pick all that apply', opts: { owner: 'Owner', manager: 'Manager', cashier: 'Cashier', waiter: 'Waiter / Captain', chef: 'Chef / Cook', bartender: 'Bartender', delivery: 'Delivery', housekeeping: 'Housekeeping', front_desk: 'Front desk' } },
   q_devices: { label: 'Devices you’ll use', hint: 'Pick all that apply', opts: { owner_phone: 'Owner’s phone', counter: 'Counter tablet / laptop', waiter_phones: 'Waiter phones', kitchen_tablet: 'Kitchen tablet', tv: 'TV for token numbers' } },
@@ -218,7 +218,7 @@ function viewsFor(role) {
 function rolesOffered() { return rolesOfferedFor(profileOf().answers); }
 function rolesOfferedFor(answers) {
   const f = deriveFeatures(answers);
-  return ['manager', 'cashier', 'waiter', 'kitchen', 'owner'].filter((r) => (r === 'waiter' ? f.waiter_app || f.tables : r === 'kitchen' ? f.kitchen !== 'none' : true));
+  return ['manager', 'cashier', 'captain', 'waiter', 'kitchen', 'housekeeping', 'owner'].filter((r) => (r === 'waiter' ? f.waiter_app || f.tables : r === 'kitchen' ? f.kitchen !== 'none' : r === 'captain' || r === 'housekeeping' ? f.tables : true));
 }
 
 /* ---------------- "Your app will have" (plain words) ---------------- */

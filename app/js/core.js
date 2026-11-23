@@ -74,10 +74,12 @@ const ROLES = {
   cashier: { label: 'Cashier', desc: 'Billing · orders · day closing', color: '#c2783c', views: ['billing', 'orders', 'journal'] },
   waiter:  { label: 'Waiter',  desc: 'Orders · tables & cleaning · reservations · serving', color: '#0f766e', views: ['orders'] },
   kitchen: { label: 'Kitchen', desc: 'Kitchen screen · menu & recipes', color: '#d97706', views: ['kitchen', 'menu'] },
+  captain: { label: 'Captain', desc: 'Tables & orders · kitchen screen · reservations · table cleaning (tells housekeeping)', color: '#0e7490', views: ['orders', 'kitchen'] },
+  housekeeping: { label: 'Housekeeping', desc: 'Tables to clean — gets an alert, taps "Cleaned"', color: '#64748b', views: ['orders'] },
 };
 
 /** Only these roles may start cooking / mark food ready (everyone may mark ready food as served) */
-const KITCHEN_ROLES = ['owner', 'kitchen'];
+const KITCHEN_ROLES = ['owner', 'kitchen', 'captain'];
 const VIEWS = {
   dashboard: { label: 'Dashboard', icon: 'grid' },
   orders:    { label: 'Orders',    icon: 'clipboard' },
@@ -302,6 +304,36 @@ function billRows(t, st = S.settings || {}) {
   const ro = round2(roundShown(t.total) - t.total);
   if (ro) rows.push(['Round off', ro]);
   return rows;
+}
+/* ---------- printers: the bill is laid out for the paper of the printer you print on ---------- */
+const PRINTERS = {
+  bt58: { label: '58 mm thermal', paper: '58mm', width: '48mm', font: 10.5, cls: 'p58' },
+  usb80: { label: '80 mm thermal', paper: '80mm', width: '72mm', font: 12, cls: 'p80' },
+  a4: { label: 'A4 printer', paper: 'A4', width: '170mm', font: 14, cls: 'pa4' },
+};
+/** Printers this café uses (settings, or the sign-up answers of older cafés) */
+function cafePrinters() {
+  const st = S.settings || {};
+  const list = (Array.isArray(st.printers) ? st.printers : asArr(st.profile?.answers?.q_printer)).filter((p) => PRINTERS[p]);
+  return list.length ? list : ['usb80'];
+}
+/** Print what is in #print on one printer: sets paper size (width × auto length) and layout */
+function printOn(key) {
+  const p = PRINTERS[key] || PRINTERS.usb80;
+  try { localStorage.setItem('cj.printer', key); } catch (e) { /* ignore */ }
+  const box = $('#print'); box.className = p.cls;
+  let st = $('#print-page'); if (!st) { st = document.createElement('style'); st.id = 'print-page'; document.head.appendChild(st); }
+  st.textContent = key === 'a4' ? '@media print { @page { size: A4; margin: 14mm; } }' : `@media print { @page { size: ${p.paper} auto; margin: 2mm; } }`;
+  setTimeout(() => window.print(), 30);
+}
+/** Put the bill HTML in #print and print it — asks which printer when the café has more than one */
+function printBill(html) {
+  $('#print').innerHTML = html;
+  const list = cafePrinters();
+  if (list.length === 1) return printOn(list[0]);
+  let last = ''; try { last = localStorage.getItem('cj.printer') || ''; } catch (e) { /* ignore */ }
+  openSheet(`${sheetHead('Print', 'Which printer?')}
+    <div class="list">${list.map((k) => `<button class="choice${k === last ? ' primary' : ''}" data-act="printPick" data-p="${k}">${icon('printer')}<span><b>${esc(PRINTERS[k].label)}</b><small>Paper ${esc(PRINTERS[k].paper)}${k === last ? ' · used last time' : ''}</small></span>${icon('right')}</button>`).join('')}</div>`);
 }
 /** Tax + round-off lines for the open bill (updated live as the discount changes) */
 const billTaxRowsHtml = (t) => billRows(t).filter(([k]) => k !== 'Subtotal' && k !== 'Discount')

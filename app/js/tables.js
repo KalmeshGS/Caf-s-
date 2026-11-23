@@ -30,8 +30,23 @@ const ordersTabs = (tab) => {
 const rulesNotice = () => (typeof Cloud !== 'undefined' && Cloud.on && Cloud.rulesOutdated
   ? `<div class="banner warn">${icon('alert')}<span>Table status and reservations are being switched on for your café. Please refresh in a minute.</span></div>` : '');
 
+/* ---------------- Housekeeping: only the tables that need cleaning ---------------- */
+const isHousekeeping = () => Session.role() === 'housekeeping';
+const canMarkClean = () => ['owner', 'manager', 'waiter', 'captain', 'housekeeping'].includes(Session.role());
+function cleaningView() {
+  const dirty = Object.entries(S.tableState || {}).filter(([, s]) => s && s.status === 'cleaning').sort((a, b) => (a[1].at || 0) - (b[1].at || 0));
+  const others = tableNames().filter((t) => !dirty.some(([d]) => d === t));
+  return `${pageHead('Housekeeping', 'Tables to clean')}
+    ${'Notification' in window && Notification.permission === 'default' ? `<div class="banner info">${icon('bell')}<span>Turn on alerts so your phone rings when a table needs cleaning.</span>${btn('Turn on alerts', 'enableAlerts', { cls: 'primary sm' })}</div>` : ''}
+    ${dirty.length ? `<section class="card">${eyebrow(`${pl(dirty.length, 'table')} waiting`)}
+      ${dirty.map(([t, s]) => `<div class="line-row clean-row"><span><b>${esc(tableTitle(t))}</b><small class="muted"> · ${esc(ago(s.at || Date.now()))}${s.note ? ` · ${esc(s.note)}` : ''}</small></span>${btn('Cleaned', 'markClean', { cls: 'primary', ic: 'check', data: `data-t="${t}"` })}</div>`).join('')}</section>`
+      : `<section class="card center">${icon('check')}<h3>All tables are clean</h3><p class="muted">You'll get an alert when a table needs cleaning.</p></section>`}
+    ${others.length ? `<section class="card">${eyebrow('Report a table that needs cleaning')}<div class="chip-row">${others.map((t) => `<button class="chip" data-act="markDirty" data-t="${t}">${esc(t)}</button>`).join('')}</div></section>` : ''}`;
+}
+
 /* ---------------- Tables screen ---------------- */
 function tablesView() {
+  if (isHousekeeping()) return cleaningView();
   const open = openOrders();
   const tiles = tableNames().map((t) => {
     const o = open.find((x) => x.table === t);
@@ -50,6 +65,7 @@ function tablesView() {
       </button>
       <button class="tt-more" data-act="tableMenu" data-t="${t}" aria-label="Status of ${esc(tableTitle(t))}" title="Table status">${icon('more')}</button>
       ${pending ? '<i class="dot" title="Not sent to kitchen"></i>' : ''}
+      ${!o && ms?.status === 'cleaning' && canMarkClean() ? `<button class="tt-clean" data-act="markClean" data-t="${t}">${icon('check')} Cleaned</button>` : ''}
     </div>`;
   }).join('');
   const takeaways = open.filter((o) => o.table === 'Takeaway' && (o.items.length || Date.now() - o.createdAt < 10 * 60000));
@@ -134,7 +150,7 @@ function resForm(r = {}, presetTable = '') {
 }
 
 /* ---------------- actions ---------------- */
-Views.orders = (p) => (p.t || p.o ? orderEditor(p) : p.tab === 'res' && feat('reservations') ? reservationsView() : tablesView());
+Views.orders = (p) => (isHousekeeping() ? cleaningView() : p.t || p.o ? orderEditor(p) : p.tab === 'res' && feat('reservations') ? reservationsView() : tablesView());
 
 const origOpenTable = Actions.openTable;
 const origAddItem = Actions.addItem;
@@ -155,6 +171,18 @@ Object.assign(Actions, {
     origAddItem(el);
   },
   tableMenu(el) { openSheet(tableSheet(el.dataset.t)); },
+  markClean(el) {
+    const t = el.dataset.t; if (!canMarkClean()) return toast('You can’t change table status.');
+    if (S.tableState?.[t]?.status === 'cleaning') delete S.tableState[t];
+    closeSheet(); save(); App.cleanSeen?.delete(t);
+    toast(`${tableTitle(t)} is clean ✓`);
+  },
+  markDirty(el) {
+    const t = el.dataset.t, me = Session.user(); if (!canMarkClean()) return;
+    S.tableState = S.tableState || {};
+    S.tableState[t] = { status: 'cleaning', note: '', by: me?.name || '', at: Date.now() };
+    save(); toast(`${tableTitle(t)}: needs cleaning`);
+  },
   setTableStatus(el) {
     const t = el.dataset.t, s = el.dataset.s, me = Session.user();
     S.tableState = S.tableState || {};

@@ -20,7 +20,7 @@ const SETUP_TYPES = [
   ['cafe', 'Café', 'cup'], ['restaurant', 'Restaurant', 'flame'], ['hotel', 'Hotel / Dhaba', 'grid'],
   ['bakery', 'Bakery', 'box'], ['other', 'Something else', 'more'],
 ];
-const ACCESS_ROLES = ['manager', 'cashier', 'waiter', 'kitchen', 'owner'];
+const ACCESS_ROLES = ['manager', 'cashier', 'captain', 'waiter', 'kitchen', 'housekeeping', 'owner'];
 const filled = (rows) => (rows || []).filter((r) => String(r.name || '').trim());
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 const draftCounts = (d) => [filled(d.menu).length && plural(filled(d.menu).length, 'menu item', 'menu items'), filled(d.stock).length && plural(filled(d.stock).length, 'stock item', 'stock items'), filled(d.staff).length && plural(filled(d.staff).length, 'staff member', 'staff')].filter(Boolean);

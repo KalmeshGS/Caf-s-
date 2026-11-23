@@ -5,7 +5,7 @@
    Inputs are named a_<questionId> so they never clash with other fields.
    ========================================================= */
 const BOOL_QS = ['q_area_pricing', 'q_time_menus', 'q_alcohol', 'q_price_incl'];
-const MULTI_QS = ['q_eat_where', 'q_order_by', 'q_pay_when', 'q_menu_style', 'q_bookings', 'q_regulars', 'q_staff_roles', 'q_devices', 'q_language'];
+const MULTI_QS = ['q_eat_where', 'q_order_by', 'q_pay_when', 'q_menu_style', 'q_bookings', 'q_regulars', 'q_staff_roles', 'q_devices', 'q_language', 'q_printer'];
 const listText = (arr) => asArr(arr).join(', ');
 const textList = (s) => String(s || '').split(',').map((x) => x.trim()).filter(Boolean).slice(0, 12);
 
@@ -68,7 +68,7 @@ function questionHtml(qid, a) {
 function readAnswers(form, a) {
   const fd = new FormData(form); const has = (k) => form.querySelector(`[name="${k}"]`);
   MULTI_QS.forEach((q) => { if (has(`a_${q}`)) a[q] = fd.getAll(`a_${q}`).map(String); });
-  ['q_handoff', 'q_kitchen', 'q_kitchen_device', 'q_internet', 'q_stock', 'q_gst', 'q_service_charge', 'q_packing', 'q_printer'].forEach((q) => { if (has(`a_${q}`)) a[q] = fd.get(`a_${q}`) || a[q]; });
+  ['q_handoff', 'q_kitchen', 'q_kitchen_device', 'q_internet', 'q_stock', 'q_gst', 'q_service_charge', 'q_packing'].forEach((q) => { if (has(`a_${q}`)) a[q] = fd.get(`a_${q}`) || a[q]; });
   BOOL_QS.forEach((q) => { if (has(`a_${q}`)) a[q] = fd.get(`a_${q}`) === 'yes'; });
   // Keep exactly what was typed (checked in answersError) — never change it silently
   if (has('a_q_table_count_n')) { const raw = String(fd.get('a_q_table_count_n') ?? '').trim(); a.q_table_count = { count: raw === '' ? NaN : Number(raw), areas: textList(fd.get('a_q_table_count_areas')) }; }
@@ -138,6 +138,7 @@ function profileSettings(answers, by) {
     profile: { preset: answers.q_preset, answers: JSON.parse(JSON.stringify(answers)), updatedAt: Date.now(), updatedBy: by || '' },
     features: plain, taxProfile: plain.tax,
     tables: f.tables ? clamp(num(answers.q_table_count?.count), 0, 99) : 0,
+    printers: asArr(answers.q_printer).filter((p) => PRINTERS[p]),
     tax: billTaxPct(f.tax), gstin: answers.q_gst !== 'none' ? (answers.q_gstin || '') : '', fssai: answers.q_fssai || '',
     type: PRESETS[answers.q_preset]?.type || 'restaurant',
   };
@@ -185,69 +186,9 @@ async function saveProfile(form) {
   } catch (e) { formError(e.message || String(e)); } finally { busy(form, false); }
 }
 
-/* ---------------- menu import (spec §14.4 menu_import): Excel / CSV paste, CSV file, or a photo ---------------- */
-/** "Masala Dosa, 60, Tiffin" · "Masala Dosa\t60" · "Masala Dosa ...... 60" · a line without a price = category heading */
-function parseMenuText(text) {
-  const out = []; let cat = '';
-  String(text || '').split(/\r?\n/).forEach((raw) => {
-    const line = raw.replace(/[₹$]|\bRs\.?\s*(?=\d)/gi, ' ').replace(/\s+$/, '');
-    if (!line.trim()) return;
-    const cells = line.includes('\t') ? line.split('\t') : line.includes(',') ? line.split(',') : null;
-    if (cells && cells.length >= 2) {
-      const ci = cells.findIndex((c, i) => i > 0 && /^\s*\d+(\.\d+)?\s*$/.test(c));
-      if (ci > 0) {
-        const name = cells.slice(0, ci).join(' ').trim(); const rest = cells.slice(ci + 1).map((c) => c.trim()).filter(Boolean);
-        if (/^(item|name|dish)s?$/i.test(name)) return; // header row
-        if (name) out.push({ name: name.slice(0, 40), price: Number(cells[ci]), cat: (rest[0] || cat || 'General').slice(0, 24) });
-        return;
-      }
-    }
-    const m = line.match(/^(.*?)[\s.·:\-–]+(\d{1,5}(?:\.\d{1,2})?)\s*\/?-?\s*$/);
-    if (m && m[1].trim().length > 1) { out.push({ name: m[1].replace(/[.·:\-–]+$/, '').trim().slice(0, 40), price: Number(m[2]), cat: cat || 'General' }); return; }
-    const head = line.trim();
-    if (head.length <= 24 && !/\d/.test(head)) cat = head.replace(/[:\-–]+$/, '').trim();
-  });
-  return out.filter((r) => r.name && r.price >= 0);
-}
-function addImportedMenu(rows) {
-  const d = App.setup.d; const keep = filled(d.menu);
-  const fresh = rows.filter((r) => !keep.some((k) => k.name.toLowerCase() === r.name.toLowerCase()));
-  d.menu = keep.concat(fresh);
-  render(); toast(fresh.length ? `${pl(fresh.length, 'item')} added — check names, prices and categories` : 'No new items found. One item per line, like "Masala Dosa, 60".');
-}
-Object.assign(Actions, {
-  menuImport(el) {
-    keepSetupFields(el.closest('form'));
-    const box = $('#menu-import'); if (box) { box.hidden = !box.hidden; return; }
-  },
-  menuImportRead(el) { const t = $('#menu-import-text'); keepSetupFields(el.closest('form')); addImportedMenu(parseMenuText(t ? t.value : '')); },
-  menuImportFile() { $('#menu-import-file')?.click(); },
-  menuImportPhoto() { $('#menu-import-photo')?.click(); },
-});
-Changes.menuImportFile = (el) => {
-  const f = el.files[0]; el.value = ''; if (!f) return;
-  if (/\.xlsx?$/i.test(f.name)) return toast('Please save the sheet as CSV (File → Download → CSV), or copy the cells and paste them here.');
-  const r = new FileReader(); r.onload = () => { keepSetupFields(el.closest('form')); addImportedMenu(parseMenuText(r.result)); }; r.readAsText(f);
-};
-Changes.menuImportPhoto = async (el) => {
-  const f = el.files[0]; el.value = ''; if (!f) return;
-  const st = $('#menu-import-status'); if (st) st.textContent = 'Reading the menu photo… (the first time, the reader downloads about 7 MB)';
-  try {
-    const worker = await ocrWorker((m) => { if (st && m.status === 'recognizing text') st.textContent = `Reading the photo… ${Math.round(m.progress * 100)}%`; });
-    const { data } = await worker.recognize(await downscale(f));
-    const t = $('#menu-import-text'); if (t) t.value = (data.text || '').trim();
-    if (st) st.textContent = 'Text read from the photo — check it, fix any mistakes, then tap “Add these items”.';
-  } catch (e) { if (st) st.textContent = `Couldn't read the photo here (${e.message}). Type or paste the menu instead.`; }
-};
-const menuImportHtml = () => `<div class="btn-row">${btn('Import from Excel or a photo', 'menuImport', { cls: 'ghost sm', ic: 'upload' })}</div>
-  <div id="menu-import" class="imp-panel" hidden>
-    <label class="field"><span>Paste your menu <em>(copy cells from Excel / Google Sheets, or type one item per line: “Masala Dosa, 60, Tiffin”)</em></span>
-      <textarea id="menu-import-text" rows="6" placeholder="TIFFIN&#10;Idli Vada, 50&#10;Masala Dosa, 60&#10;BEVERAGES&#10;Filter Coffee, 25"></textarea></label>
-    <div class="btn-row tight">${btn('Add these items', 'menuImportRead', { cls: 'primary sm', ic: 'check' })}${btn('Choose CSV file', 'menuImportFile', { cls: 'ghost sm', ic: 'upload' })}${btn('From a photo of the menu', 'menuImportPhoto', { cls: 'ghost sm', ic: 'camera' })}</div>
-    <input type="file" id="menu-import-file" accept=".csv,text/csv,text/plain" hidden data-change="menuImportFile">
-    <input type="file" id="menu-import-photo" accept="image/*" hidden data-change="menuImportPhoto">
-    <p class="muted sm" id="menu-import-status">Lines without a price become category headings. You can check and edit every row before saving.</p>
-  </div>`;
+/* ---------------- menu import: see menuimport.js (Excel / CSV / paste / photo, with a check-first review) ---------------- */
+Actions.menuImport = (el) => { keepSetupFields(el.closest('form')); Actions.menuImpOpen({ dataset: { target: 'setup' } }); };
+const menuImportHtml = () => `<div class="btn-row">${btn('Import from Excel, CSV or a photo', 'menuImport', { cls: 'ghost sm', ic: 'upload' })}${btn('Blank Excel template', 'menuImpTemplate', { cls: 'ghost sm', ic: 'download' })}</div>`;
 
 /* ---------------- dashboard: "Your setup" summary (new cafés) / invitation (older cafés) ---------------- */
 const seenKey = () => `cj.setupSeen.${(typeof Cloud !== 'undefined' && Cloud.cid) || 'local'}`;

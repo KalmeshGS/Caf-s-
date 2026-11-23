@@ -85,13 +85,13 @@ service cloud.firestore {
 
       // ---------- café data, by role ----------
       match /meta/settings { allow read: if ok(cid); allow write: if owner(cid); }
-      match /meta/seq { allow read: if ok(cid); allow write: if can(cid, ['owner', 'manager', 'cashier', 'waiter']); }
+      match /meta/seq { allow read: if ok(cid); allow write: if can(cid, ['owner', 'manager', 'cashier', 'waiter', 'captain']); }
 
       match /menu/{id}       { allow read: if ok(cid); allow write: if can(cid, ['owner', 'manager', 'kitchen']); }
       // Bills. Floor staff open and edit them; only cashier / manager / owner take payment;
       // once paid, a bill can be changed or deleted by the owner only.
       match /orders/{id} {
-        function floor() { return can(cid, ['owner', 'manager', 'cashier', 'waiter']); }
+        function floor() { return can(cid, ['owner', 'manager', 'cashier', 'waiter', 'captain']); }
         function isNum(v) { return v is int || v is float; }
         // The payment fields must be sane: discount within the subtotal, total = subtotal - discount + tax
         function validPayment(d) {
@@ -117,20 +117,23 @@ service cloud.firestore {
       // starts cooking, and mark ready food as served. Only the kitchen and the owner start cooking / mark ready.
       match /kots/{id} {
         allow read: if ok(cid);
-        allow create: if can(cid, ['owner', 'manager', 'cashier', 'waiter']) && request.resource.data.status == 'new';
-        allow update: if can(cid, ['owner', 'kitchen'])
+        allow create: if can(cid, ['owner', 'manager', 'cashier', 'waiter', 'captain']) && request.resource.data.status == 'new';
+        allow update: if can(cid, ['owner', 'kitchen', 'captain'])
           // while the kitchen hasn't started, floor staff may change the ticket (items, quantities, instructions)
           || (can(cid, ['manager', 'cashier', 'waiter']) && resource.data.status == 'new' && request.resource.data.status == 'new')
           || (can(cid, ['manager', 'cashier', 'waiter']) && resource.data.status == 'ready'
               && request.resource.data.status == 'served' && onlyKeys(['status', 'updatedAt', 'stockDone']));
-        allow delete: if can(cid, ['owner', 'kitchen'])
+        allow delete: if can(cid, ['owner', 'kitchen', 'captain'])
           || (can(cid, ['manager', 'cashier', 'waiter']) && resource.data.status == 'new');
       }
       match /stock/{id} {
-        allow read: if can(cid, ['owner', 'manager', 'kitchen']);
-        allow write: if can(cid, ['owner', 'manager']);
-        // anyone serving food may only take ingredients OFF the stock (never add)
-        allow update: if can(cid, ['cashier', 'waiter', 'kitchen']) && onlyKeys(['qty']) && request.resource.data.qty < resource.data.qty;
+        allow read: if can(cid, ['owner', 'manager', 'kitchen', 'captain']);
+        // stock can never be negative
+        allow create, update: if can(cid, ['owner', 'manager']) && request.resource.data.qty is number && request.resource.data.qty >= 0;
+        allow delete: if can(cid, ['owner', 'manager']);
+        // anyone serving food may only take ingredients OFF the stock (never add, never below 0)
+        allow update: if can(cid, ['cashier', 'waiter', 'kitchen', 'captain']) && onlyKeys(['qty'])
+          && request.resource.data.qty < resource.data.qty && request.resource.data.qty >= 0;
       }
       match /expenses/{id}   { allow read: if can(cid, ['owner', 'manager', 'cashier']); allow write: if can(cid, ['owner', 'manager']); }
       match /vendors/{id}    { allow read, write: if can(cid, ['owner', 'manager']); }
@@ -139,9 +142,15 @@ service cloud.firestore {
       match /staffPrivate/{id} { allow read, write: if owner(cid); }   // salary, KYC, address, DOB…
       match /attendance/{day} { allow read: if can(cid, ['owner', 'manager', 'cashier']); allow write: if can(cid, ['owner', 'manager']); }
       match /journal/{day}   { allow read, write: if can(cid, ['owner', 'manager', 'cashier']); }
-      match /tables/{table}  { allow read: if ok(cid); allow write: if can(cid, ['owner', 'manager', 'cashier', 'waiter']); }
+      match /tables/{table}  {
+        allow read: if ok(cid);
+        allow write: if can(cid, ['owner', 'manager', 'cashier', 'waiter', 'captain']);
+        // housekeeping: mark a table "Needs cleaning" or cleaned (removes the status) — nothing else
+        allow create, update: if can(cid, ['housekeeping']) && request.resource.data.status == 'cleaning';
+        allow delete: if can(cid, ['housekeeping']) && resource.data.status == 'cleaning';
+      }
       match /notices/{id}    { allow read: if ok(cid); allow write: if can(cid, ['owner', 'manager']); }
-      match /reservations/{id} { allow read, write: if can(cid, ['owner', 'manager', 'cashier', 'waiter']); }
+      match /reservations/{id} { allow read: if can(cid, ['owner', 'manager', 'cashier', 'waiter', 'captain', 'housekeeping']); allow write: if can(cid, ['owner', 'manager', 'cashier', 'waiter', 'captain']); }
     }
 
     // Which café an owner belongs to (so owners can log in with just email + password)

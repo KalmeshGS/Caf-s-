@@ -16,9 +16,11 @@ function chatSheet() {
   return `${sheetHead('AI help', 'Ask anything')}
   <div class="chat" id="chat-log" aria-live="polite">${chatBody()}</div>
   <form data-form="aiAsk" class="chat-form">
+    <button type="button" class="icon-btn" data-act="menuImpOpen" aria-label="Add a menu photo or file" title="Add a menu photo or file (Excel, CSV)">${icon('upload')}</button>
     <input name="q" maxlength="800" autocomplete="off" placeholder="Type your question…" aria-label="Your question" required>
     <button class="btn primary" type="submit" aria-label="Send">${icon('send')}</button>
   </form>
+  <p class="muted sm">${icon('upload')} Got a menu as a photo, Excel or CSV? Tap the upload button — it's read on this phone, you check it, then add it to Menu or download a Cafe Journal menu file.</p>
   <p class="fine">Free AI — answers can be wrong; check important things. Don't type passwords or customer details.</p>`;
 }
 const msgsHtml = () => App.chat.map((m) => `<div class="msg ${m.role === 'user' ? 'me' : 'ai'}${m.err ? ' err' : ''}${m.pending ? ' pending' : ''}">${esc(m.content).replace(/\n/g, '<br>')}</div>`).join('');
@@ -47,6 +49,7 @@ function homeHero() {
     <form data-form="aiAsk" class="home-box">
       <textarea id="home-q" name="q" rows="2" maxlength="800" placeholder="How can I help you today?" aria-label="Ask the AI"></textarea>
       <div class="home-box-bar">
+        <button type="button" class="btn ghost sm" data-act="menuImpOpen" title="Read a menu photo, Excel or CSV file">${icon('upload')}<span>Menu photo / file</span></button>
         <span class="muted sm">Free AI · ask about the app, recipes, prices…</span>
         <button class="btn primary home-send" type="submit" aria-label="Send">${icon('send')}</button>
       </div>

@@ -950,3 +950,37 @@ h1, .page-head h1, .onb h2, .center-screen h2, .sheet-head h2, .ticket h2, .home
 .onb .form-actions { flex-wrap: wrap; }
 .onb .form-actions .btn-row { flex-wrap: wrap; justify-content: flex-end; }
 @media (max-width: 480px) { .onb .form-actions .btn-row { width: 100%; } .onb .form-actions .btn-row .btn { flex: 1; } }
+
+/* ---------- menu import review (menuimport.js) ---------- */
+.mi-pick { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 8px; }
+.mi-pick label.btn { cursor: pointer; }
+#mi-paste { display: grid; gap: 8px; margin-bottom: 8px; }
+#mi-paste textarea { width: 100%; }
+.mi-head, .mi-row { display: grid; grid-template-columns: 22px minmax(0, 1.6fr) minmax(0, 1.2fr) 86px; gap: 6px; align-items: center; }
+.mi-head { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); padding: 0 8px; }
+.mi-head span:last-child { display: none; }
+.mi-list { display: grid; gap: 6px; max-height: 52vh; overflow: auto; padding-right: 2px; margin-bottom: 10px; }
+.mi-row { padding: 6px 8px; border-radius: 10px; background: var(--surface); border: 1px solid var(--line); }
+.mi-row input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); }
+.mi-row input:not([type=checkbox]) { min-height: 36px; padding: 5px 8px; font-size: 14px; min-width: 0; }
+.mi-row small { grid-column: 2 / -1; }
+.mi-row small:empty { display: none; }
+@media (max-width: 560px) { .mi-head { display: none; } .mi-row { grid-template-columns: 22px 1fr 80px; } .mi-row .mi-cat { grid-column: 2 / 3; grid-row: 2; } }
+
+/* ---------- bill sized for the printer (core.js printOn) ---------- */
+@media print {
+  #print.p58 .receipt { width: 48mm; font-size: 10.5px; }
+  #print.p58 .receipt h2 { font-size: 13px; }
+  #print.p80 .receipt { width: 72mm; font-size: 12px; }
+  #print.pa4 .receipt { width: 170mm; font: 14px/1.5 system-ui, Arial, sans-serif; }
+  #print.pa4 .receipt h2 { font-size: 22px; }
+  #print.pa4 .receipt .r { padding: 2px 0; }
+  #print.pa4 .receipt .r.b { font-size: 18px; }
+}
+
+/* ---------- table cleaning ---------- */
+.table-tile { position: relative; }
+.tt-clean { margin: 6px 8px 8px; padding: 6px 10px; border-radius: 999px; border: 0; background: var(--ok); color: #fff; font: 600 12.5px/1.2 inherit; display: inline-flex; gap: 4px; align-items: center; cursor: pointer; }
+.tt-clean svg { width: 14px; height: 14px; }
+.clean-row { padding: 10px 0; gap: 10px; }
+.clean-row b { font-size: 17px; }

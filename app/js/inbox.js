@@ -33,13 +33,13 @@ function notifications() {
 
   // Food ready to serve
   S.kots.filter((k) => (k.status === 'ready' || (k.status === 'served' && now - k.updatedAt < day))
-    && (role === 'waiter' ? k.byId === me.id : ['owner', 'manager', 'cashier'].includes(role))).forEach((k) => out.push({
+    && (role === 'waiter' ? k.byId === me.id : ['owner', 'manager', 'cashier', 'captain'].includes(role))).forEach((k) => out.push({
     id: `ready:${k.id}`, type: 'ready', ic: 'check', at: k.updatedAt, link: '#/orders',
     title: k.status === 'ready' ? `Food ready to serve · ${tableTxt(k)}` : `Served · ${tableTxt(k)}`, body: itemsTxt(k), done: k.status === 'served',
   }));
 
   // Kitchen: new & changed tickets
-  if (role === 'kitchen' || role === 'owner') {
+  if (role === 'kitchen' || role === 'owner' || role === 'captain') {
     S.kots.filter((k) => k.status === 'new').forEach((k) => out.push({
       id: `kot:${k.id}:${k.changedAt || k.createdAt}`, type: 'kitchen', ic: 'flame', at: k.changedAt || k.createdAt, link: '#/kitchen',
       title: `${k.changedAt ? 'Order changed' : 'New order'} · ${tableTxt(k)}`, body: itemsTxt(k),
@@ -47,7 +47,7 @@ function notifications() {
   }
 
   // Reservations in the next 90 minutes
-  if (role !== 'kitchen') {
+  if (role !== 'kitchen' && role !== 'housekeeping') {
     (S.reservations || []).filter((r) => r.status === 'booked' && r.date === dayKey() && resWhen(r) - now < 90 * 60000 && resWhen(r) - now > -30 * 60000).forEach((r) => out.push({
       id: `res:${r.id}`, type: 'res', ic: 'clock', at: Math.min(now, resWhen(r) - 90 * 60000), link: '#/orders?tab=res',
       title: `Reservation at ${hm(r.time)} · ${r.name}`, body: `${pl(Number(r.guests) || 0, 'guest')} · ${r.table ? tableTitle(r.table) : 'any table'}${r.note ? ` · ${r.note}` : ''}`,
@@ -55,10 +55,18 @@ function notifications() {
   }
 
   // Low stock
-  if (role === 'owner' || role === 'manager') {
+  if (LOW_STOCK_ROLES.includes(role)) {
     S.stock.filter(isLow).forEach((s) => out.push({
       id: `low:${s.id}:${s.qty}`, type: 'stock', ic: 'alert', at: now - 60000, link: '#/stock',
       title: `Running low · ${s.name}`, body: `${+Number(s.qty).toFixed(2)} ${s.unit} left (alert below ${s.low} ${s.unit})`,
+    }));
+  }
+
+  // Tables waiting to be cleaned
+  if (CLEANING_ROLES.includes(role)) {
+    Object.entries(S.tableState || {}).filter(([, s]) => s && s.status === 'cleaning').forEach(([t, s]) => out.push({
+      id: `clean:${t}:${s.at}`, type: 'clean', ic: 'alert', at: s.at || now, link: '#/orders',
+      title: `Clean ${tableTitle(t)}`, body: `${s.note || 'Needs cleaning'}${s.by ? ` · ${s.by}` : ''}`,
     }));
   }
 
@@ -94,7 +102,7 @@ function noticeForm() {
   return `${sheetHead('Notifications', 'Post a notice')}
   <form data-form="notice" class="form">
     <label class="field"><span>Message</span><textarea name="text" rows="4" maxlength="500" required placeholder="e.g. Staff meeting at 4 PM today. Paneer is out of stock — don't take orders for it."></textarea></label>
-    <label class="field"><span>Who should read it</span><select name="to"><option value="all">Everyone</option>${['manager', 'cashier', 'waiter', 'kitchen'].map((r) => `<option value="${r}">${ROLES[r].label}s only</option>`).join('')}</select></label>
+    <label class="field"><span>Who should read it</span><select name="to"><option value="all">Everyone</option>${['manager', 'cashier', 'captain', 'waiter', 'kitchen', 'housekeeping'].map((r) => `<option value="${r}">${ROLES[r].label}s only</option>`).join('')}</select></label>
     <p class="neg sm" id="form-err" role="alert"></p>
     <div class="form-actions"><span></span><button class="btn primary" type="submit">${icon('send')}<span>Post notice</span></button></div>
   </form>`;
@@ -120,6 +128,48 @@ Object.assign(Forms, {
     closeSheet(); save(); toast('Notice posted');
   },
 });
+
+/** Phone / desktop notification (+ beep, vibrate and an on-screen message) */
+function phoneAlert(title, body, tag) {
+  beep(); setTimeout(beep, 600);
+  try { if (navigator.vibrate && navigator.userActivation?.hasBeenActive !== false) navigator.vibrate([200, 100, 200]); } catch (e) { /* ignore */ }
+  toast(`${title}${body ? ' — ' + body : ''}`);
+  if ('Notification' in window && Notification.permission === 'granted') {
+    const opts = { body, tag, renotify: true, icon: 'icons/icon-192.png', badge: 'icons/icon-192.png', vibrate: [200, 100, 200] };
+    (navigator.serviceWorker ? navigator.serviceWorker.getRegistration() : Promise.resolve(null))
+      .then((reg) => (reg ? reg.showNotification(title, opts) : new Notification(title, opts))).catch(() => { try { new Notification(title, opts); } catch (e) { /* ignore */ } });
+  }
+}
+
+/* ---------------- low stock: alert the moment an item drops to / below its "alert below" level ---------------- */
+const LOW_STOCK_ROLES = ['owner', 'manager', 'kitchen', 'captain'];
+function checkLowStock() {
+  const me = Session.user(); if (!me || !LOW_STOCK_ROLES.includes(me.role)) { App.lowSeen = null; return; }
+  const low = (S.stock || []).filter(isLow);
+  const prev = App.lowSeen;
+  App.lowSeen = new Set(low.map((s) => s.id));
+  const line = (s) => `${s.name}: ${+Number(s.qty).toFixed(2)} ${s.unit} left${Number(s.qty) <= 0 ? ' (OUT)' : ''}`;
+  if (!prev) { // just logged in: one summary
+    if (low.length) setTimeout(() => toast(`${pl(low.length, 'stock item')} running low — see Stock or 🔔`), 1500);
+    return;
+  }
+  const fresh = low.filter((s) => !prev.has(s.id));
+  if (!fresh.length) return;
+  phoneAlert(fresh.length === 1 ? `Running low · ${fresh[0].name}` : `${fresh.length} items running low`, fresh.map(line).join(' · '), 'low-stock');
+}
+
+/* ---------------- tables waiting to be cleaned: alert the people who clean / manage the floor ---------------- */
+const CLEANING_ROLES = ['owner', 'manager', 'waiter', 'captain', 'housekeeping'];
+function checkCleaning() {
+  const me = Session.user(); if (!me || !CLEANING_ROLES.includes(me.role)) { App.cleanSeen = null; return; }
+  const dirty = Object.entries(S.tableState || {}).filter(([, t]) => t && t.status === 'cleaning').map(([name]) => name);
+  const prev = App.cleanSeen;
+  App.cleanSeen = new Set(dirty);
+  if (!prev) { if (dirty.length) setTimeout(() => toast(`${pl(dirty.length, 'table')} waiting to be cleaned: ${dirty.join(', ')}`), 1800); return; }
+  const fresh = dirty.filter((t) => !prev.has(t));
+  const notes = fresh.map((t) => S.tableState[t]?.note).filter(Boolean);
+  if (fresh.length) phoneAlert(`Clean ${fresh.length === 1 ? 'table' : 'tables'} ${fresh.join(', ')}`, `${notes.length ? notes.join(' · ') + ' — ' : ''}tap “Cleaned” when done.`, 'cleaning');
+}
 
 /** Pop up new notices that arrive while the app is open (once each) */
 function checkNotices() {

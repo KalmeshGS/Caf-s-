@@ -240,6 +240,7 @@ Views.billing = (p) => {
         ${Object.entries(pm).map(([k, m]) => `<div class="meter-row"><span>${esc(m.label)}</span>${meter(total ? (bm[k] / total) * 100 : 0, m.color)}<b>${money(bm[k])}</b></div>`).join('')}
         <p class="muted sm">${pl(paid.length, 'bill')} paid today${closing ? ` · closed at ${fmtTime(closing.at)}` : ''}</p>
         ${btn(closing ? 'Update day closing' : 'Close day & save to journal', 'closeDay', { cls: 'ghost block', ic: 'book' })}
+        ${canReport() ? btn('Download daily report (PDF / Word / Excel)', 'reportOpen', { cls: 'ghost block', ic: 'download' }) : ''}
       </section>
       <section class="card">${eyebrow('Paid today')}
         <div class="list compact">${paid.length ? paid.slice(0, 12).map((o) => `<button class="list-btn" data-act="selectBill" data-id="${o.id}">
@@ -381,7 +382,7 @@ Views.reports = () => {
   const bm = byMethod(paid), pm = payMethods();
   const best = daily.indexOf(Math.max(...daily));
 
-  return `${pageHead(`Report · ${monthLabel(mk)}`, 'Month at a glance', `<button class="btn ghost" data-act="exportCsv">${icon('download')}<span>CSV</span></button>`)}
+  return `${pageHead(`Report · ${monthLabel(mk)}`, 'Month at a glance', `<div class="btn-row tight">${btn('Daily report', 'reportOpen', { cls: 'ghost', ic: 'download' })}<button class="btn ghost" data-act="exportCsv">${icon('download')}<span>CSV</span></button></div>`)}
   ${monthNav(mk)}
   <div class="kpis">
     ${kpi('Sales', money(sales), `${pl(paid.length, 'bill')}`)}
@@ -416,7 +417,7 @@ Views.journal = () => {
   const recent = Object.entries(S.journal).filter(([k, v]) => k !== dk && (v.note || v.tags?.length || v.closing)).sort((a, b) => b[0].localeCompare(a[0])).slice(0, 10);
   const c = e.closing;
   const pm = payMethods();
-  return `${pageHead('Journal', 'Daybook', '')}
+  return `${pageHead('Journal', 'Daybook', canReport() ? btn('Daily report', 'reportOpen', { cls: 'ghost', ic: 'download' }) : '')}
   <div class="stepper">
     <button class="icon-btn" data-act="dayNav" data-d="-1" aria-label="Previous day">${icon('left')}</button>
     <span>${dk === dayKey() ? 'Today · ' : ''}${fmtDate(keyToDate(dk), { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}</span>
@@ -503,7 +504,7 @@ function setupCards() {
 Views.menu = () => {
   const cats = [...new Set(S.menu.map((m) => m.cat))];
   const noRecipe = S.menu.filter((m) => !(m.recipe && m.recipe.length)).length;
-  return `${pageHead('Menu & recipes', 'Menu', `<div class="btn-row tight">${noRecipe && S.stock.length ? btn('Fill all from recipe library', 'fillRecipes', { cls: 'ghost sm' }) : ''}${btn('Menu item', 'menuAdd', { cls: 'primary', ic: 'plus' })}</div>`)}
+  return `${pageHead('Menu & recipes', 'Menu', `<div class="btn-row tight">${noRecipe && S.stock.length ? btn('Fill all from recipe library', 'fillRecipes', { cls: 'ghost sm' }) : ''}${btn('Import menu', 'menuImpOpen', { cls: 'ghost sm', ic: 'upload' })}${btn('Menu item', 'menuAdd', { cls: 'primary', ic: 'plus' })}</div>`)}
     <p class="muted sm">${pl(S.menu.length, 'item')} · ${pl(cats.length, 'category', 'categories')}. Set the ingredients of each dish once — stock then goes down automatically every time it is served.</p>
     ${!S.stock.length ? `<div class="banner info">${icon('box')}<span>Add your stock items first (milk, sugar, tea powder…) so dishes can use them.</span>${can('stock') ? `<a class="btn primary sm" href="#/stock">Go to Stock</a>` : ''}</div>` : ''}
     ${noRecipe && S.stock.length ? `<div class="banner info">${icon('box')}<span>${pl(noRecipe, 'item')} ${noRecipe === 1 ? 'has' : 'have'} no ingredients yet, so stock won't reduce when ${noRecipe === 1 ? 'it is' : 'they are'} served. Tap an item to add them, or "Fill all from recipe library" (280+ common dishes built in).</span></div>` : ''}

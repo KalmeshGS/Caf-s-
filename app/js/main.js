@@ -206,7 +206,7 @@ const Actions = {
     const raw = $('form.bill input[name=discount]')?.value;
     const derr = discountError(raw, orderSubtotal(o)); if (derr) return formError(derr);
     const disc = num(raw);
-    $('#print').innerHTML = receiptHtml(o, orderTotals(o, disc)); window.print();
+    printBill(receiptHtml(o, orderTotals(o, disc)));
   },
   payPrint(el) { App.printAfterPay = true; el.closest('form').requestSubmit(); },
   async enableAlerts() {
@@ -218,7 +218,7 @@ const Actions = {
   },
   printReceipt(el) {
     const o = byId(S.orders, el.dataset.id); if (!o) return;
-    $('#print').innerHTML = receiptHtml(o); window.print();
+    printBill(receiptHtml(o));
   },
   closeDay() {
     const dk = dayKey(), paid = paidOn(dk), bm = byMethod(paid);
@@ -350,11 +350,21 @@ const Forms = {
     const t = orderTotals(o, num(fd.get('discount')));
     Object.assign(o, { status: 'paid', paidAt: Date.now(), method: fd.get('method') || 'cash', subtotal: t.sub, discount: t.discount, tax: t.tax, total: t.total });
     S.kots.forEach((k) => { if (k.orderId === o.id && k.status === 'ready') { k.status = 'served'; k.updatedAt = Date.now(); useStockFor(k); } });
+    // Guests have paid and will leave: the table needs cleaning (alerts housekeeping, captain, waiters…)
+    if (o.table && o.table !== 'Takeaway' && tableNames().includes(o.table) && !openOrders().some((x) => x.table === o.table && x !== o)) {
+      S.tableState = S.tableState || {};
+      if (S.tableState[o.table]?.status !== 'blocked') S.tableState[o.table] = { status: 'cleaning', note: 'Bill paid — guests leaving', by: 'Auto (bill paid)', at: Date.now() };
+    }
     save(); toast(`Paid ${money(t.total)} ✓`);
-    if (App.printAfterPay) { App.printAfterPay = false; $('#print').innerHTML = receiptHtml(o); setTimeout(() => window.print(), 50); }
+    if (App.printAfterPay) { App.printAfterPay = false; setTimeout(() => printBill(receiptHtml(o)), 50); }
   },
   stockItem(fd) {
     const d = { name: fd.get('name').trim(), qty: num(fd.get('qty')), unit: fd.get('unit'), max: num(fd.get('max')), low: num(fd.get('low')), step: num(fd.get('step')) || 1 };
+    if (!d.name) return formError('Please type the stock item name.');
+    for (const [v, what] of [[d.qty, 'In stock'], [d.low, 'Alert below'], [d.max, 'Full stock']]) {
+      if (!Number.isFinite(v) || v < 0) return formError(`${what} can’t be negative.`);
+      if (v > MAX_AMOUNT) return formError(`${what} looks too high — check for an extra zero.`);
+    }
     const s = byId(S.stock, fd.get('id'));
     if (s) Object.assign(s, d); else S.stock.push({ id: uid('s'), ...d });
     closeSheet(); save();

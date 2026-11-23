@@ -249,7 +249,7 @@ Object.assign(Actions, {
   },
   printId(el) {
     const p = byId(S.staff, el.dataset.id); if (!p) return;
-    $('#print').innerHTML = idCardHtml(p); window.print();
+    $('#print').className = ''; $('#print-page')?.remove(); $('#print').innerHTML = idCardHtml(p); window.print();
   },
 });
 

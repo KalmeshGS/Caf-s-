@@ -12,7 +12,7 @@
    ========================================================= */
 
 App.loginFails = {}; // rate-limit for unknown login names (memory only)
-const ROLE_ORDER = ['owner', 'manager', 'cashier', 'waiter', 'kitchen'];
+const ROLE_ORDER = ['owner', 'manager', 'cashier', 'captain', 'waiter', 'kitchen', 'housekeeping'];
 const PW_MIN = 8;
 const WARN_AFTER = 3;
 const LOCK_AFTER = 4;

@@ -234,7 +234,8 @@ function stockUse(k) {
 }
 /** Offline: change S directly. (Online mode replaces this with safe server-side decrements.) */
 let applyStockUse = (use) => {
-  Object.entries(use).forEach(([id, q]) => { const s = byId(S.stock, id); if (s) s.qty = r6(Number(s.qty) - q); });
+  Object.entries(use).forEach(([id, q]) => { const s = byId(S.stock, id); if (s) s.qty = Math.max(0, r6(Number(s.qty) - q)); }); // never below 0
+  checkLowStock();
 };
 /** Call when a ticket becomes Served — once per ticket */
 function useStockFor(k) {

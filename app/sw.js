@@ -1,6 +1,6 @@
 /* Cafe Journal service worker — makes the app work offline */
-const CACHE = 'cafe-journal-v31';
-const ASSETS = ['./', 'index.html', 'app.css', 'js/core.js', 'js/businessProfile.config.js', 'js/profile.js', 'js/data.js', 'js/views.js', 'js/main.js', 'js/staff.js', 'js/onboarding.js', 'js/bizsetup.js', 'js/auth.js', 'js/tables.js', 'js/recipes.js', 'js/import.js', 'js/library.js', 'js/ai-config.js', 'js/assistant.js', 'js/inbox.js', 'vendor/firebase.js', 'js/firebase-config.js', 'js/cloud.js',
+const CACHE = 'cafe-journal-v33';
+const ASSETS = ['./', 'index.html', 'app.css', 'js/core.js', 'js/businessProfile.config.js', 'js/profile.js', 'js/data.js', 'js/views.js', 'js/main.js', 'js/staff.js', 'js/onboarding.js', 'js/bizsetup.js', 'js/auth.js', 'js/tables.js', 'js/recipes.js', 'js/import.js', 'js/files.js', 'js/menuimport.js', 'js/report.js', 'js/library.js', 'js/ai-config.js', 'js/assistant.js', 'js/inbox.js', 'vendor/firebase.js', 'js/firebase-config.js', 'js/cloud.js',
   'manifest.webmanifest', '../assets/fonts/marcellus-400.woff2', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/maskable-512.png'];
 
 // Cache each file on its own: one missing or slow file must not stop the whole app from installing

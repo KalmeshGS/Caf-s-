@@ -23,16 +23,17 @@ const Cloud = {
   cafeCode: '', cafeName: '',
 };
 
-const ALL_ROLES = ['owner', 'manager', 'cashier', 'waiter', 'kitchen'];
+const ALL_ROLES = ['owner', 'manager', 'cashier', 'waiter', 'kitchen', 'captain', 'housekeeping'];
+const FLOOR_ROLES = ['owner', 'manager', 'cashier', 'waiter', 'captain'];
 const PRIVATE_STAFF = ['salary', 'dob', 'email', 'address', 'emergencyName', 'emergencyPhone', 'idType', 'idNumber', 'pan'];
 const WINDOW_DAYS = 62;
 const SPEC = [
   { key: 'settings', kind: 'doc', path: ['meta', 'settings'], read: ALL_ROLES, write: ['owner'] },
-  { key: 'seq', kind: 'doc', path: ['meta', 'seq'], read: ALL_ROLES, write: ['owner', 'manager', 'cashier', 'waiter'] },
+  { key: 'seq', kind: 'doc', path: ['meta', 'seq'], read: ALL_ROLES, write: FLOOR_ROLES },
   { key: 'menu', kind: 'items', coll: 'menu', read: ALL_ROLES, write: ['owner', 'manager', 'kitchen'] },
-  { key: 'orders', kind: 'items', coll: 'orders', read: ALL_ROLES, write: ['owner', 'manager', 'cashier', 'waiter'], since: { field: 'createdAt', days: WINDOW_DAYS, num: true } },
+  { key: 'orders', kind: 'items', coll: 'orders', read: ALL_ROLES, write: FLOOR_ROLES, since: { field: 'createdAt', days: WINDOW_DAYS, num: true } },
   { key: 'kots', kind: 'items', coll: 'kots', read: ALL_ROLES, write: ALL_ROLES, since: { field: 'updatedAt', days: 2, num: true } }, // finer limits in firestore.rules
-  { key: 'stock', kind: 'items', coll: 'stock', read: ['owner', 'manager', 'kitchen'], write: ['owner', 'manager'] },
+  { key: 'stock', kind: 'items', coll: 'stock', read: ['owner', 'manager', 'kitchen', 'captain'], write: ['owner', 'manager'] },
   { key: 'expenses', kind: 'items', coll: 'expenses', read: ['owner', 'manager', 'cashier'], write: ['owner', 'manager'], since: { field: 'date', days: WINDOW_DAYS } },
   { key: 'vendors', kind: 'items', coll: 'vendors', read: ['owner', 'manager'], write: ['owner', 'manager'] },
   { key: 'vendorTx', kind: 'items', coll: 'vendorTx', read: ['owner', 'manager'], write: ['owner', 'manager'], since: { field: 'date', days: 120 } },
@@ -40,9 +41,9 @@ const SPEC = [
   { key: 'attendance', kind: 'map', coll: 'attendance', read: ['owner', 'manager', 'cashier'], write: ['owner', 'manager'], days: WINDOW_DAYS },
   { key: 'journal', kind: 'map', coll: 'journal', read: ['owner', 'manager', 'cashier'], write: ['owner', 'manager', 'cashier'], days: WINDOW_DAYS },
   { key: 'requests', kind: 'items', coll: 'requests', read: ['owner'], write: ['owner'], where: ['status', '==', 'open'] },
-  { key: 'tableState', kind: 'map', coll: 'tables', read: ALL_ROLES, write: ['owner', 'manager', 'cashier', 'waiter'] },
+  { key: 'tableState', kind: 'map', coll: 'tables', read: ALL_ROLES, write: [...FLOOR_ROLES, 'housekeeping'] },
   { key: 'notices', kind: 'items', coll: 'notices', read: ALL_ROLES, write: ['owner', 'manager'], since: { field: 'at', days: 30, num: true } },
-  { key: 'reservations', kind: 'items', coll: 'reservations', read: ['owner', 'manager', 'cashier', 'waiter'], write: ['owner', 'manager', 'cashier', 'waiter'], since: { field: 'date', days: 7 } },
+  { key: 'reservations', kind: 'items', coll: 'reservations', read: [...FLOOR_ROLES, 'housekeeping'], write: FLOOR_ROLES, since: { field: 'date', days: 7 } },
 ];
 const NEW_RULE_KEYS = ['tableState', 'reservations', 'notices']; // need the v3.3 security rules
 
@@ -275,7 +276,7 @@ function rebuildUsers() {
 }
 Cloud.changed = () => {
   if (!Cloud.attached) return;
-  if (Session.user()) { checkReady(); checkNotices(); }
+  if (Session.user()) { checkReady(); checkNotices(); checkLowStock(); checkCleaning(); }
   const busyTyping = document.activeElement && document.activeElement.matches('input, textarea, select');
   if (!$('#sheet').hidden || busyTyping) { Cloud.pending = true; return; }
   render();
@@ -301,6 +302,10 @@ async function attach(cid, user, restoring) {
   const ms = await FB.getDoc(cref('members', user.uid));
   const m = ms.exists() ? ms.data() : null;
   if (!m || m.active !== true) { await Cloud.signOut(m ? 'This account has been disabled. Ask the owner.' : 'You no longer have access to this café.'); return; }
+  if (m.mustChange) { // e.g. a refresh while "Set your own password" was open: never skip the forced change
+    Cloud.loading = false; Cloud.pendingUser = { cid, user, member: m }; render();
+    return openSheet(changePwSheet({ id: user.uid, name: m.name, hash: 'online' }, 'first'));
+  }
   Cloud.me = { ...m, id: user.uid, hash: 'online' };
   if (!restoring || Session._id !== user.uid) Session.set(user.uid); // fresh login; a refresh keeps the lock state
   App.kotSeen = null;
@@ -326,6 +331,9 @@ async function attach(cid, user, restoring) {
   S.seq = Object.assign({ day: '', n: 0, emp: 0 }, S.seq);
   if (!S.settings.short) S.settings.short = shortCode(S.settings.name);
   Cloud.attached = true; Cloud.loading = false;
+  // Older versions let stock go below 0 — owners / managers put those back to 0 once
+  if (['owner', 'manager'].includes(role) && S.stock.some((s) => Number(s.qty) < 0)) { S.stock.forEach((s) => { if (Number(s.qty) < 0) s.qty = 0; }); persist(); }
+  App.lowSeen = null;
   try { localStorage.setItem('cj.cafe', cid); localStorage.setItem('cj.cafeName', S.settings.name); } catch (e) { /* ignore */ }
   Cloud.cafeCode = cid; Cloud.cafeName = S.settings.name;
   FB.updateDoc(cref('members', user.uid), { lastLogin: Date.now() }).catch(() => {});
@@ -573,9 +581,16 @@ async function cloudSignup(fd, form) {
 /* ---------------- overrides (only in online mode) ---------------- */
 function installOverrides() {
   // Stock goes down on the server with an atomic decrement (works for every role, never overwrites)
+  // Never below 0: the rules refuse a decrement that would go negative; then the item is set to 0 (sold out)
   applyStockUse = (use) => {
     Object.entries(use).forEach(([id, q]) => {
-      FB.updateDoc(cref('stock', id), { qty: FB.increment(-q) }).catch((e) => console.warn('stock update', e));
+      const local = byId(S.stock, id); // owner / manager / kitchen can see stock; others cannot
+      const goesNegative = local && Number(local.qty) - q < 0;
+      const write = goesNegative ? FB.updateDoc(cref('stock', id), { qty: 0 }) : FB.updateDoc(cref('stock', id), { qty: FB.increment(-q) });
+      write.catch((e) => {
+        if (e.code === 'permission-denied' && !goesNegative) return FB.updateDoc(cref('stock', id), { qty: 0 }).catch(() => {}); // not enough left → 0
+        console.warn('stock update', e);
+      });
     });
   };
   // Never write café data to the device
@@ -587,7 +602,11 @@ function installOverrides() {
   Session.set = function (id) { if (id) return baseSet(id); if (Cloud.me || Cloud.auth.currentUser) Cloud.signOut(); else baseSet(null); };
   // After a sheet closes, show changes that arrived from other devices meanwhile
   const origClose = closeSheet;
-  closeSheet = function () { origClose(); if (Cloud.pending) { Cloud.pending = false; setTimeout(render, 0); } };
+  closeSheet = function () {
+    // Closing "Set your own password" without saving: sign out, so nobody is left half-logged-in
+    if (Cloud.pendingUser && !Cloud.attached) { Cloud.pendingUser = null; Cloud.signOut(); return; }
+    origClose(); if (Cloud.pending) { Cloud.pending = false; setTimeout(render, 0); }
+  };
   Actions.closeSheet = closeSheet;
 
   const origMonthNav = Actions.monthNav;
@@ -708,7 +727,7 @@ function installOverrides() {
     async newPw(fd, form) {
       const pw = fd.get('pw1'), pw2 = fd.get('pw2'), mode = fd.get('mode');
       const user = mode === 'self' ? Cloud.auth.currentUser : Cloud.pendingUser?.user;
-      if (!user) return;
+      if (!user) { closeSheet(); return toast('Please log in again.'); }
       const err = passwordError(pw, pw2, { name: mode === 'self' ? Cloud.me?.name : Cloud.pendingUser?.member.name }); if (err) return formError(err);
       busy(form, true);
       try {
@@ -717,12 +736,33 @@ function installOverrides() {
           await FB.updatePassword(user, pw);
           closeSheet(); return toast('Password changed');
         }
-        await FB.updatePassword(user, pw);
+        // First login: the session must still be this person's, or nothing is changed
         const { cid } = Cloud.pendingUser;
-        await FB.updateDoc(FB.doc(Cloud.db, 'cafes', cid, 'members', user.uid), { mustChange: false, lastLogin: Date.now() });
+        if (Cloud.auth.currentUser?.uid !== user.uid) {
+          Cloud.pendingUser = null; await Cloud.signOut();
+          return toast('Your login expired — please log in again with the password the owner gave you.');
+        }
+        await FB.updatePassword(user, pw);
+        // The new password is saved now. Mark "changed" — with a fresh token and a few retries,
+        // because the password change renews the sign-in token.
+        let saved = false, lastErr = null;
+        for (let i = 0; i < 4 && !saved; i++) {
+          try {
+            await user.getIdToken(true);
+            await FB.updateDoc(FB.doc(Cloud.db, 'cafes', cid, 'members', user.uid), { mustChange: false, lastLogin: Date.now() });
+            saved = true;
+          } catch (e) { lastErr = e; await sleep(700 * (i + 1)); }
+        }
+        if (!saved) {
+          console.warn('first-login flag', lastErr);
+          Cloud.pendingUser = null; await Cloud.signOut();
+          return openSheet(cloudSheet('Password saved', 'Please log in again', `<p><b>Your new password is saved.</b> The app couldn't finish signing you in just now.</p>
+            <p>Log in again with your <b>NEW</b> password (not the one the owner gave you). If it asks once more, type the same new password again.</p>
+            ${btn('OK', 'closeSheet', { cls: 'primary block' })}`));
+        }
         Cloud.pendingUser = null;
         await attach(cid, user);
-      } catch (e) { formError(BAD_PASSWORD.includes(e.code) ? 'Current password is not right.' : friendly(e)); } finally { busy(form, false); }
+      } catch (e) { formError(BAD_PASSWORD.includes(e.code) ? 'Current password is not right.' : e.code === 'auth/requires-recent-login' ? 'Your login expired — close this box and log in again with the password the owner gave you.' : friendly(e)); } finally { busy(form, false); }
     },
     async setupStep(fd, form) { if (App.setup.mode === 'later' || stepName() !== 'owner') return origSetupStep(fd, form); return cloudSignup(fd, form); },
     async access(fd, form) {
