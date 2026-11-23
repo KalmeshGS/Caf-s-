@@ -151,3 +151,4 @@ section { padding: 64px 0; }
 .foot { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 28px 0 40px; border-top: 1px solid var(--line); font-size: 13.5px; color: var(--muted); }
 body::after { content: ""; display: block; height: 140px; background: linear-gradient(180deg, var(--bg), #f4d3b8); }
 .foot span:first-child { font-family: var(--serif); font-weight: 400; color: var(--ink); font-size: 18px; }
+.guest-note { margin-top: 10px; }

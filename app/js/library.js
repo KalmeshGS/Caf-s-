@@ -337,6 +337,7 @@ function libraryRecipe(name, stock = S.stock) {
 /* ---------------- free AI helper (Cloudflare Worker, see worker/README.md) ---------------- */
 async function aiCall(route, body) {
   if (!window.AI_URL) throw new Error('AI is not set up yet');
+  if (typeof Cloud !== 'undefined' && Cloud.demo) throw new Error('the AI helper needs a free account — tap “Sign up free” to use it');
   const user = typeof Cloud !== 'undefined' ? Cloud.auth?.currentUser : null;
   if (!user) throw new Error('please log in online first');
   const res = await fetch(`${String(window.AI_URL).replace(/\/+$/, '')}/${route}`, {

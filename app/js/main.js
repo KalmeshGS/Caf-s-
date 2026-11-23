@@ -34,7 +34,7 @@ function shell(view, content) {
     <div class="topbar"><span class="brand-mark sm">${esc(initials(st.name))}</span><strong>${esc(st.name)}</strong>${aiBtn()}${bellBtn(view)}
       <button class="role-pill" style="--c:${r.color}" data-act="myPin" title="Change my password">${esc(me.name.split(' ')[0])} · ${esc(r.label)}</button>
       <button class="icon-btn" data-act="logout" aria-label="Log out">${icon('logout')}</button></div>
-    <main class="main" id="main">${content}</main>
+    <main class="main" id="main">${typeof guestBar === 'function' ? guestBar() : ''}${content}</main>
     ${rv.length > 1 ? `<nav class="tabbar">${tabs.map((v) => navItem(v)).join('')}
       ${rv.length > MOBILE_TABS + 1 ? `<button class="nav-i ${moreActive ? 'on' : ''}" data-act="moreNav">${icon('more')}<span>More</span></button>` : ''}</nav>` : ''}
   </div>`;
