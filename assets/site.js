@@ -4,7 +4,7 @@
 (function () {
   // Same one-time clean-up as the app (fresh start after the database reset)
   try {
-    if (window.localStorage.getItem('cj.epoch') !== '2026-11-22-fresh') {
+    if (window.localStorage.getItem('cj.epoch') !== '2026-11-24-fresh') {
       ['cafe-journal.v1', 'cafe-journal.session', 'cj.cafe', 'cj.cafeName', 'cj.session'].forEach((k) => localStorage.removeItem(k));
     }
   } catch (e) { /* ignore */ }
