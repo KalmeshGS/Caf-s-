@@ -14,8 +14,9 @@
 function isPrepaid(o) {
   if (!o) return false;
   if (o.status === 'paid' && o.token) return true;
-  if (o.table === 'Takeaway') return true; // takeaway / parcel / counter orders, at every kind of place
-  return feat('prepaid_flow') && !feat('running_bill'); // pay-first places, even when the customer sits at a table
+  // Pay first: self-service counter, takeaway and parcel orders, at every kind of place.
+  // An order taken at a table (by a waiter) always goes to the kitchen first and is billed at the end.
+  return o.table === 'Takeaway';
 }
 /** Next token for today (starts at 1 every day) */
 function nextToken() {
