@@ -1026,3 +1026,67 @@ h1, .page-head h1, .onb h2, .center-screen h2, .sheet-head h2, .ticket h2, .home
 @keyframes tvpulse { 50% { transform: scale(1.05); } }
 @media (prefers-reduced-motion: reduce) { .tv-tok.ready { animation: none; } }
 .tv-empty { color: var(--muted); font-size: 22px; }
+
+/* =========================================================
+   Apple Human Interface Guidelines pass (measured with an audit of every screen)
+   · controls ≥ 44×44 pt on touch screens · text ≥ 11 pt (labels 12+)
+   · inputs 16 px so iPhone does not zoom on focus · text contrast ≥ 4.5:1
+   · respect Reduce Motion · sheet grabber on phones
+   ========================================================= */
+/* text fields: 16 px stops iOS Safari zooming the whole page when a field is tapped */
+.field input, .field select, .field textarea, input:not([type=checkbox]):not([type=radio]):not([type=range]), select, textarea { font-size: 16px; }
+.mi-row input:not([type=checkbox]) { font-size: 16px; min-height: 44px; }
+/* smallest text: HIG minimum 11 pt; small capitals labels 12 px */
+.eyebrow, .crumb { font-size: 12px; letter-spacing: .14em; }
+.nbadge { font-size: 11px; min-width: 18px; height: 18px; }
+.chart text { font-size: 11px; }
+.chip.sm, .badge, .tag, .status { font-size: 12px; }
+.tag { padding: 2px 8px; }
+small.muted, .fine { font-size: max(12px, .85em); }
+.rec-sum { font-size: 12.5px; }
+.brand-mark.sm { font-size: 12px; }
+.tabbar .nav-i { font-size: 11px; }
+/* contrast ≥ 4.5:1 — coloured labels are darkened from their own colour */
+.tag, .role-tag { color: color-mix(in srgb, var(--c) 58%, #1d1410); }
+:root { --ok-text: #2f6b3e; --accent-text: color-mix(in srgb, var(--accent) 82%, #000); }
+.live, .badge.ok, .diff-on, .timer { color: var(--ok-text); }
+.role-pill { color: color-mix(in srgb, var(--c) 70%, #1d1410); }
+.emp-id { color: var(--accent-text); }
+.kpi.profit .eyebrow, .kpi.profit .kpi-s, .choice.primary > .ic, .choice.primary small { color: var(--accent-ink); }
+.att-b.on.late { background: #8a560c; border-color: #8a560c; }
+.att-b.on.leave { background: #4f46e5; border-color: #4f46e5; }
+/* touch screens: every control at least 44×44 pt (Apple's minimum hit target) */
+@media (pointer: coarse) {
+  .btn, .btn.sm, .chip, .q-opts span, .seg span, .fchip, .att-b, .link-btn, .role-pill { min-height: 44px; }
+  .btn.sm { padding: 0 16px; }
+  .chip, .fchip { display: inline-flex; align-items: center; }
+  .icon-btn, .icon-btn.sm, .tt-more { min-width: 44px; min-height: 44px; }
+  .att-b { min-width: 44px; }
+  .nav-i { min-height: 44px; }
+  .with-av.plain, .list-btn { min-height: 44px; }
+  .role-pill { display: inline-flex; align-items: center; padding: 0 14px; }
+  .guest-bar .btn { min-height: 44px; }
+}
+/* phones: a grabber shows the sheet is a temporary card that slides away */
+@media (max-width: 699px) {
+  .sheet-panel { padding-top: 26px; }
+  .sheet-panel::before { content: ""; position: absolute; top: 9px; left: 50%; width: 36px; height: 5px; margin-left: -18px; border-radius: 3px; background: var(--line); }
+}
+/* Reduce Motion: no sliding, scaling or pulsing — changes still happen, just instantly */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}
+/* chat Send button keeps its full 44 pt size; text fields are at least 44 pt tall */
+.home-send { flex: 0 0 44px; width: 44px; min-height: 44px; }
+@media (pointer: coarse) {
+  .field input, .field select, input:not([type=checkbox]):not([type=radio]):not([type=range]), select { min-height: 44px; }
+  .pw-eye { width: 44px; height: 44px; right: 0; }
+  .link, .home-down { display: inline-flex; align-items: center; min-height: 44px; }
+}
+/* phones: the top bar keeps room for the café name */
+@media (max-width: 480px) {
+  .topbar { gap: 6px; }
+  .rp-name { display: none; }
+  .role-pill { padding: 0 12px; }
+  .home-box-bar > .muted { display: none; }
+}

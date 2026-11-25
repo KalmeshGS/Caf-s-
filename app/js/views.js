@@ -436,7 +436,7 @@ Views.journal = () => {
   <div class="grid-2 wide-left">
     <section class="card journal-page">
       ${eyebrow('Notes for the day')}
-      <textarea data-input="journalNote" rows="9" placeholder="How did the day go? Anything to remember — a supplier issue, a regular's birthday, an idea for the menu…">${esc(e.note)}</textarea>
+      <textarea data-input="journalNote" rows="9" aria-label="Today's journal note" placeholder="How did the day go? Anything to remember — a supplier issue, a regular's birthday, an idea for the menu…">${esc(e.note)}</textarea>
       <div class="chip-row">${JOURNAL_TAGS.map((t) => `<button class="chip ${e.tags?.includes(t) ? 'on' : ''}" data-act="tagToggle" data-tag="${esc(t)}">${esc(t)}</button>`).join('')}</div>
       <p class="fine" id="journal-saved">Saves automatically.</p>
     </section>
