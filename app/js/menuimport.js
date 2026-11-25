@@ -24,6 +24,36 @@ const isPrice = (s) => Number.isFinite(priceOf(s));
 const cleanName = (s) => String(s || '').replace(/[.·…_]{2,}/g, ' ').replace(/[\s.·:\-–—_|]+$/, '').replace(/^[\s.·:\-–—_|•*]+/, '').replace(/\s+/g, ' ').trim();
 const looksHeading = (s) => { const t = cleanName(s); return t.length >= 2 && t.length <= 30 && !/\d/.test(t) && /[a-z]/i.test(t); };
 
+/** Is this row a column-header row? → { name, price, cat, avail, diet } column numbers, else null.
+    Copes with titles like "Item Name", "Dish", "Price ₹ (before GST)", "Rate(Rs)", "MRP", "Food Type". */
+const hnorm = (c) => String(c || '').toLowerCase().replace(/[₹()\[\]:*.#]/g, ' ').replace(/\s+/g, ' ').trim();
+const H_NAME = /^(s ?no |sl ?no )?(item|items|item name|name|dish|dish name|dishes|product|product name|particulars|description|menu item|menu items|food item|food items|item description|dish description|item name english|name english)$/;
+const H_PRICE = /^(price|prices|rate|rates|amount|mrp|selling price|sale price|base price|menu price|rs|inr)\b/;
+const H_CAT = /^(category|categories|section|type|group|course|menu|menu section|menu category|cuisine)$/;
+const H_AVAIL = /^(available|availability|status|in stock|active)$/;
+const H_DIET = /^(food type|veg ?\/ ?non ?veg|veg non ?veg|veg|diet|veg type|veg or non ?veg)$/;
+function headerMap(r) {
+  const n = r.map(hnorm);
+  const name = n.findIndex((c) => H_NAME.test(c));
+  const prices = n.map((c, i) => (H_PRICE.test(c) && !/%/.test(c) ? i : -1)).filter((i) => i >= 0);
+  if (name < 0 || !prices.length) return null;
+  // Several price columns ("before GST" / "incl. GST"): the app adds GST itself unless menu prices already include it
+  const incl = !!S.settings?.taxProfile?.pricesInclusive;
+  const pick = (re) => prices.find((i) => re.test(n[i]));
+  const price = (incl ? pick(/incl|with gst|inclusive/) : pick(/before|excl|without|base/)) ?? prices.find((i) => !/incl|with gst|inclusive/.test(n[i])) ?? prices[0];
+  return { name, price, cat: n.findIndex((c) => H_CAT.test(c)), avail: n.findIndex((c) => H_AVAIL.test(c)), diet: n.findIndex((c) => H_DIET.test(c)) };
+}
+/** A workbook → the items of its menu sheet: the sheet with the most priced items (a sheet called "Menu" wins a tie) */
+function sheetsToItems(sheets) {
+  let best = { items: [], name: '' };
+  const bonus = (n) => (/menu|price|item/i.test(n) ? 0.5 : 0);
+  sheets.filter((s) => !s.hidden).forEach((s) => {
+    const items = rowsToItems(s.rows);
+    if (items.length + bonus(s.name) > best.items.length + bonus(best.name)) best = { items, name: s.name };
+  });
+  App.menuImp.sheet = sheets.length > 1 && best.items.length ? best.name : '';
+  return best.items;
+}
 /** Rows of cells (Excel / CSV / pasted) → items */
 function rowsToItems(rows) {
   const out = []; let cat = '';
@@ -32,14 +62,15 @@ function rowsToItems(rows) {
     const r = r0.map((c) => String(c ?? '').trim());
     if (!r.some(Boolean)) continue;
     // header row?
-    const idx = (re) => r.findIndex((c) => re.test(c.replace(/\s+/g, ' ')));
-    const ni = idx(HEAD_RE.name), pi = idx(HEAD_RE.price);
-    if (ni >= 0 && pi >= 0) { map = { name: ni, price: pi, cat: idx(HEAD_RE.cat), avail: idx(HEAD_RE.avail) }; continue; }
+    const hm = headerMap(r);
+    if (hm) { map = hm; continue; }
     if (map) {
       const name = cleanName(r[map.name]); const price = priceOf(r[map.price]);
       if (name && Number.isFinite(price)) {
         const av = map.avail >= 0 ? !/^(no|n|false|0|off|out|unavailable|not available)$/i.test(r[map.avail] || '') : true;
-        out.push({ name, cat: cleanName(map.cat >= 0 ? r[map.cat] : '') || cat || 'General', price, available: av });
+        const dt = map.diet >= 0 ? String(r[map.diet] || '').toLowerCase() : '';
+        const diet = /non/.test(dt) ? 'nonveg' : /egg/.test(dt) ? 'egg' : /veg/.test(dt) ? 'veg' : '';
+        out.push({ name, cat: cleanName(map.cat >= 0 ? r[map.cat] : '') || cat || 'General', price, available: av, ...(diet ? { diet } : {}) });
       } else if (name && !r[map.price] && looksHeading(name)) cat = name; // a heading row inside the table
       continue;
     }
@@ -177,8 +208,8 @@ function photoToItems(data) {
 /* ---------------- read any file ---------------- */
 async function readMenuFile(file, onStatus = () => {}) {
   const name = file.name || '';
-  if (/\.xlsx$/i.test(name) || file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') { onStatus('Reading the Excel file…'); return rowsToItems(await readXlsx(file)); }
-  if (/\.xls$/i.test(name)) throw new Error('Old Excel (.xls) files can’t be read — open it in Excel and “Save as” .xlsx or CSV.');
+  if (/\.xlsx$/i.test(name) || file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') { onStatus('Reading the Excel file…'); return sheetsToItems(await readXlsxSheets(file)); }
+  if (/\.(xls|ods)$/i.test(name)) { onStatus('Reading the Excel file…'); return sheetsToItems(await readLegacySheets(file)); }
   if (/\.(csv|txt|tsv)$/i.test(name) || /^text\//.test(file.type)) { onStatus('Reading the file…'); const t = await file.text(); return /\.tsv$/i.test(name) ? rowsToItems(t.split(/\r?\n/).map((l) => l.split('\t'))) : (/\.csv$/i.test(name) ? rowsToItems(parseCsv(t)) : parseMenuText(t)); }
   if (/^image\//.test(file.type) || /\.(jpe?g|png|webp|heic|bmp)$/i.test(name)) {
     onStatus('Reading the menu photo… (the first time, the reader downloads about 7 MB)');
@@ -208,12 +239,12 @@ function menuImportSheet(target = 'menu') {
   return `${sheetHead('Menu import', 'Read a menu from a photo or file')}
     <div class="mi-pick">
       <label class="btn ghost sm">${icon('camera')}<span>Photo of menu</span><input type="file" accept="image/*" hidden data-change="menuImpFile"></label>
-      <label class="btn ghost sm">${icon('upload')}<span>Excel / CSV file</span><input type="file" accept=".xlsx,.csv,.tsv,.txt,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden data-change="menuImpFile"></label>
+      <label class="btn ghost sm">${icon('upload')}<span>Excel / CSV file</span><input type="file" accept=".xlsx,.xls,.ods,.csv,.tsv,.txt,application/vnd.ms-excel,application/vnd.oasis.opendocument.spreadsheet,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden data-change="menuImpFile"></label>
       ${btn('Paste text', 'menuImpPasteToggle', { cls: 'ghost sm', ic: 'clipboard' })}
       ${btn('Blank template', 'menuImpTemplate', { cls: 'ghost sm', ic: 'download' })}
     </div>
     <div id="mi-paste" hidden><textarea id="mi-text" rows="5" placeholder="Copy cells from Excel / Google Sheets, or one item per line:&#10;TIFFIN&#10;Masala Dosa  80&#10;Idli Vada, 55"></textarea>${btn('Read text', 'menuImpReadText', { cls: 'primary sm', ic: 'check' })}</div>
-    <p class="muted sm" id="mi-status">${items.length ? `${pl(items.length, 'item')} found — fix anything wrong, untick what you don't want.` : 'Choose a photo, an Excel/CSV file, or paste text. Columns can be in any order: Item Name, Category, Price.'}</p>
+    <p class="muted sm" id="mi-status">${items.length ? `${pl(items.length, 'item')} found${App.menuImp.sheet ? ` on the sheet “${esc(App.menuImp.sheet)}”` : ''} — fix anything wrong, untick what you don't want.` : 'Choose a photo, an Excel/CSV file, or paste text. Columns can be in any order: Item Name, Category, Price.'}</p>
     ${items.length ? `<div class="mi-head"><span></span><span>Item name</span><span>Category</span><span>Price</span><span></span></div><div class="mi-list">${rows}</div>
       <datalist id="mi-cats">${[...new Set(items.map((x) => x.cat).concat(S.menu.map((m) => m.cat)))].map((c) => `<option value="${esc(c)}">`).join('')}</datalist>
       <p class="neg sm" id="form-err" role="alert"></p>
@@ -223,14 +254,15 @@ function menuImportSheet(target = 'menu') {
       </div>` : ''}`;
 }
 function menuImpCollect() {
-  return $$('#sheet .mi-row').map((r) => ({
+  return $$('#sheet .mi-row').map((r, i) => ({
+    diet: App.menuImp.items[i]?.diet || '', available: App.menuImp.items[i]?.available !== false,
     on: r.querySelector('.mi-on').checked, name: cleanName(r.querySelector('.mi-name').value), cat: cleanName(r.querySelector('.mi-cat').value) || 'General', price: r.querySelector('.mi-price').value,
   }));
 }
 const menuFileRows = (items) => [MENU_COLUMNS, ...items.map((it) => [it.name, it.cat, Number(it.price) || 0, it.available === false ? 'No' : 'Yes'])];
 const menuFileName = (ext) => `${slug(S.settings?.name || App.setup?.d?.name || 'cafe')}-menu-${dayKey()}.${ext}`;
 Object.assign(Actions, {
-  menuImpOpen(el) { App.menuImp.items = []; openSheet(menuImportSheet(el?.dataset?.target || 'menu'), { wide: true }); },
+  menuImpOpen(el) { App.menuImp.items = []; App.menuImp.sheet = ''; openSheet(menuImportSheet(el?.dataset?.target || 'menu'), { wide: true }); },
   menuImpPasteToggle() { const p = $('#mi-paste'); if (p) { p.hidden = !p.hidden; $('#mi-text')?.focus(); } },
   menuImpReadText() { App.menuImp.items = parseMenuText($('#mi-text')?.value); openSheet(menuImportSheet(App.menuImp.target), { wide: true }); if (!App.menuImp.items.length) $('#mi-status').textContent = 'No items with a price found. One item per line, like "Masala Dosa 80".'; },
   menuImpTemplate() {
@@ -258,7 +290,7 @@ Object.assign(Actions, {
     rows.forEach((r) => {
       const old = S.menu.find((m) => m.name.toLowerCase() === r.name.toLowerCase());
       if (old) { old.price = Number(r.price); old.cat = r.cat; updated++; return; }
-      S.menu.push({ id: uid('m'), name: r.name, cat: r.cat, price: Number(r.price), available: true, recipe: typeof suggestRecipe === 'function' ? suggestRecipe(r.name, S.stock) : [] });
+      S.menu.push({ id: uid('m'), name: r.name, cat: r.cat, price: Number(r.price), available: r.available !== false, ...(r.diet ? { diet: r.diet } : {}), recipe: typeof suggestRecipe === 'function' ? suggestRecipe(r.name, S.stock) : [] });
       added++;
     });
     save(); closeSheet(); toast(`${added ? pl(added, 'item') + ' added' : ''}${added && updated ? ' · ' : ''}${updated ? pl(updated, 'price') + ' updated' : ''} — see Menu`);

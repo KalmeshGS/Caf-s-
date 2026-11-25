@@ -69,37 +69,53 @@ async function unzip(buf) {
 /* ---------------- Excel (.xlsx) ---------------- */
 const xmlEsc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, '');
 const colName = (i) => { let s = ''; i++; while (i) { const m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = Math.floor((i - 1) / 26); } return s; };
-/** First sheet of an .xlsx → rows of cell texts */
-async function readXlsx(file) {
+/** Every sheet of an .xlsx → [{ name, rows }] (rows of cell texts), in workbook order */
+async function readXlsxSheets(file) {
   const z = await unzip(await file.arrayBuffer());
   const dec = new TextDecoder(), xml = (p) => (z[p] ? new DOMParser().parseFromString(dec.decode(z[p]), 'application/xml') : null);
   const tags = (doc, t) => (doc ? [...doc.getElementsByTagNameNS('*', t)] : []);
-  const shared = tags(xml('xl/sharedStrings.xml'), 'si').map((si) => tags(si, 't').map((t) => t.textContent).join(''));
-  // first sheet in workbook order
-  let sheetPath = 'xl/worksheets/sheet1.xml';
+  const find = (p) => Object.keys(z).find((k) => k.toLowerCase() === p.toLowerCase());
+  const shared = tags(xml(find('xl/sharedStrings.xml') || 'xl/sharedStrings.xml'), 'si').map((si) => tags(si, 't').map((t) => t.textContent).join(''));
   const wb = xml('xl/workbook.xml'), rels = xml('xl/_rels/workbook.xml.rels');
-  const first = tags(wb, 'sheet')[0];
-  if (first && rels) {
-    const rid = first.getAttribute('r:id') || first.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships', 'id');
-    const rel = tags(rels, 'Relationship').find((r) => r.getAttribute('Id') === rid);
-    if (rel) { const t = rel.getAttribute('Target').replace(/^\//, ''); sheetPath = t.startsWith('xl/') ? t : 'xl/' + t; }
-  }
-  const sheet = xml(sheetPath); if (!sheet) throw new Error('No sheet found in that Excel file.');
-  const rows = [];
-  tags(sheet, 'row').forEach((r) => {
-    const row = [];
-    tags(r, 'c').forEach((c, k) => {
-      const ref = c.getAttribute('r') || ''; const letters = ref.replace(/\d+/g, '');
-      const ci = letters ? letters.split('').reduce((a, ch) => a * 26 + ch.charCodeAt(0) - 64, 0) - 1 : k;
-      const t = c.getAttribute('t'); const v = tags(c, 'v')[0]?.textContent ?? '';
-      let val = t === 's' ? shared[+v] ?? '' : t === 'inlineStr' ? tags(c, 't').map((x) => x.textContent).join('') : t === 'b' ? (v === '1' ? 'TRUE' : 'FALSE') : v;
-      if (t !== 's' && t !== 'inlineStr' && /^-?\d+\.\d{6,}$/.test(val)) val = String(Math.round(+val * 100) / 100); // 39.99999999 → 40
-      row[ci] = String(val).trim();
-    });
-    for (let i = 0; i < row.length; i++) if (row[i] == null) row[i] = '';
-    if (row.some((x) => x !== '')) rows.push(row);
+  let list = tags(wb, 'sheet').map((sh, i) => {
+    const rid = sh.getAttribute('r:id') || sh.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships', 'id');
+    const rel = rels && tags(rels, 'Relationship').find((r) => r.getAttribute('Id') === rid);
+    let path = `xl/worksheets/sheet${i + 1}.xml`;
+    if (rel) { const t = rel.getAttribute('Target').replace(/^\//, ''); path = t.startsWith('xl/') ? t : 'xl/' + t; }
+    return { name: sh.getAttribute('name') || `Sheet ${i + 1}`, path: find(path) || path, hidden: (sh.getAttribute('state') || '') !== '' && sh.getAttribute('state') !== 'visible' };
   });
-  return rows;
+  if (!list.length) list = Object.keys(z).filter((k) => /^xl\/worksheets\/[^/]+\.xml$/i.test(k)).sort().map((k, i) => ({ name: `Sheet ${i + 1}`, path: k }));
+  const out = [];
+  for (const sh of list) {
+    const sheet = xml(sh.path); if (!sheet) continue;
+    const rows = [];
+    tags(sheet, 'row').forEach((r) => {
+      const row = [];
+      tags(r, 'c').forEach((c, k) => {
+        const ref = c.getAttribute('r') || ''; const letters = ref.replace(/\d+/g, '');
+        const ci = letters ? letters.split('').reduce((a, ch) => a * 26 + ch.charCodeAt(0) - 64, 0) - 1 : k;
+        const t = c.getAttribute('t'); const v = tags(c, 'v')[0]?.textContent ?? '';
+        let val = t === 's' ? shared[+v] ?? '' : t === 'inlineStr' ? tags(c, 't').map((x) => x.textContent).join('') : t === 'b' ? (v === '1' ? 'TRUE' : 'FALSE') : v;
+        if (t !== 's' && t !== 'inlineStr' && /^-?\d+\.\d{6,}$/.test(val)) val = String(Math.round(+val * 100) / 100); // 39.99999999 → 40
+        row[ci] = String(val).trim();
+      });
+      for (let i = 0; i < row.length; i++) if (row[i] == null) row[i] = '';
+      if (row.some((x) => x !== '')) rows.push(row);
+    });
+    out.push({ name: sh.name, hidden: !!sh.hidden, rows });
+  }
+  if (!out.length) throw new Error('No sheet found in that Excel file.');
+  return out;
+}
+/** First sheet of an .xlsx → rows of cell texts */
+async function readXlsx(file) { return (await readXlsxSheets(file))[0].rows; }
+/** Old Excel (.xls) / OpenDocument (.ods): loads the SheetJS reader only when needed */
+async function readLegacySheets(file) {
+  if (!window.XLSX) {
+    await new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = 'vendor/xlsx.full.min.js'; sc.onload = res; sc.onerror = () => rej(new Error('Could not load the Excel reader — check the internet and try again.')); document.head.appendChild(sc); });
+  }
+  const wb = window.XLSX.read(new Uint8Array(await file.arrayBuffer()), { type: 'array' });
+  return wb.SheetNames.map((n) => ({ name: n, rows: window.XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, raw: false, defval: '' }).map((r) => r.map((c) => String(c ?? '').trim())).filter((r) => r.some(Boolean)) }));
 }
 /** [{ name, rows: [[...]], widths?: [chars] }] → .xlsx Blob. First row of each sheet is shown bold (header). */
 function writeXlsx(sheets) {
