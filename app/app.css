@@ -1162,3 +1162,25 @@ small.muted, .fine { font-size: max(12px, .85em); }
 .pur-card { padding: 12px 14px; margin-top: 10px; box-shadow: none; background: var(--surface-2); }
 .pur-card small { display: block; font-size: 12px; }
 .line-row.sm { font-size: 13.5px; padding: 3px 0; color: var(--ink-2); }
+
+/* ---------- barcode scanning ---------- */
+.scan-bar { display: flex; gap: 8px; align-items: center; }
+.scan-in { flex: 1; display: flex; align-items: center; gap: 8px; padding: 0 12px; border: 1.5px dashed color-mix(in srgb, var(--accent) 45%, var(--line)); border-radius: 12px; background: var(--surface); min-height: 44px; }
+.scan-in input { border: 0 !important; background: transparent !important; box-shadow: none !important; flex: 1; min-width: 0; padding: 8px 0 !important; outline: none; }
+.scan-in .ic { color: var(--accent); width: 20px; height: 20px; flex: none; }
+.scan-cam { position: relative; border-radius: 14px; overflow: hidden; background: #111; aspect-ratio: 4 / 3; max-height: 300px; }
+.scan-cam video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.scan-cam .scan-aim { position: absolute; left: 12%; right: 12%; top: 38%; bottom: 38%; border: 2px solid rgba(255,255,255,.85); border-radius: 10px; box-shadow: 0 0 0 999px rgba(0,0,0,.25); }
+.scan-cam .btn { position: absolute; right: 10px; bottom: 10px; }
+.scan-cam[hidden] { display: none; }
+.scan-msg { font-size: 14px; min-height: 0; }
+.scan-msg.ok { color: var(--ok-text); } .scan-msg.warn { color: #7a4a06; }
+.scan-msg .ic { width: 16px; height: 16px; vertical-align: -3px; }
+.scan-new { display: grid; gap: 8px; padding: 12px; border-radius: 12px; background: color-mix(in srgb, var(--amber) 10%, var(--surface)); color: var(--ink); }
+.scan-new .row-3 { align-items: center; }
+.pur-row.flash { animation: purflash .8s ease; }
+@keyframes purflash { from { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 50%, transparent); } }
+.kot-f .link-btn { margin-right: auto; color: var(--danger); font-size: 13px; }
+label.state-btn input { position: absolute; opacity: 0; pointer-events: none; }
+label.state-btn:has(input:checked) { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+label.state-btn span { display: inline-flex; align-items: center; gap: 8px; }

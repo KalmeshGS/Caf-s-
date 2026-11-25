@@ -376,6 +376,12 @@ const Forms = {
   },
   stockItem(fd) {
     const d = { name: fd.get('name').trim(), qty: num(fd.get('qty')), unit: fd.get('unit'), max: num(fd.get('max')), low: num(fd.get('low')), step: num(fd.get('step')) || 1 };
+    if (fd.has('barcode')) {
+      const codes = [...new Set(String(fd.get('barcode') || '').split(',').map((x) => x.trim().replace(/\s+/g, '')).filter(Boolean))];
+      const clash = codes.map((c) => [c, S.stock.find((x) => x.id !== fd.get('id') && String(x.barcode || '').split(',').map((y) => y.trim()).includes(c))]).find(([, x]) => x);
+      if (clash) return formError(`Barcode ${clash[0]} already belongs to ${clash[1].name}.`);
+      d.barcode = codes.join(', '); const pk = num(fd.get('pack')); d.pack = pk > 0 ? pk : null;
+    }
     if (fd.has('cost')) { d.cost = num(fd.get('cost')); if (!Number.isFinite(d.cost) || d.cost < 0 || d.cost > MAX_AMOUNT) return formError('Check the purchase price.'); }
     if (!d.name) return formError('Please type the stock item name.');
     for (const [v, what] of [[d.qty, 'In stock'], [d.low, 'Alert below'], [d.max, 'Full stock']]) {

@@ -132,7 +132,7 @@ service cloud.firestore {
           // while the kitchen hasn't started, floor staff may change the ticket (items, quantities, instructions)
           || (can(cid, ['manager', 'cashier', 'waiter']) && resource.data.status == 'new' && request.resource.data.status == 'new')
           || (can(cid, ['manager', 'cashier', 'waiter']) && resource.data.status == 'ready'
-              && request.resource.data.status == 'served' && onlyKeys(['status', 'updatedAt', 'stockDone']))
+              && request.resource.data.status == 'served' && onlyKeys(['status', 'updatedAt', 'stockDone', 'outcome']))
           // guests moved to another table: the ticket follows them
           || (can(cid, ['manager', 'cashier', 'waiter']) && request.resource.data.status == resource.data.status
               && onlyKeys(['table', 'movedFrom', 'updatedAt']));

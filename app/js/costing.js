@@ -11,8 +11,9 @@
    Records: S.stockLog (purchases, waste, corrections) · S.audit (leakage events)
    ========================================================= */
 
-const WASTE_REASONS = ['Spoiled', 'Expired', 'Burnt / spilled', 'Returned by guest', 'Staff meal', 'Other'];
+const WASTE_REASONS = ['Spoiled', 'Expired', 'Burnt / spilled', 'Returned by guest', 'Order not collected', 'Donated', 'Staff meal', 'Other'];
 const COST_ROLES = ['owner', 'manager'];
+const FOOD_FATE_LABEL = { wasted: 'Wasted', donated: 'Donated', staff: 'Staff meal' };
 const seesCost = () => COST_ROLES.includes(Session.role());
 const unitCost = (s) => (s && Number(s.cost) > 0 ? Number(s.cost) : 0);
 const stockValue = (s) => Math.max(0, Number(s.qty) || 0) * unitCost(s);
@@ -124,6 +125,7 @@ function leakage(mk) {
     { k: 'comp', title: 'Free (complimentary) bills', hint: 'Food given without payment.', items: ev.filter((x) => x.type === 'comp').map((x) => ({ when: x.at, who: x.by, what: `Bill #${x.no} · ${x.reason || ''}`, amt: x.amount || 0 })) },
     { k: 'discount', title: 'Discounts given', hint: 'Every rupee off a bill.', items: disc.map((o) => ({ when: o.paidAt, who: o.by, what: `${orderLabel(o)} · bill #${o.no}`, amt: o.discount })) },
     { k: 'reprint', title: 'Receipts printed again after payment', hint: 'A second copy can be reused for a cash sale.', items: reprints.map((x) => ({ when: x.at, who: x.by, what: `Bill #${x.no} · ${money(x.total)}`, amt: 0 })) },
+    { k: 'unclaimed', title: 'Food cooked but not collected', hint: 'Wasted, donated or eaten by staff — at menu price.', items: ev.filter((x) => x.type === 'unclaimed').map((x) => ({ when: x.at, who: x.by, what: `${x.token ? `Token ${x.token}` : `Bill #${x.no}`} · ${x.items || ''} · ${FOOD_FATE_LABEL[x.fate] || x.fate || ''}`, amt: x.amount || 0 })) },
     { k: 'waste', title: 'Wasted stock', hint: 'Recorded on the Stock or Kitchen screen.', items: waste.map((w) => ({ when: w.at, who: w.by, what: `${qtyText(w.qty, w.unit)} ${w.name} · ${w.reason || ''}`, amt: w.amount || 0 })) },
     { k: 'missing', title: 'Stock missing when counted', hint: 'Less in the store than the app expected.', items: missing.map((c) => ({ when: c.at, who: c.by, what: `${qtyText(-c.qty, c.unit)} ${c.name}`, amt: Math.abs(c.amount || 0) })) },
   ];
@@ -217,10 +219,12 @@ function purchaseForm() {
       <label class="field"><span>Date</span><input name="date" type="date" value="${dayKey()}" max="${dayKey()}" required></label>
       <div class="field"><span>Payment</span><div class="seg"><label><input type="radio" name="paid" value="1" checked><span>Paid now</span></label><label><input type="radio" name="paid" value="0"><span>Pay later</span></label></div></div>
     </div>
+    ${typeof scanBarHtml === 'function' ? scanBarHtml() : ''}
     <div id="pur-rows" class="pur-rows">${purchaseRow()}</div>
     <template id="pur-tpl">${purchaseRow()}</template>
     <button type="button" class="btn ghost sm" data-act="purRowAdd">${icon('plus')}<span>Another item</span></button>
     <p class="fine">Stock goes up and each item's average purchase price is updated. "Pay later" adds the amount to the supplier's dues.</p>
+    <p class="neg sm" id="form-err" role="alert"></p>
     <div class="form-actions"><span></span><button class="btn primary" type="submit">Save purchase</button></div>
   </form>`;
 }
@@ -234,6 +238,7 @@ function wasteForm(stockId) {
       <label class="field"><span>Why</span><select name="reason">${WASTE_REASONS.map((r) => `<option>${r}</option>`).join('')}</select></label>
     </div>
     <label class="field"><span>Note <em>(optional)</em></span><input name="note" maxlength="80"></label>
+    <p class="neg sm" id="form-err" role="alert"></p>
     <div class="form-actions"><span></span><button class="btn primary" type="submit">Save</button></div>
   </form>`;
 }
