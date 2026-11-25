@@ -168,3 +168,33 @@ body::after { content: ""; display: block; height: 140px; background: linear-gra
 .fchip { font-size: 12px; }
 /* phones: headline and sign-up first, the illustration after (HIG: order content by importance) */
 @media (max-width: 600px) { .hero-art { order: 0; max-width: 260px; margin-top: 8px; } }
+
+/* ---------- Real app screens (replaces the drawn dishes) ---------- */
+.hero-art { aspect-ratio: 1 / 1.02; }
+.phone { position: absolute; margin: 0; width: 45%; aspect-ratio: 390 / 844; padding: 8px; border-radius: 40px; background: #1d1d1f;
+  box-shadow: 0 40px 70px -30px rgba(29, 29, 31, .45), 0 0 0 1px rgba(0, 0, 0, .06); }
+.phone img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top; border-radius: 32px; background: var(--surface); }
+.phone.front { right: 8%; top: 1%; z-index: 2; }
+.phone.back { left: 6%; top: 8%; z-index: 1; transform: rotate(-5deg); }
+.float-badge { z-index: 3; box-shadow: 0 16px 34px -18px rgba(29, 29, 31, .35); }
+.float-badge.b2 { top: 4%; left: -2%; }
+.float-badge { bottom: 10%; right: -3%; }
+@media (max-width: 600px) { .hero-art { max-width: 340px; } .phone { border-radius: 30px; padding: 6px; } .phone img { border-radius: 25px; } }
+
+.pop { padding: 12px 12px 20px; margin-top: 0; display: flex; flex-direction: column; }
+.pop .shot { margin: 0 0 16px; height: 230px; border-radius: 16px; overflow: hidden; background: var(--surface-2); border: 1px solid var(--line); }
+.pop .shot img { display: block; width: 100%; height: auto; transition: transform .6s cubic-bezier(.2, .8, .2, 1); }
+.pop:hover .shot img { transform: translateY(-14%); }
+.pop h3, .pop p { padding: 0 8px; } .pop .tag { margin-left: 8px; align-self: flex-start; }
+.pop:hover { border-color: color-mix(in srgb, var(--red) 35%, var(--line)); }
+
+.dl .ico { flex: none; width: 52px; height: 52px; border-radius: 14px; display: grid; place-items: center; background: var(--peach); color: var(--red); }
+.dl .ico svg { width: 26px; height: 26px; }
+.dl:hover { border-color: color-mix(in srgb, var(--red) 35%, var(--line)); }
+/* Porcelain & Ink Blue leftovers: banner, page end, avatar dots, hover borders */
+.banner-cta { background: var(--red); }
+.banner-cta p { opacity: 1; color: rgba(255, 255, 255, .92); }
+body::after { background: linear-gradient(180deg, var(--bg), #dfe7f0); }
+.dots i { background: #1f4e79; } .dots i:nth-child(2) { background: #4f7aa6; } .dots i:nth-child(3) { background: #9db6cf; }
+/* screen previews: skip the app's top bar so each card starts at the screen title */
+.pop .shot img { margin-top: -16%; }
