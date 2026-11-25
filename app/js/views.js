@@ -187,7 +187,7 @@ Views.kitchen = () => {
         <button class="btn ${status === 'ready' ? 'ghost' : 'primary'} sm" data-act="kotNext" data-id="${k.id}">${esc(status === 'ready' && k.token ? 'Collected' : next)}</button></div>
       </article>`).join('') : `<p class="muted k-empty">—</p>`}</section>`;
   };
-  return `${pageHead('Kitchen', 'Kitchen screen', `<div class="btn-row tight">${btn('Token TV screen', 'openTokens', { cls: 'ghost sm', ic: 'grid' })}${live()}</div>`)}
+  return `${pageHead('Kitchen', 'Kitchen screen', `<div class="btn-row tight">${['owner', 'manager', 'kitchen'].includes(Session.role()) && S.stock.length ? btn('Wastage', 'wasteOpen', { cls: 'ghost sm', ic: 'trash' }) : ''}${btn('Token TV screen', 'openTokens', { cls: 'ghost sm', ic: 'grid' })}${live()}</div>`)}
     <div class="kitchen">${col('new', 'New', 'Start cooking')}${col('cooking', 'Cooking', 'Mark ready')}${col('ready', 'Ready to serve', 'Served')}</div>
     <p class="fine">Tip: open this screen on the kitchen tablet. New tickets ping and the timer turns amber after 10 min, red after 20.</p>`;
 };
@@ -229,6 +229,7 @@ Views.billing = (p) => {
       ${billRows({ sub: sel.subtotal ?? orderSubtotal(sel), discount: sel.discount || 0, tax: sel.tax || 0, total: sel.total }).map(([k, v]) => `<div class="line-row"><span>${esc(k)}</span><span>${money(v, true)}</span></div>`).join('')}
       <div class="line-row"><b>Total</b><b>${money(sel.total)}</b></div>
       <div class="line-row"><span>Paid by</span><b>${esc(pm[sel.method]?.label || sel.method)} · ${fmtTime(sel.paidAt)}</b></div>
+      ${typeof billProfitLine === 'function' ? billProfitLine(sel) : ''}
       <div class="row-2">${btn('Print receipt', 'printReceipt', { cls: 'ghost', ic: 'printer', data: `data-id="${sel.id}"` })}${btn('Done', 'closeBill', { cls: 'primary' })}</div>
     </div>`;
   }
@@ -265,9 +266,14 @@ Views.stock = () => {
   const f = App.ui.stockFilter;
   const low = S.stock.filter(isLow);
   const list = (f === 'low' ? low : S.stock).slice().sort((a, b) => (isLow(b) - isLow(a)) || a.name.localeCompare(b.name));
-  return `${pageHead('Stock · live', 'Inventory', btn('Add item', 'stockAdd', { cls: 'primary', ic: 'plus' }))}
+  const costs = typeof seesCost === 'function' && seesCost();
+  const head = pageHead('Stock · live', 'Inventory', `<div class="btn-row tight">${costs ? btn('Wastage', 'wasteOpen', { cls: 'ghost sm', ic: 'trash' }) : ''}${btn('Add item', 'stockAdd', { cls: 'ghost sm', ic: 'plus' })}${costs ? btn('Purchase', 'purchaseOpen', { cls: 'primary', ic: 'download' }) : ''}</div>`);
+  const chips = `<div class="chip-row"><button class="chip ${f === 'all' ? 'on' : ''}" data-act="stockFilter" data-f="all">All (${S.stock.length})</button><button class="chip ${f === 'low' ? 'on' : ''}" data-act="stockFilter" data-f="low">Low (${low.length})</button>${costs ? `<button class="chip ${f === 'move' ? 'on' : ''}" data-act="stockFilter" data-f="move">Movement & value</button>` : ''}</div>`;
+  if (f === 'move' && costs) return `${head}${stockKpis()}${chips}${movementCard(App.ui.month)}`;
+  return `${head}
+  ${costs ? stockKpis() : ''}
   ${low.length ? `<div class="banner warn">${icon('alert')}<span><b>${low.length} item${low.length > 1 ? 's' : ''} running low:</b> ${low.map((s) => esc(s.name)).join(', ')}. Reorder before you run out.</span></div>` : ''}
-  <div class="chip-row"><button class="chip ${f === 'all' ? 'on' : ''}" data-act="stockFilter" data-f="all">All (${S.stock.length})</button><button class="chip ${f === 'low' ? 'on' : ''}" data-act="stockFilter" data-f="low">Low (${low.length})</button></div>
+  ${chips}
   <section class="card">
     ${list.length ? list.map((s) => {
       const pct = s.max ? (s.qty / s.max) * 100 : 0;
@@ -276,7 +282,7 @@ Views.stock = () => {
         <div class="stock-main" data-act="stockEdit" data-id="${s.id}" role="button" tabindex="0">
           <div class="line-row"><strong>${esc(s.name)}</strong><b class="${lo ? 'neg' : ''}">${esc(+Number(s.qty).toFixed(2))} ${esc(s.unit)}</b></div>
           ${meter(pct, lo ? 'var(--danger)' : 'var(--accent)')}
-          <small class="muted">Alert at ${esc(s.low)} ${esc(s.unit)} · full ${esc(s.max)} ${esc(s.unit)}${usedBy(s.id).length ? ` · reduces automatically with: ${esc(usedBy(s.id).join(', '))}` : ''}</small>
+          <small class="muted">Alert at ${esc(s.low)} ${esc(s.unit)} · full ${esc(s.max)} ${esc(s.unit)}${typeof stockRowValue === 'function' ? stockRowValue(s) : ''}${usedBy(s.id).length ? ` · reduces automatically with: ${esc(usedBy(s.id).join(', '))}` : ''}</small>
         </div>
         <div class="qty"><button class="icon-btn sm" data-act="stockAdj" data-id="${s.id}" data-d="-1" aria-label="Use">${icon('minus')}</button><button class="icon-btn sm" data-act="stockAdj" data-id="${s.id}" data-d="1" aria-label="Add">${icon('plus')}</button></div>
       </div>`;
@@ -298,6 +304,7 @@ function stockForm(s = {}) {
       <label class="field"><span>Alert below</span><input name="low" type="number" step="any" min="0" required value="${esc(s.low ?? '')}"></label>
       <label class="field"><span>+/− step</span><input name="step" type="number" step="any" min="0.01" value="${esc(s.step ?? 1)}"></label>
     </div>
+    ${typeof seesCost === 'function' && seesCost() ? `<label class="field"><span>Purchase price per ${esc(s.unit || 'unit')} (₹) <em>(updates itself when you record a purchase)</em></span><input name="cost" type="number" step="any" min="0" inputmode="decimal" value="${esc(s.cost ?? '')}" placeholder="e.g. 56"></label>` : ''}
     <div class="form-actions">${s.id ? btn('Delete', 'stockDel', { cls: 'danger-ghost', ic: 'trash', data: `data-id="${s.id}"` }) : '<span></span>'}
       <button class="btn primary" type="submit">Save</button></div>
   </form>`;
@@ -409,6 +416,7 @@ Views.reports = () => {
       ${cats.length ? cats.map((x) => `<div class="meter-row"><span>${esc(x.c)}</span>${meter((x.v / spend) * 100, x.color)}<b>${Math.round((x.v / spend) * 100)}%</b></div>`).join('') : empty('No expenses this month.')}
     </section>
   </div>
+  ${typeof seesCost === 'function' && seesCost() ? `<div class="grid-2">${foodCostCard(mk)}${leakageCard(mk)}</div>` : ''}
   <section class="card">${eyebrow('How customers paid')}
     ${Object.entries(pm).map(([k, m]) => `<div class="meter-row"><span>${esc(m.label)}</span>${meter(sales ? (bm[k] / sales) * 100 : 0, m.color)}<b>${money(bm[k])}</b></div>`).join('')}
   </section>`;
@@ -519,7 +527,7 @@ Views.menu = () => {
     ${!S.stock.length ? `<div class="banner info">${icon('box')}<span>Add your stock items first (milk, sugar, tea powder…) so dishes can use them.</span>${can('stock') ? `<a class="btn primary sm" href="#/stock">Go to Stock</a>` : ''}</div>` : ''}
     ${noRecipe && S.stock.length ? `<div class="banner info">${icon('box')}<span>${pl(noRecipe, 'item')} ${noRecipe === 1 ? 'has' : 'have'} no ingredients yet, so stock won't reduce when ${noRecipe === 1 ? 'it is' : 'they are'} served. Tap an item to add them, or "Fill all from recipe library" (280+ common dishes built in).</span></div>` : ''}
     ${cats.map((c) => `<section class="card">${eyebrow(c)}${S.menu.filter((m) => m.cat === c).map((m) => `<div class="menu-row ${m.available === false ? 'off' : ''}">
-        ${dishImg(m)}<span>${esc(m.name)}${m.recipe && m.recipe.length ? `<small class="muted rec-sum">${esc(recipeText(m.recipe))}</small>` : `<small class="neg rec-sum">No ingredients set</small>`}</span><b>${money(m.price)}</b>
+        ${dishImg(m)}<span>${esc(m.name)}${m.recipe && m.recipe.length ? `<small class="muted rec-sum">${esc(recipeText(m.recipe))}</small>` : `<small class="neg rec-sum">No ingredients set</small>`}${typeof costLine === 'function' ? costLine(m) : ''}</span><b>${money(m.price)}</b>
         <label class="switch" title="Available today"><input type="checkbox" data-act="menuToggle" data-id="${m.id}" ${m.available !== false ? 'checked' : ''}><i></i></label>
         <button class="icon-btn sm" data-act="menuEdit" data-id="${m.id}" aria-label="Edit ${esc(m.name)}">${icon('edit')}</button></div>`).join('')}</section>`).join('') || empty('No menu yet.', btn('Add first item', 'menuAdd', { cls: 'ghost', ic: 'plus' }))}
     <p class="fine">The switch marks an item available / not available today (e.g. sold out).</p>`;

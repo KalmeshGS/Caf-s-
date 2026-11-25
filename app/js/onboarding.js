@@ -300,7 +300,7 @@ Object.assign(Actions, {
   eraseCafeData() {
     if (!confirm('Erase ALL café data — menu, stock, staff, bills, expenses, vendors, attendance and journal?\n\nYour café settings and login accounts stay. This cannot be undone.')) return;
     if (!confirm('Are you sure? Download a backup first if you might need this data.')) return;
-    ['menu', 'orders', 'kots', 'stock', 'expenses', 'vendors', 'vendorTx', 'staff'].forEach((k) => { S[k] = []; });
+    ['menu', 'orders', 'kots', 'stock', 'expenses', 'vendors', 'vendorTx', 'staff', 'stockLog', 'audit'].forEach((k) => { S[k] = []; });
     S.attendance = {}; S.journal = {};
     const hasLinked = S.users.some((u) => u.staffId || u.loginId);
     S.seq = { day: '', n: 0, emp: hasLinked ? S.seq.emp : 0 };

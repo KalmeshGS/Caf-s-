@@ -138,7 +138,7 @@ const Actions = {
     const r = line(el.dataset.id); if (!r?.l) return;
     const { o, l } = r, st = lineState(o, l);
     if (l.qty <= st.locked) return toast(`${l.name}: the kitchen has started cooking it — it can't be changed now.`);
-    if (st.unsent > 0) l.qty -= 1; else { takeFromKitchen(o, l, 1); l.qty -= 1; }
+    if (st.unsent > 0) l.qty -= 1; else { takeFromKitchen(o, l, 1); l.qty -= 1; audit('pulled', { no: o.no, table: o.table, item: l.name, qty: 1, amount: round2(l.price) }); }
     finishLineChange(o, l);
   },
   removeLine(el) {
@@ -148,6 +148,7 @@ const Actions = {
     if (!removable) return toast(`${l.name}: the kitchen has started cooking it — it can't be removed now.`);
     if (!confirm(`Remove ${removable} × ${l.name}${st.locked ? ` (${st.locked} already cooking will stay)` : ''}?`)) return;
     l.qty -= st.unsent; takeFromKitchen(o, l, st.queued); l.qty -= st.queued;
+    if (st.queued) audit('pulled', { no: o.no, table: o.table, item: l.name, qty: st.queued, amount: round2(l.price * st.queued) });
     finishLineChange(o, l);
   },
   lineNote(el) {
@@ -208,7 +209,9 @@ const Actions = {
     const raw = $('form.bill input[name=discount]')?.value;
     const derr = discountError(raw, orderSubtotal(o)); if (derr) return formError(derr);
     const disc = num(raw);
-    printBill(receiptHtml(o, orderTotals(o, disc)));
+    const t = orderTotals(o, disc);
+    if (o.status === 'open') { o.printed = { at: Date.now(), total: t.total }; persist(); } // leakage check: was it lowered later?
+    printBill(receiptHtml(o, t));
   },
   payPrint(el) { App.printAfterPay = true; el.closest('form').requestSubmit(); },
   async enableAlerts() {
@@ -220,6 +223,7 @@ const Actions = {
   },
   printReceipt(el) {
     const o = byId(S.orders, el.dataset.id); if (!o) return;
+    if (o.status === 'paid') { audit('reprint', { no: o.no, total: o.total, orderId: o.id }); persist(); }
     printBill(receiptHtml(o));
   },
   closeDay() {
@@ -235,7 +239,9 @@ const Actions = {
   stockEdit(el) { const s = byId(S.stock, el.dataset.id); s && openSheet(stockForm(s)); },
   stockAdj(el) {
     const s = byId(S.stock, el.dataset.id); if (!s) return;
-    s.qty = Math.max(0, round2(Number(s.qty) + Number(el.dataset.d) * (Number(s.step) || 1)));
+    const before = Number(s.qty) || 0;
+    s.qty = Math.max(0, round2(before + Number(el.dataset.d) * (Number(s.step) || 1)));
+    logCorrection(s, r6(s.qty - before));
     save();
   },
   stockDel(el) { if (confirm('Delete this stock item?')) { S.stock = S.stock.filter((x) => x.id !== el.dataset.id); closeSheet(); save(); } },
@@ -350,7 +356,8 @@ const Forms = {
     const derr = discountError(fd.get('discount'), orderSubtotal(o));
     if (derr) { App.printAfterPay = false; return formError(derr); }
     const t = orderTotals(o, num(fd.get('discount')));
-    Object.assign(o, { status: 'paid', paidAt: Date.now(), method: fd.get('method') || 'cash', subtotal: t.sub, discount: t.discount, tax: t.tax, total: t.total });
+    if (o.printed && t.total < o.printed.total - 0.009) audit('lowered', { no: o.no, table: o.table, printed: o.printed.total, paid: t.total, amount: round2(o.printed.total - t.total) });
+    Object.assign(o, { status: 'paid', paidAt: Date.now(), method: fd.get('method') || 'cash', subtotal: t.sub, discount: t.discount, tax: t.tax, total: t.total, receiptPrinted: !!App.printAfterPay });
     // Pay-first orders (self-service, takeaway): the bill gets a token and the order goes to the kitchen now
     const token = tokenAfterPay(o, fd);
     if (!token) S.kots.forEach((k) => { if (k.orderId === o.id && k.status === 'ready') { k.status = 'served'; k.updatedAt = Date.now(); useStockFor(k); } });
@@ -365,13 +372,14 @@ const Forms = {
   },
   stockItem(fd) {
     const d = { name: fd.get('name').trim(), qty: num(fd.get('qty')), unit: fd.get('unit'), max: num(fd.get('max')), low: num(fd.get('low')), step: num(fd.get('step')) || 1 };
+    if (fd.has('cost')) { d.cost = num(fd.get('cost')); if (!Number.isFinite(d.cost) || d.cost < 0 || d.cost > MAX_AMOUNT) return formError('Check the purchase price.'); }
     if (!d.name) return formError('Please type the stock item name.');
     for (const [v, what] of [[d.qty, 'In stock'], [d.low, 'Alert below'], [d.max, 'Full stock']]) {
       if (!Number.isFinite(v) || v < 0) return formError(`${what} can’t be negative.`);
       if (v > MAX_AMOUNT) return formError(`${what} looks too high — check for an extra zero.`);
     }
     const s = byId(S.stock, fd.get('id'));
-    if (s) Object.assign(s, d); else S.stock.push({ id: uid('s'), ...d });
+    if (s) { const before = Number(s.qty) || 0, unit = s.unit; Object.assign(s, d); if (d.unit === unit) logCorrection(s, r6(d.qty - before)); } else S.stock.push({ id: uid('s'), ...d });
     closeSheet(); save();
   },
   expense(fd) {
