@@ -32,7 +32,7 @@ function shell(view, content) {
         <button class="icon-btn" data-act="logout" title="Log out" aria-label="Log out">${icon('logout')}</button></div>
     </aside>
     <div class="topbar"><span class="brand-mark sm">${esc(initials(st.name))}</span><strong>${esc(st.name)}</strong>${aiBtn()}${bellBtn(view)}
-      <button class="role-pill" style="--c:${r.color}" data-act="myPin" title="Change my password">${esc(me.name.split(' ')[0])} · ${esc(r.label)}</button>
+      <button class="role-pill" style="--c:${r.color}" data-act="myPin" title="Change my password" aria-label="${esc(me.name)} · ${esc(r.label)} — change my password"><span class="rp-name">${esc(me.name.split(' ')[0])} · </span>${esc(r.label)}</button>
       <button class="icon-btn" data-act="logout" aria-label="Log out">${icon('logout')}</button></div>
     <main class="main" id="main">${typeof guestBar === 'function' ? guestBar() : ''}${content}</main>
     ${rv.length > 1 ? `<nav class="tabbar">${tabs.map((v) => navItem(v)).join('')}

@@ -152,3 +152,19 @@ section { padding: 64px 0; }
 body::after { content: ""; display: block; height: 140px; background: linear-gradient(180deg, var(--bg), #f4d3b8); }
 .foot span:first-child { font-family: var(--serif); font-weight: 400; color: var(--ink); font-size: 18px; }
 .guest-note { margin-top: 10px; }
+
+/* Apple Human Interface Guidelines pass: readable small capitals (12–13 px), 44 pt touch targets, Reduce Motion */
+.btn { font-size: 13px; letter-spacing: .12em; }
+.btn.sm { font-size: 12px; min-height: 44px; }
+.kicker { font-size: 12px; letter-spacing: .18em; }
+.nav nav { font-size: 12px; letter-spacing: .16em; }
+.nav nav a { display: inline-flex; align-items: center; min-height: 44px; }
+.nav-toggle { min-width: 44px; min-height: 44px; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+  .btn:active { transform: none; }
+}
+@media (pointer: coarse) { .fchip { min-height: 44px; } .logo { min-height: 44px; display: inline-flex; align-items: center; } }
+.fchip { font-size: 12px; }
+/* phones: headline and sign-up first, the illustration after (HIG: order content by importance) */
+@media (max-width: 600px) { .hero-art { order: 0; max-width: 260px; margin-top: 8px; } }
