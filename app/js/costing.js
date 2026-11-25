@@ -104,7 +104,7 @@ function audit(type, d = {}) {
 function leakage(mk) {
   const paid = paidInMonth(mk);
   const ev = (S.audit || []).filter((x) => String(x.date || '').startsWith(mk));
-  const disc = paid.filter((o) => (o.discount || 0) > 0);
+  const disc = paid.filter((o) => (o.discount || 0) > 0 && o.method !== 'comp');
   const stale = mk === monthKey() ? S.orders.filter((o) => o.status === 'open' && o.items.some((l) => l.sent > 0) && Date.now() - o.createdAt > 4 * 3600e3) : [];
   const staleAmt = (o) => round2(sum(o.items, (l) => Math.min(l.sent, l.qty) * l.price));
   const waste = logsInMonth(mk, 'waste');
@@ -120,6 +120,8 @@ function leakage(mk) {
     { k: 'unbilled', title: 'Food sent to the kitchen, bill still open after 4 hours', hint: 'Served but not paid yet — or never billed.', items: stale.map((o) => ({ when: o.createdAt, who: o.by, what: `${orderLabel(o)} · bill #${o.no}`, amt: staleAmt(o) })) },
     { k: 'lowered', title: 'Bill printed, then made smaller before payment', hint: 'Guest saw one amount, a lower one was collected.', items: ev.filter((x) => x.type === 'lowered').map((x) => ({ when: x.at, who: x.by, what: `Bill #${x.no} · ${money(x.printed)} → ${money(x.paid)}`, amt: x.amount })) },
     { k: 'pulled', title: 'Items taken back after sending to the kitchen', hint: 'Removed before cooking started — check they were really not served.', items: ev.filter((x) => x.type === 'pulled').map((x) => ({ when: x.at, who: x.by, what: `${x.qty}× ${x.item} · bill #${x.no}`, amt: x.amount })) },
+    { k: 'cancelled', title: 'Bills cancelled', hint: 'Cancelled with a reason — check the food was not served.', items: ev.filter((x) => x.type === 'cancelled').map((x) => ({ when: x.at, who: x.by, what: `Bill #${x.no}${x.table ? ` · ${x.table}` : ''} · ${x.reason || ''}`, amt: x.amount || 0 })) },
+    { k: 'comp', title: 'Free (complimentary) bills', hint: 'Food given without payment.', items: ev.filter((x) => x.type === 'comp').map((x) => ({ when: x.at, who: x.by, what: `Bill #${x.no} · ${x.reason || ''}`, amt: x.amount || 0 })) },
     { k: 'discount', title: 'Discounts given', hint: 'Every rupee off a bill.', items: disc.map((o) => ({ when: o.paidAt, who: o.by, what: `${orderLabel(o)} · bill #${o.no}`, amt: o.discount })) },
     { k: 'reprint', title: 'Receipts printed again after payment', hint: 'A second copy can be reused for a cash sale.', items: reprints.map((x) => ({ when: x.at, who: x.by, what: `Bill #${x.no} · ${money(x.total)}`, amt: 0 })) },
     { k: 'waste', title: 'Wasted stock', hint: 'Recorded on the Stock or Kitchen screen.', items: waste.map((w) => ({ when: w.at, who: w.by, what: `${qtyText(w.qty, w.unit)} ${w.name} · ${w.reason || ''}`, amt: w.amount || 0 })) },
@@ -164,10 +166,11 @@ function stockKpis() {
   const bought = round2(sum(logsInMonth(mk, 'purchase'), (p) => p.total || 0));
   const wasted = round2(sum(logsInMonth(mk, 'waste'), (w) => w.amount || 0));
   const noCost = S.stock.filter((s) => !unitCost(s)).length;
-  return `<div class="kpis">
+  const tap = (act, html) => `<button type="button" class="kpi-tap" data-act="${act}" aria-label="Show details">${html}</button>`;
+  return `<div class="kpis three">
     ${kpi('Stock value now', money(value), noCost ? `${pl(noCost, 'item')} without a price` : 'at average purchase price')}
-    ${kpi('Bought this month', money(bought), `${pl(logsInMonth(mk, 'purchase').length, 'purchase')}`)}
-    ${kpi('Wasted this month', money(wasted), `${pl(logsInMonth(mk, 'waste').length, 'entry', 'entries')}`, wasted ? 'neg' : '')}
+    ${tap('purchaseList', kpi('Bought this month', money(bought), `${pl(logsInMonth(mk, 'purchase').length, 'purchase')} · tap to see`))}
+    ${tap('wasteList', kpi('Wasted this month', money(wasted), `${pl(logsInMonth(mk, 'waste').length, 'entry', 'entries')} · tap to see`, wasted ? 'neg' : ''))}
   </div>`;
 }
 function stockRowValue(s) {
@@ -236,7 +239,25 @@ function wasteForm(stockId) {
 }
 
 /* ---------------- actions & forms ---------------- */
+/** Purchases / wastage recorded this month (tap the cards on the Stock screen) */
+function purchaseListSheet() {
+  const list = logsInMonth(monthKey(), 'purchase').sort((a, b) => b.at - a.at);
+  return `${sheetHead('Stock', `Bought this month · ${money(sum(list, (p) => p.total || 0))}`)}
+    <p class="muted sm">Every purchase recorded with the <b>Purchase</b> button in ${esc(monthLabel(monthKey()))}: supplier bills and market buys. They also show in Expenses${list.some((p) => !p.paid) ? ' and unpaid ones in Vendors (dues)' : ''}.</p>
+    ${list.length ? list.map((p) => `<div class="card pur-card"><div class="line-row"><span><strong>${esc(p.vendorName || 'Market')}</strong><small class="muted">${fmtDate(keyToDate(p.date), { day: 'numeric', month: 'short' })}${p.invoice ? ` · Invoice ${esc(p.invoice)}` : ''} · ${p.paid ? 'Paid' : '<b class="neg">Pay later</b>'}${p.by ? ` · ${esc(p.by)}` : ''}</small></span><b>${money(p.total || 0)}</b></div>
+      ${(p.lines || []).map((l) => `<div class="line-row sm"><span>${esc(l.name)} · ${esc(qtyText(l.qty, l.unit))}</span><span>${money(l.amount || 0)}</span></div>`).join('')}</div>`).join('')
+    : empty('No purchases recorded this month yet.', can('stock') ? btn('Record a purchase', 'purchaseOpen', { cls: 'primary', ic: 'download' }) : '')}`;
+}
+function wasteListSheet() {
+  const list = logsInMonth(monthKey(), 'waste').sort((a, b) => b.at - a.at);
+  return `${sheetHead('Stock', `Wasted this month · ${money(sum(list, (w) => w.amount || 0))}`)}
+    ${list.length ? `<div class="list compact">${list.map((w) => `<div class="line-row"><span><strong>${esc(qtyText(w.qty, w.unit))} ${esc(w.name)}</strong><small class="muted">${fmtDate(keyToDate(w.date), { day: 'numeric', month: 'short' })} · ${esc(w.reason || '')}${w.by ? ` · ${esc(w.by)}` : ''}</small></span><b class="neg">${money(w.amount || 0)}</b></div>`).join('')}</div>`
+    : empty('No wastage recorded this month.')}`;
+}
+
 Object.assign(Actions, {
+  purchaseList() { openSheet(purchaseListSheet(), { wide: true }); },
+  wasteList() { openSheet(wasteListSheet()); },
   purchaseOpen() { openSheet(purchaseForm(), { wide: true }); },
   wasteOpen(el) { openSheet(wasteForm(el?.dataset?.id)); },
   purRowAdd() { const t = $('#pur-tpl'), box = $('#pur-rows'); if (t && box) box.insertAdjacentHTML('beforeend', t.innerHTML); },
