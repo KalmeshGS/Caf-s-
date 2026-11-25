@@ -1090,3 +1090,37 @@ small.muted, .fine { font-size: max(12px, .85em); }
   .role-pill { padding: 0 12px; }
   .home-box-bar > .muted { display: none; }
 }
+
+/* ---------- Stock & profit ---------- */
+.cost-sum { display: block; font-size: 12.5px; color: var(--muted); margin-top: 3px; }
+.cost-pill { display: inline-block; font-weight: 600; padding: 1px 8px; border-radius: 99px; margin-right: 6px; color: var(--ok-text); background: color-mix(in srgb, var(--ok) 12%, transparent); }
+.cost-pill.warm { color: #7a4a06; background: color-mix(in srgb, var(--amber) 16%, transparent); }
+.cost-pill.neg { color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, transparent); }
+.warn-t { color: #7a4a06; font-weight: 600; }
+.kpis.mini { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-bottom: 12px; }
+.kpis.mini .kpi { box-shadow: none; background: var(--surface-2); }
+.cost-row span small { display: block; font-size: 12px; }
+.bill-profit { color: var(--ok-text); font-weight: 600; }
+
+.leak-total { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.leak-total b { font-size: 26px; font-variant-numeric: tabular-nums; }
+.leak-g { border-top: 1px solid var(--line); }
+.leak-g summary { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 0; cursor: pointer; list-style: none; min-height: 44px; }
+.leak-g summary::-webkit-details-marker { display: none; }
+.leak-g summary strong { display: block; font-size: 14px; } .leak-g summary small { display: block; font-size: 12.5px; }
+.leak-g summary b { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.leak-g:not(.none) summary b { color: var(--danger); }
+.leak-g.none summary { opacity: .7; }
+.leak-i small { display: block; font-size: 12px; }
+
+.tbl-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -4px; }
+.tbl { width: 100%; border-collapse: collapse; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+.tbl th, .tbl td { padding: 9px 8px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; vertical-align: top; }
+.tbl thead th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+.tbl tbody th, .tbl thead th:first-child { text-align: left; position: sticky; left: 0; background: var(--surface); font-weight: 600; white-space: normal; min-width: 120px; }
+.tbl small { display: block; font-size: 11.5px; color: var(--muted); font-weight: 400; }
+.tbl td.neg { color: var(--danger); }
+
+.pur-rows { display: grid; gap: 10px; }
+.pur-row { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) auto; gap: 10px; align-items: end; padding: 10px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface-2); }
+@media (max-width: 560px) { .pur-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; } .pur-row > .field:first-child { grid-column: 1 / -1; } }

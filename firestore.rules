@@ -150,6 +150,18 @@ service cloud.firestore {
         allow delete: if can(cid, ['housekeeping']) && resource.data.status == 'cleaning';
       }
       match /notices/{id}    { allow read: if ok(cid); allow write: if can(cid, ['owner', 'manager']); }
+      // Stock & profit: purchases, wastage and stock corrections. The kitchen may only record wastage.
+      match /stockLog/{id} {
+        allow read: if can(cid, ['owner', 'manager', 'kitchen']);
+        allow create: if can(cid, ['owner', 'manager']) || (can(cid, ['kitchen']) && request.resource.data.type == 'waste');
+        allow update, delete: if can(cid, ['owner', 'manager']);
+      }
+      // Leakage check: anyone working adds events (append-only); only the owner and manager read them
+      match /audit/{id} {
+        allow read: if can(cid, ['owner', 'manager']);
+        allow create: if ok(cid) && request.resource.data.type is string;
+        allow update, delete: if owner(cid);
+      }
       match /reservations/{id} { allow read: if can(cid, ['owner', 'manager', 'cashier', 'waiter', 'captain', 'housekeeping']); allow write: if can(cid, ['owner', 'manager', 'cashier', 'waiter', 'captain']); }
     }
 

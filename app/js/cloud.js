@@ -44,8 +44,12 @@ const SPEC = [
   { key: 'tableState', kind: 'map', coll: 'tables', read: ALL_ROLES, write: [...FLOOR_ROLES, 'housekeeping'] },
   { key: 'notices', kind: 'items', coll: 'notices', read: ALL_ROLES, write: ['owner', 'manager'], since: { field: 'at', days: 30, num: true } },
   { key: 'reservations', kind: 'items', coll: 'reservations', read: [...FLOOR_ROLES, 'housekeeping'], write: FLOOR_ROLES, since: { field: 'date', days: 7 } },
+  // Stock & profit: purchases, wastage, corrections (kitchen may only add wastage — see firestore.rules)
+  { key: 'stockLog', kind: 'items', coll: 'stockLog', read: ['owner', 'manager', 'kitchen'], write: ['owner', 'manager', 'kitchen'], since: { field: 'date', days: WINDOW_DAYS } },
+  // Leakage check: everyone adds events, only the owner / manager can read them
+  { key: 'audit', kind: 'items', coll: 'audit', read: ['owner', 'manager'], write: ALL_ROLES, since: { field: 'date', days: WINDOW_DAYS } },
 ];
-const NEW_RULE_KEYS = ['tableState', 'reservations', 'notices']; // need the v3.3 security rules
+const NEW_RULE_KEYS = ['tableState', 'reservations', 'notices', 'stockLog', 'audit']; // need the v3.3 security rules
 
 /* ---------------- small helpers ---------------- */
 function canon(v) { // JSON with sorted keys, so the same data always gives the same text

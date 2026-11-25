@@ -156,7 +156,7 @@ function emptyState() {
     v: 1,
     settings: null,
     menu: [], orders: [], kots: [], stock: [], expenses: [],
-    vendors: [], vendorTx: [], staff: [], attendance: {}, journal: {}, tableState: {}, reservations: [], notices: [],
+    vendors: [], vendorTx: [], staff: [], attendance: {}, journal: {}, tableState: {}, reservations: [], notices: [], stockLog: [], audit: [],
     users: [], requests: [], recovery: null,
     seq: { day: '', n: 0, emp: 0 },
   };

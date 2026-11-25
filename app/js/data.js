@@ -74,6 +74,17 @@ function starterStock(type) {
   return (TEMPLATES[type] || TEMPLATES.other).stock.map(([name, unit, max, low, step]) => ({ id: uid('s'), name, unit, qty: max, max, low, step }));
 }
 
+/** A believable purchase price per unit for sample stock (₹; scaled for other currencies) */
+function demoCost(name, unit, scale = 1) {
+  const n = String(name).toLowerCase();
+  const table = [[/milk/, 56], [/sugar/, 44], [/tea/, 420], [/coffee/, 950], [/paneer/, 380], [/chicken/, 240], [/mutton/, 720], [/fish/, 360], [/egg/, 7], [/rice/, 70], [/atta|flour|maida/, 42], [/oil/, 150], [/ghee/, 620], [/butter/, 520], [/cheese/, 560], [/onion/, 35], [/tomato/, 32], [/potato/, 30], [/dal|lentil/, 120], [/bread|bun/, 6], [/beer/, 120], [/whisky|rum|vodka|gin/, 1400], [/soda|water/, 18], [/cylinder|gas/, 1100], [/cup|glass|box|container/, 4]];
+  const hit = table.find(([re]) => re.test(n));
+  const base = hit ? hit[1] : ({ kg: 120, L: 70, pcs: 8, packs: 45, dozen: 75, bottles: 140, cylinders: 1100, g: 0.15, ml: 0.08 }[unit] || 50);
+  // the price table is per kg / L / piece: convert for g / ml stock
+  const per = unit === 'g' || unit === 'ml' ? (hit ? base / 1000 : base) : base;
+  return Math.round(per * scale * 10000) / 10000;
+}
+
 /** Fill the store with ~5 weeks of realistic activity so every screen has something to show */
 function makeDemo(state) {
   const st = state.settings;
@@ -86,7 +97,8 @@ function makeDemo(state) {
   state.menu = starterMenu(st.type, st.currency);
   const snap = (v, step) => round2(Math.round(v / step) * step);
   state.stock = starterStock(st.type).map((s, i) => ({ ...s, qty: i % 3 === 1 ? snap(s.low * 0.8, s.step) : snap(s.max * R(0.35, 0.9), s.step) }));
-  state.orders = []; state.kots = []; state.expenses = []; state.vendorTx = []; state.attendance = {}; state.journal = {};
+  state.stock.forEach((s) => { s.cost = demoCost(s.name, s.unit, scale); });
+  state.orders = []; state.kots = []; state.expenses = []; state.vendorTx = []; state.attendance = {}; state.journal = {}; state.stockLog = []; state.audit = [];
 
   if (typeof suggestRecipe === 'function') state.menu.forEach((m) => { m.recipe = suggestRecipe(m.name, state.stock); });
   const tables = Array.from({ length: Number(st.tables) || 8 }, (_, i) => `T${i + 1}`);
@@ -201,6 +213,19 @@ function makeDemo(state) {
     if (pay > 0) state.vendorTx.push({ id: uid('t'), vendorId: v.id, type: 'payment', amount: pay, date: shiftDay(dayKey(), -2), note: 'Cleared old bills', method: 'upi' });
     v.due = round2(v.due - pay);
   });
+
+  // Stock & profit: a few purchases, some wastage and leakage events
+  const sk = state.stock.filter((x) => x.cost > 0);
+  const vend = state.vendors[0];
+  [[-9, 0], [-3, 1]].forEach(([back, i]) => {
+    const lines = sk.slice(i * 3, i * 3 + 3).map((x) => { const q = round2(Math.max(x.step || 1, x.max * 0.4)); return { stockId: x.id, name: x.name, unit: x.unit, qty: q, amount: round2(q * x.cost) }; });
+    if (!lines.length) return;
+    state.stockLog.push({ id: uid('pu'), type: 'purchase', date: shiftDay(dayKey(), back), at: Date.now() + back * 864e5, by: 'Owner', vendorId: vend?.id || null, vendorName: vend?.name || 'Market', invoice: `INV-${200 + i}`, paid: true, total: round2(sum(lines, (l) => l.amount)), lines });
+  });
+  sk.slice(0, 2).forEach((x, i) => { const q = round2((x.step || 1) * (i + 1)); state.stockLog.push({ id: uid('sl'), type: 'waste', date: shiftDay(dayKey(), -(i + 1)), at: Date.now() - (i + 1) * 864e5, by: 'Chef', stockId: x.id, name: x.name, unit: x.unit, qty: q, cost: x.cost, amount: round2(q * x.cost), reason: i ? 'Expired' : 'Spoiled' }); });
+  if (sk[2]) state.stockLog.push({ id: `fix-${shiftDay(dayKey(), -2)}-${sk[2].id}`, type: 'count', date: shiftDay(dayKey(), -2), at: Date.now() - 2 * 864e5, by: 'Manager', stockId: sk[2].id, name: sk[2].name, unit: sk[2].unit, qty: -(sk[2].step || 1), cost: sk[2].cost, amount: -round2((sk[2].step || 1) * sk[2].cost) });
+  const m0 = state.menu[1] || state.menu[0];
+  if (m0) state.audit.push({ id: uid('a'), type: 'pulled', at: Date.now() - 864e5, date: shiftDay(dayKey(), -1), by: 'Waiter', no: 12, table: 'T3', item: m0.name, qty: 1, amount: m0.price });
 
   // A couple of journal notes
   state.journal[shiftDay(dayKey(), -1)] = { note: 'Busy evening — ran out of cold coffee glasses by 8 PM. Order more tomorrow.', tags: ['Busy'], closing: null };
