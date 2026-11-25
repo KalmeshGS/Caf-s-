@@ -719,10 +719,13 @@ function installOverrides() {
         catch (e) {
           if (!BAD_PASSWORD.includes(e.code)) throw e;
           const failed = (L.failed || 0) + 1, locked = failed >= LOCK_AFTER;
-          await FB.updateDoc(lref, locked ? { failed, locked: true, lockedAt: FB.serverTimestamp() } : { failed }).catch(() => {});
-          if (locked) return openSheet(cloudLockedSheet(code, loginId, false));
-          if (failed >= WARN_AFTER) return openSheet(cloudWarnSheet(code, loginId, failed));
-          return formError('Login details are not right.');
+          const write = FB.updateDoc(lref, locked ? { failed, locked: true, lockedAt: FB.serverTimestamp() } : { failed }).catch(() => {});
+          if (locked) { await write; return openSheet(cloudLockedSheet(code, loginId, false)); }
+          // Tell the person straight away; the attempt is still counted (the write finishes in the background)
+          if (failed >= WARN_AFTER) openSheet(cloudWarnSheet(code, loginId, failed)); else formError('Login details are not right.');
+          busy(form, false); if (form.pw) form.pw.value = '';
+          await write;
+          return;
         }
         if (L.failed) await FB.updateDoc(lref, { failed: 0 }).catch(() => {});
         await afterSignIn(code, cred.user);
