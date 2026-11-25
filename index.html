@@ -30,20 +30,10 @@
   <link rel="apple-touch-icon" href="app/icons/icon-192.png">
   <link rel="manifest" href="app/manifest.webmanifest">
   <link rel="preload" href="assets/fonts/marcellus-400.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="assets/site.css?v=20261125j">
+  <link rel="stylesheet" href="assets/site.css?v=20261125l">
 </head>
 <body>
   <!-- Dish illustrations (drawn, top-down plates) -->
-  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
-    <defs>
-      <symbol id="d-curry" viewBox="0 0 100 100"><circle cx="50" cy="50" r="48" fill="#c99a4a"/><circle cx="50" cy="50" r="40" fill="#e07a2a"/><circle cx="38" cy="42" r="7" fill="#fbe7c4" opacity=".9"/><circle cx="58" cy="56" r="8" fill="#fbe7c4" opacity=".85"/><circle cx="55" cy="36" r="5" fill="#fbe7c4" opacity=".8"/><circle cx="40" cy="61" r="5" fill="#fbe7c4" opacity=".8"/><path d="M30 50c10-8 30 6 42-4" stroke="#fff6e4" stroke-width="2.5" fill="none" opacity=".7"/><circle cx="64" cy="44" r="2.5" fill="#2f7d32"/><circle cx="46" cy="52" r="2" fill="#2f7d32"/><circle cx="33" cy="55" r="2" fill="#2f7d32"/></symbol>
-      <symbol id="d-tikka" viewBox="0 0 100 100"><circle cx="50" cy="50" r="48" fill="#efe6d8"/><circle cx="50" cy="50" r="41" fill="#f8f2e9"/><rect x="24" y="30" width="18" height="14" rx="5" fill="#d64a2a" transform="rotate(-18 33 37)"/><rect x="46" y="26" width="18" height="14" rx="5" fill="#d64a2a" transform="rotate(12 55 33)"/><rect x="36" y="48" width="18" height="14" rx="5" fill="#d64a2a" transform="rotate(-6 45 55)"/><rect x="58" y="50" width="16" height="13" rx="5" fill="#d64a2a" transform="rotate(20 66 56)"/><circle cx="30" cy="66" r="7" fill="#e6f0d8"/><circle cx="30" cy="66" r="4" fill="#8bc34a"/><path d="M60 72h16" stroke="#f5d061" stroke-width="5" stroke-linecap="round"/></symbol>
-      <symbol id="d-palak" viewBox="0 0 100 100"><circle cx="50" cy="50" r="48" fill="#c99a4a"/><circle cx="50" cy="50" r="40" fill="#6f9e35"/><rect x="33" y="36" width="11" height="11" rx="2" fill="#fff8e7"/><rect x="55" y="34" width="11" height="11" rx="2" fill="#fff8e7"/><rect x="44" y="54" width="11" height="11" rx="2" fill="#fff8e7"/><rect x="60" y="56" width="9" height="9" rx="2" fill="#fff8e7"/><path d="M32 60c8 4 14-6 22-2" stroke="#fffbe9" stroke-width="2.5" fill="none" opacity=".75"/></symbol>
-      <symbol id="d-biryani" viewBox="0 0 100 100"><circle cx="50" cy="50" r="48" fill="#efe6d8"/><circle cx="50" cy="50" r="41" fill="#f1dfae"/><g fill="#d9822b"><circle cx="40" cy="38" r="3"/><circle cx="60" cy="44" r="3"/><circle cx="48" cy="60" r="3"/><circle cx="34" cy="54" r="2.5"/><circle cx="64" cy="60" r="2.5"/></g><circle cx="52" cy="46" r="9" fill="#a8461c"/><circle cx="38" cy="45" r="2" fill="#3f8a3a"/><circle cx="60" cy="54" r="2" fill="#3f8a3a"/><path d="M30 66c6-3 10 2 16-1" stroke="#7b3b14" stroke-width="2" fill="none"/></symbol>
-      <symbol id="d-chai" viewBox="0 0 100 100"><circle cx="50" cy="50" r="48" fill="#efe6d8"/><circle cx="50" cy="50" r="30" fill="#f3ede4"/><circle cx="50" cy="50" r="24" fill="#b07a45"/><path d="M78 46h8a6 6 0 0 1 0 12h-8" stroke="#f3ede4" stroke-width="5" fill="none"/><path d="M42 46c4-4 12-4 16 2" stroke="#f2d2a8" stroke-width="2.5" fill="none" opacity=".8"/></symbol>
-      <symbol id="d-dosa" viewBox="0 0 100 100"><circle cx="50" cy="50" r="48" fill="#d9dcd2"/><circle cx="50" cy="50" r="44" fill="#cfd3c6"/><path d="M14 58c20-30 56-36 74-20-10 18-50 34-74 20z" fill="#e4a14a"/><path d="M20 56c20-20 48-26 62-16" stroke="#b56a22" stroke-width="2" fill="none" opacity=".6"/><circle cx="30" cy="76" r="8" fill="#f1efe4"/><circle cx="48" cy="80" r="8" fill="#e0632e"/><circle cx="66" cy="75" r="8" fill="#9ccf55"/></symbol>
-    </defs>
-  </svg>
 
   <div class="glow" aria-hidden="true"></div>
 
@@ -74,7 +64,8 @@
         <p class="fine" id="welcome-back"></p>
       </div>
       <div class="hero-art" aria-hidden="true">
-        <div class="plate-ring"><svg class="dish big"><use href="#d-curry"/></svg></div>
+        <figure class="phone back"><img src="assets/shots/reports.jpg" alt="" width="390" height="844" decoding="async"></figure>
+        <figure class="phone front"><img src="assets/shots/kitchen.jpg" alt="" width="390" height="844" decoding="async" fetchpriority="high"></figure>
         <div class="float-badge"><span class="dot-ok"></span><span><b>Order ready</b><small>Table 4 · 2 items</small></span></div>
         <div class="float-badge b2"><b>₹24,860</b><small>Today's sales</small></div>
       </div>
@@ -83,10 +74,10 @@
     <section class="wrap popular" id="features">
       <div class="sec-head"><h2>Popular right now</h2><span class="muted">What owners use every day</span></div>
       <div class="pop-row">
-        <article class="pop"><svg class="dish"><use href="#d-tikka"/></svg><h3>Orders → Kitchen</h3><p>Waiter sends the order, the kitchen sees it with a timer and notes.</p><span class="tag">Live</span></article>
-        <article class="pop"><svg class="dish"><use href="#d-chai"/></svg><h3>Billing</h3><p>Cash, UPI or card. Print the bill, close the day in one tap.</p><span class="tag">Fast</span></article>
-        <article class="pop"><svg class="dish"><use href="#d-palak"/></svg><h3>Stock &amp; recipes</h3><p>Set each dish's ingredients once — stock goes down when it's served.</p><span class="tag">Auto</span></article>
-        <article class="pop"><svg class="dish"><use href="#d-biryani"/></svg><h3>Reports</h3><p>Best sellers, where the money went and your real profit.</p><span class="tag">Monthly</span></article>
+        <article class="pop"><figure class="shot"><img src="assets/shots/kitchen.jpg" alt="Kitchen screen with live order tickets and timers" width="390" height="844" loading="lazy" decoding="async"></figure><h3>Orders → Kitchen</h3><p>Waiter sends the order, the kitchen sees it with a timer and notes.</p><span class="tag">Live</span></article>
+        <article class="pop"><figure class="shot"><img src="assets/shots/billing.jpg" alt="Billing screen with open bills and day closing" width="390" height="844" loading="lazy" decoding="async"></figure><h3>Billing</h3><p>Cash, UPI or card. Print the bill, close the day in one tap.</p><span class="tag">Fast</span></article>
+        <article class="pop"><figure class="shot"><img src="assets/shots/stock.jpg" alt="Stock screen with low-stock alerts" width="390" height="844" loading="lazy" decoding="async"></figure><h3>Stock &amp; recipes</h3><p>Set each dish's ingredients once — stock goes down when it's served.</p><span class="tag">Auto</span></article>
+        <article class="pop"><figure class="shot"><img src="assets/shots/reports.jpg" alt="Monthly report with sales, expenses and real profit" width="390" height="844" loading="lazy" decoding="async"></figure><h3>Reports</h3><p>Best sellers, where the money went and your real profit.</p><span class="tag">Monthly</span></article>
       </div>
     </section>
 
@@ -98,14 +89,14 @@
         <button class="fchip on" data-f="all">All</button><button class="fchip" data-f="floor">Floor</button><button class="fchip" data-f="kitchen">Kitchen</button><button class="fchip" data-f="money">Money</button><button class="fchip" data-f="team">Team</button>
       </div>
       <div class="dish-list">
-        <article class="dl" data-k="floor"><svg class="dish"><use href="#d-tikka"/></svg><div><h3>Orders &amp; tables <small>Waiter</small></h3><p>Tables, takeaway, notes like "less sugar", and edits until the chef starts cooking.</p></div><span class="price">01</span></article>
-        <article class="dl" data-k="floor"><svg class="dish"><use href="#d-chai"/></svg><div><h3>Reservations <small>Floor</small></h3><p>Guest, time and table. Mark tables Free, Running, Cleaning or Reserved.</p></div><span class="price">02</span></article>
-        <article class="dl" data-k="kitchen"><svg class="dish"><use href="#d-curry"/></svg><div><h3>Kitchen screen <small>Chef</small></h3><p>New → Cooking → Ready. Waiters get a ping when the food is ready.</p></div><span class="price">03</span></article>
-        <article class="dl" data-k="kitchen"><svg class="dish"><use href="#d-dosa"/></svg><div><h3>Menu &amp; recipes <small>Chef · Owner</small></h3><p>Dish photos, ingredients per serving from a 280-dish recipe library, Google, a photo or AI.</p></div><span class="price">04</span></article>
-        <article class="dl" data-k="money"><svg class="dish"><use href="#d-biryani"/></svg><div><h3>Billing &amp; day closing <small>Cashier</small></h3><p>Discounts, tax, printed bills, and the cash / UPI / card split saved to the journal.</p></div><span class="price">05</span></article>
-        <article class="dl" data-k="money"><svg class="dish"><use href="#d-palak"/></svg><div><h3>Expenses &amp; vendors <small>Owner</small></h3><p>Rent, gas, salaries and vendor bills — who you owe and how much.</p></div><span class="price">06</span></article>
-        <article class="dl" data-k="team"><svg class="dish"><use href="#d-chai"/></svg><div><h3>Staff &amp; ID cards <small>Owner · Manager</small></h3><p>Photo, KYC, blood group, auto employee IDs like KK26001 and printable ID cards.</p></div><span class="price">07</span></article>
-        <article class="dl" data-k="team"><svg class="dish"><use href="#d-curry"/></svg><div><h3>Secure logins <small>Everyone</small></h3><p>Own password for each person. Wrong passwords lock the account until the owner unlocks it.</p></div><span class="price">08</span></article>
+        <article class="dl" data-k="floor"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2.5" width="8" height="4" rx="1"/><path d="M16 4.5h2a2 2 0 0 1 2 2V20a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6.5a2 2 0 0 1 2-2h2"/><path d="M9 12h6M9 16h4"/></svg></span><div><h3>Orders &amp; tables <small>Waiter</small></h3><p>Tables, takeaway, notes like "less sugar", and edits until the chef starts cooking.</p></div><span class="price">01</span></article>
+        <article class="dl" data-k="floor"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></span><div><h3>Reservations <small>Floor</small></h3><p>Guest, time and table. Mark tables Free, Running, Cleaning or Reserved.</p></div><span class="price">02</span></article>
+        <article class="dl" data-k="kitchen"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c3.9 0 7-2.9 7-6.8 0-3.6-2.4-5.6-3.9-8.2-.6 1.7-1.6 2.7-2.6 3.1.2-3.1-.9-6-3.5-8.1.2 3.6-1.6 5.6-3.1 7.7C5 11.2 5 12.9 5 15.2 5 19.1 8.1 22 12 22z"/></svg></span><div><h3>Kitchen screen <small>Chef</small></h3><p>New → Cooking → Ready. Waiters get a ping when the food is ready.</p></div><span class="price">03</span></article>
+        <article class="dl" data-k="kitchen"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5a2 2 0 0 1 2-2h14v15H6a2 2 0 0 0-2 2 2 2 0 0 0 2 2h14"/><path d="M8.5 7.5h7"/></svg></span><div><h3>Menu &amp; recipes <small>Chef · Owner</small></h3><p>Dish photos, ingredients per serving from a 280-dish recipe library, Google, a photo or AI.</p></div><span class="price">04</span></article>
+        <article class="dl" data-k="money"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 2.5h14V21l-2.5-1.5L14 21l-2-1.5L10 21l-2.5-1.5L5 21z"/><path d="M9 7.5h6M9 11h6M9 14.5h3.5"/></svg></span><div><h3>Billing &amp; day closing <small>Cashier</small></h3><p>Discounts, tax, printed bills, and the cash / UPI / card split saved to the journal.</p></div><span class="price">05</span></article>
+        <article class="dl" data-k="money"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 6.5V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v1.5"/><rect x="3" y="6.5" width="18" height="14" rx="2"/><path d="M21 11h-4a2 2 0 0 0 0 4h4"/></svg></span><div><h3>Expenses &amp; vendors <small>Owner</small></h3><p>Rent, gas, salaries and vendor bills — who you owe and how much.</p></div><span class="price">06</span></article>
+        <article class="dl" data-k="team"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.2A6.5 6.5 0 0 1 21.5 20"/></svg></span><div><h3>Staff &amp; ID cards <small>Owner · Manager</small></h3><p>Photo, KYC, blood group, auto employee IDs like KK26001 and printable ID cards.</p></div><span class="price">07</span></article>
+        <article class="dl" data-k="team"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></span><div><h3>Secure logins <small>Everyone</small></h3><p>Own password for each person. Wrong passwords lock the account until the owner unlocks it.</p></div><span class="price">08</span></article>
       </div>
     </section>
 
