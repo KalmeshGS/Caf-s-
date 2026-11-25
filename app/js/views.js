@@ -184,7 +184,7 @@ Views.kitchen = () => {
         <div class="kot-h"><strong>${k.token ? `<span class="tok">Token ${esc(k.token)}</span>` : esc(k.table === 'Takeaway' ? 'TA #' + k.no : k.table)}</strong>${k.parcel ? '<span class="badge">Parcel</span>' : ''}${k.custName ? `<small class="muted">${esc(k.custName)}</small>` : ''}${status === 'new' ? (k.changedAt ? '<span class="badge changed">Changed</span>' : '<span class="badge warm">New</span>') : `<small class="muted">#${k.no}</small>`}</div>
         <ul>${k.items.map((i) => `<li><b>${i.qty}×</b> ${esc(i.name)}${i.note ? `<span class="knote ${hasAllergy(i.note) ? 'allergy' : ''}">${hasAllergy(i.note) ? '⚠ ' : ''}${esc(i.note)}</span>` : ''}</li>`).join('')}</ul>
         <div class="kot-f"><span class="timer" data-since="${k.createdAt}">${icon('clock')}<span>${elapsed(k.createdAt)}</span></span>
-        <button class="btn ${status === 'ready' ? 'ghost' : 'primary'} sm" data-act="kotNext" data-id="${k.id}">${esc(status === 'ready' && k.token ? 'Collected' : next)}</button></div>
+        ${status === 'ready' && typeof canFoodFate === 'function' && canFoodFate() ? `<button class="link-btn" data-act="kotUnclaimed" data-id="${k.id}">Not collected</button>` : ''}<button class="btn ${status === 'ready' ? 'ghost' : 'primary'} sm" data-act="kotNext" data-id="${k.id}">${esc(status === 'ready' && k.token ? 'Collected' : next)}</button></div>
       </article>`).join('') : `<p class="muted k-empty">—</p>`}</section>`;
   };
   return `${pageHead('Kitchen', 'Kitchen screen', `<div class="btn-row tight">${['owner', 'manager', 'kitchen'].includes(Session.role()) && S.stock.length ? btn('Wastage', 'wasteOpen', { cls: 'ghost sm', ic: 'trash' }) : ''}${btn('Token TV screen', 'openTokens', { cls: 'ghost sm', ic: 'grid' })}${live()}</div>`)}
@@ -306,7 +306,9 @@ function stockForm(s = {}) {
       <label class="field"><span>Alert below</span><input name="low" type="number" step="any" min="0" required value="${esc(s.low ?? '')}"></label>
       <label class="field"><span>+/− step</span><input name="step" type="number" step="any" min="0.01" value="${esc(s.step ?? 1)}"></label>
     </div>
+    ${typeof seesCost === 'function' && seesCost() ? `<div class="row-2"><label class="field"><span>Barcode(s) <em>(scan or type; several: commas)</em></span><input name="barcode" maxlength="120" autocomplete="off" value="${esc(s.barcode || '')}" placeholder="e.g. 8901262150019"></label><label class="field"><span>Each scan adds (${esc(s.unit || 'unit')})</span><input name="pack" type="number" step="any" min="0" value="${esc(s.pack ?? '')}" placeholder="${esc(s.step ?? 1)}"></label></div>` : ''}
     ${typeof seesCost === 'function' && seesCost() ? `<label class="field"><span>Purchase price per ${esc(s.unit || 'unit')} (₹) <em>(updates itself when you record a purchase)</em></span><input name="cost" type="number" step="any" min="0" inputmode="decimal" value="${esc(s.cost ?? '')}" placeholder="e.g. 56"></label>` : ''}
+    <p class="neg sm" id="form-err" role="alert"></p>
     <div class="form-actions">${s.id ? btn('Delete', 'stockDel', { cls: 'danger-ghost', ic: 'trash', data: `data-id="${s.id}"` }) : '<span></span>'}
       <button class="btn primary" type="submit">Save</button></div>
   </form>`;
