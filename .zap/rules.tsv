@@ -1,0 +1,6 @@
+# OWASP ZAP rule settings for the security scan (rule id, IGNORE/WARN/FAIL, name).
+# Only noise is ignored; anything that could be a real weakness stays visible.
+10027	IGNORE	(Information Disclosure - Suspicious Comments: matches words like "user" or "select" in normal code comments)
+10049	IGNORE	(Storable and Cacheable Content: informational only)
+10109	IGNORE	(Modern Web Application: informational only)
+10104	IGNORE	(User Agent Fuzzer: informational only)

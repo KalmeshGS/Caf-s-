@@ -1,0 +1,81 @@
+# OWASP ZAP baseline scan of the live website and app (https://github.com/zaproxy/zaproxy).
+# Passive scan only: it reads the public pages and checks headers, cookies, scripts and known weaknesses.
+# It never logs in, never submits forms and never touches the database.
+# Runs every Monday, after each change to main, and on demand (Actions → Security scan → Run workflow).
+name: Security scan
+
+on:
+  schedule:
+    - cron: '17 3 * * 1'
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-scan
+  cancel-in-progress: true
+
+jobs:
+  zap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Wait for GitHub Pages to publish the latest version
+        if: github.event_name == 'push'
+        run: sleep 90
+
+      - name: ZAP baseline scan
+        run: |
+          mkdir -p zap && chmod 777 zap
+          cp .zap/rules.tsv zap/rules.tsv
+          for target in site:https://kalmeshgs.github.io/cafe/ app:https://kalmeshgs.github.io/cafe/app/; do
+            name="${target%%:*}"; url="${target#*:}"
+            echo "::group::Scanning $url"
+            docker run --rm -v "$PWD/zap:/zap/wrk:rw" ghcr.io/zaproxy/zaproxy:stable \
+              zap-baseline.py -t "$url" -m 2 -I -c rules.tsv \
+              -r "$name-report.html" -J "$name-report.json" -w "$name-report.md" || echo "scan of $name exited with $?"
+            echo "::endgroup::"
+          done
+
+      - name: Summary
+        if: always()
+        run: |
+          python3 - <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          import json, glob
+          risk = {'3': '🔴 High', '2': '🟠 Medium', '1': '🟡 Low', '0': 'ℹ️ Info'}
+          print('## OWASP ZAP baseline scan\n')
+          for f in sorted(glob.glob('zap/*-report.json')):
+              d = json.load(open(f))
+              alerts = [a for s in d.get('site', []) for a in s.get('alerts', [])]
+              print(f"### {f.split('/')[-1].replace('-report.json', '')} — {len(alerts)} finding(s)\n")
+              if not alerts:
+                  print('No findings. ✅\n'); continue
+              print('| Risk | Finding | Where |\n|---|---|---|')
+              for a in sorted(alerts, key=lambda a: -int(a['riskcode'])):
+                  print(f"| {risk.get(a['riskcode'], a['riskcode'])} | {a['name']} (rule {a['pluginid']}) | {a['count']} URL(s) |")
+              print()
+          EOF
+
+      - name: Fail on high-risk findings
+        run: |
+          python3 - <<'EOF'
+          import json, glob, sys
+          high = [a['name'] for f in glob.glob('zap/*-report.json') for s in json.load(open(f)).get('site', []) for a in s.get('alerts', []) if a['riskcode'] == '3']
+          if high: print('High-risk findings:', ', '.join(sorted(set(high)))); sys.exit(1)
+          print('No high-risk findings.')
+          EOF
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: zap-reports
+          path: zap/*-report.*
+          retention-days: 30

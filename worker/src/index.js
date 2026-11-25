@@ -102,6 +102,14 @@ function cors(env, origin) {
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Access-Control-Max-Age': '86400',
     Vary: 'Origin',
+    // security headers (checked by the OWASP ZAP scan): answers are private, never cached, never sniffed or framed
+    'Cache-Control': 'no-store',
+    'X-Content-Type-Options': 'nosniff',
+    'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none'",
+    'X-Frame-Options': 'DENY',
+    'Referrer-Policy': 'no-referrer',
+    'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
+    'Cross-Origin-Resource-Policy': 'cross-origin',
   };
 }
 const reply = (headers, status, body) => new Response(JSON.stringify(body), { status, headers: { ...headers, 'Content-Type': 'application/json' } });
@@ -168,6 +176,7 @@ export default {
     if (tooMany(`${route}:${user.sub}`, route === 'chat' ? 60 : 40)) return reply(headers, 429, { error: 'too many AI requests — try again in an hour' });
 
     let body;
+    if (+(request.headers.get('Content-Length') || 0) > 64 * 1024) return reply(headers, 413, { error: 'message too long' });
     try { body = await request.json(); } catch { return reply(headers, 400, { error: 'bad request' }); }
     try {
       const [status, out] = route === 'chat' ? await chat(env, body) : await recipe(env, body);
