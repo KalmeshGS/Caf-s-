@@ -281,14 +281,31 @@ const openOrders = () => S.orders.filter((o) => o.status === 'open');
 const orderSubtotal = (o) => sum(o.items, (l) => l.qty * l.price);
 const orderLabel = (o) => (o.token ? `Token ${o.token}${o.parcel ? ' · Parcel' : ''}${o.custName ? ' · ' + o.custName : ''}` : o.table === 'Takeaway' ? `Takeaway #${o.no}` : o.table);
 const isLow = (s) => Number(s.qty) <= Number(s.low);
-const tableNames = () => Array.from({ length: Number(S.settings?.tables) || 0 }, (_, i) => `T${i + 1}`);
+/** Table areas (AC, Garden, Party hall…). Without areas: one list T1…Tn from the "Tables" number */
+const tableAreas = () => {
+  const a = S.settings?.areas;
+  if (Array.isArray(a) && a.some((x) => x.tables && x.tables.length)) return a.filter((x) => x.tables && x.tables.length);
+  const n = Number(S.settings?.tables) || 0;
+  return n ? [{ id: 'main', name: '', seats: 0, tables: Array.from({ length: n }, (_, i) => `T${i + 1}`) }] : [];
+};
+const tableNames = () => [...new Set(tableAreas().flatMap((a) => a.tables))];
+const areaOf = (t) => tableAreas().find((a) => a.tables.includes(t)) || null;
+/** Parcel / takeaway orders get the packing charge */
+const isParcel = (o) => !!o && (o.table === 'Takeaway' || !!o.parcel);
+/** Charge settings (Settings → Floor & bills) */
+const chargeCfg = () => ({ packing: Number(S.settings?.charges?.packing) || 0, perItem: S.settings?.profile?.answers?.q_packing === 'per_item', servicePct: Number(S.settings?.charges?.servicePct) || 0 });
 
-function orderTotals(o, discount = o.discount || 0) {
+function orderTotals(o, discount = o.discount || 0, opt = {}) {
   const sub = orderSubtotal(o);
-  const disc = clamp(Number(discount) || 0, 0, sub);
+  const comp = opt.comp ?? o.method === 'comp';
+  const disc = comp ? sub : clamp(Number(discount) || 0, 0, sub);
   const taxable = sub - disc;
   const tax = round2((taxable * (Number(S.settings?.tax) || 0)) / 100);
-  return { sub, discount: disc, tax, total: round2(taxable + tax) };
+  const c = chargeCfg();
+  const items = sum(o.items || [], (l) => l.qty);
+  const packing = comp || !isParcel(o) || !c.packing ? 0 : round2(c.perItem ? c.packing * items : c.packing);
+  const service = comp || isParcel(o) || !c.servicePct || !(opt.service ?? o.service) ? 0 : round2((taxable * c.servicePct) / 100);
+  return { sub, discount: disc, tax, packing, service, charges: round2(packing + service), total: round2(taxable + tax + packing + service) };
 }
 /** Money as shown on screen/bills (rounded to the currency's decimals, e.g. whole rupees) */
 const roundShown = (n) => { const f = 10 ** cur().dec; return Math.round((Number(n) || 0) * f) / f; };
@@ -296,6 +313,8 @@ const roundShown = (n) => { const f = 10 ** cur().dec; return Math.round((Number
 function billRows(t, st = S.settings || {}) {
   const rows = [['Subtotal', t.sub]];
   if (t.discount) rows.push(['Discount', -t.discount]);
+  if (t.packing) rows.push(['Packing charge', t.packing]);
+  if (t.service) rows.push([`Service charge (${Number(st.charges?.servicePct) || 0}%)`, t.service]);
   const rate = Number(st.tax) || 0;
   if (t.tax) {
     if (st.taxProfile?.food?.split === 'CGST_SGST') {
@@ -356,10 +375,26 @@ function topItems(orders) {
   }));
   return Object.values(m).sort((a, b) => b.qty - a.qty || b.rev - a.rev);
 }
+/** How a bill was paid, as [method, amount] parts: split bills → several parts; credit → "credit" until collected; complimentary → nothing */
+function payParts(o) {
+  if (o.method === 'comp') return [];
+  if (o.method === 'split') return Object.entries(o.split || {}).filter(([, a]) => Number(a) > 0).map(([m, a]) => [m, Number(a)]);
+  if (o.method === 'credit') return [[o.creditPaid ? o.creditPaid.method : 'credit', o.total]];
+  return [[o.method || 'other', o.total]];
+}
 function byMethod(orders) {
   const r = { cash: 0, upi: 0, card: 0 };
-  orders.forEach((o) => { r[o.method] = (r[o.method] || 0) + o.total; });
+  orders.forEach((o) => payParts(o).forEach(([m, a]) => { r[m] = round2((r[m] || 0) + a); }));
   return r;
+}
+const PAY_EXTRA = { split: 'Split', credit: 'Credit', comp: 'Complimentary' };
+/** "Cash ₹200 + UPI ₹150" / "Credit · Ramesh (to collect)" / "Complimentary · reason" */
+function paidByText(o) {
+  const pm = payMethods();
+  if (o.method === 'split') return payParts(o).map(([m, a]) => `${pm[m]?.label || m} ${money(a)}`).join(' + ');
+  if (o.method === 'credit') return `Credit · ${o.credit?.name || ''}${o.creditPaid ? ` · collected (${pm[o.creditPaid.method]?.label || o.creditPaid.method})` : ' · to collect'}`;
+  if (o.method === 'comp') return `Complimentary${o.compReason ? ` · ${o.compReason}` : ''}`;
+  return pm[o.method]?.label || o.method;
 }
 function nextBillNo() {
   const today = dayKey();

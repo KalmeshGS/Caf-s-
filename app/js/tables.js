@@ -48,7 +48,7 @@ function cleaningView() {
 function tablesView() {
   if (isHousekeeping()) return cleaningView();
   const open = openOrders();
-  const tiles = tableNames().map((t) => {
+  const tile = (t, area) => {
     const o = open.find((x) => x.table === t);
     const ms = (S.tableState || {})[t];
     const res = nextReservation(t);
@@ -67,7 +67,9 @@ function tablesView() {
       ${pending ? '<i class="dot" title="Not sent to kitchen"></i>' : ''}
       ${!o && ms?.status === 'cleaning' && canMarkClean() ? `<button class="tt-clean" data-act="markClean" data-t="${t}">${icon('check')} Cleaned</button>` : ''}
     </div>`;
-  }).join('');
+  };
+  const areas = tableAreas();
+  const tiles = areas.map((a) => `${areas.length > 1 || a.name ? `<h3 class="area-h">${esc(areaTitle(a))}<small>${pl(a.tables.length, 'table')}${a.seats ? ` · ${a.seats} seats each` : ''} · ${a.tables.filter((t) => open.some((x) => x.table === t)).length} running</small></h3>` : ''}<div class="table-grid">${a.tables.map((t) => tile(t, a)).join('')}</div>`).join('');
   const takeaways = open.filter((o) => o.table === 'Takeaway' && (o.items.length || Date.now() - o.createdAt < 10 * 60000));
   const withTables = feat('tables');
   const newLabel = withTables ? 'New takeaway' : feat('takeaway') ? 'New order' : 'New order';
@@ -75,7 +77,7 @@ function tablesView() {
     ${ordersTabs('tables')}
     ${rulesNotice()}
     ${readyCard()}
-    ${!withTables ? `<div class="banner info">${icon('receipt')}<span>Tap <b>${newLabel}</b> for each customer. Open orders show below until they are paid.</span></div>` : tableNames().length ? `<div class="table-grid">${tiles}</div>
+    ${!withTables ? `<div class="banner info">${icon('receipt')}<span>Tap <b>${newLabel}</b> for each customer. Open orders show below until they are paid.</span></div>` : tableNames().length ? `<div class="area-list">${tiles}</div>
       <p class="fine">Tables show <b>Free</b> / <b>Running</b> automatically from orders. Tap ⋯ on a table to mark it as needing cleaning, reserved or out of service.</p>`
       : empty('No tables set. Add tables in Settings, or use takeaway orders.')}
     ${takeaways.length ? `<h3 class="section-t">${withTables ? 'Takeaway' : 'Open orders'}</h3><div class="table-grid">${takeaways.map((o) => `
@@ -89,6 +91,7 @@ function tableSheet(t) {
   const choice = (k, label, ic, on) => `<button class="state-btn ${on ? 'on' : ''}" data-act="setTableStatus" data-t="${t}" data-s="${k}">${icon(ic)}<span>${esc(label)}</span></button>`;
   return `${sheetHead('Table status', tableTitle(t))}
     <p class="muted sm">${o ? `${icon('clock')} Running now — order #${o.no}, ${money(orderSubtotal(o))}. Free / Running is set automatically from orders.` : 'Free / Running is set automatically from orders. Set a status by hand when you need to:'}</p>
+    ${o && ['owner', 'manager', 'cashier', 'waiter', 'captain'].includes(Session.role()) ? `<div class="btn-row">${btn('Move to another table', 'moveOpen', { cls: 'primary', ic: 'right', data: `data-t="${esc(t)}"` })}</div>` : ''}
     <div class="state-grid">
       ${choice('auto', 'Available (automatic)', 'check', !ms)}
       ${Object.entries(TABLE_STATES).map(([k, s]) => choice(k, s.label, s.ic, ms && ms.status === k)).join('')}

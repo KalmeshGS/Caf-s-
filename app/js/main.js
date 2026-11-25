@@ -209,7 +209,7 @@ const Actions = {
     const raw = $('form.bill input[name=discount]')?.value;
     const derr = discountError(raw, orderSubtotal(o)); if (derr) return formError(derr);
     const disc = num(raw);
-    const t = orderTotals(o, disc);
+    const t = orderTotals(o, disc, { service: !!$('form.bill input[name=service]:checked'), comp: $('form.bill input[name=method]:checked')?.value === 'comp' });
     if (o.status === 'open') { o.printed = { at: Date.now(), total: t.total }; persist(); } // leakage check: was it lowered later?
     printBill(receiptHtml(o, t));
   },
@@ -332,7 +332,8 @@ function noteSheet(l) {
   return `${sheetHead('Cooking instructions', l.name)}
   <form data-form="lineNote" class="form" autocomplete="off">
     <input type="hidden" name="id" value="${l.id}">
-    <div class="chip-row">${NOTE_CHIPS.map((c) => `<button type="button" class="chip ${parts.includes(c) ? 'on' : ''}" data-act="noteChip" data-chip="${esc(c)}">${esc(c)}</button>`).join('')}</div>
+    <div class="chip-row">${noteChips().cook.map((c) => `<button type="button" class="chip ${parts.includes(c) ? 'on' : ''}" data-act="noteChip" data-chip="${esc(c)}">${esc(c)}</button>`).join('')}</div>
+    ${noteChips().allergy.length ? `<div class="chip-row allergy-chips" aria-label="Allergies">${noteChips().allergy.map((c) => `<button type="button" class="chip ${parts.includes(c) ? 'on' : ''}" data-act="noteChip" data-chip="${esc(c)}">⚠ ${esc(c)}</button>`).join('')}</div>` : ''}
     <label class="field"><span>Instructions from the customer</span><input name="note" maxlength="120" value="${esc(l.note || '')}" placeholder="e.g. Less spicy, no onion, birthday candle"></label>
     <p class="muted sm">Shown in bold on the kitchen ticket.${l.qty > 1 ? ` Applies to all ${l.qty}. For different instructions on one of them, add the item again.` : ''}</p>
     <div class="form-actions">${l.note ? `<button type="button" class="btn ghost" data-act="noteClear">Clear</button>` : '<span></span>'}<button class="btn primary" type="submit">Save</button></div>
@@ -353,11 +354,14 @@ const Forms = {
   },
   pay(fd) {
     const o = byId(S.orders, App.params.o); if (!o || o.status !== 'open') return;
-    const derr = discountError(fd.get('discount'), orderSubtotal(o));
+    const derr = fd.get('method') === 'comp' ? '' : discountError(fd.get('discount'), orderSubtotal(o));
     if (derr) { App.printAfterPay = false; return formError(derr); }
-    const t = orderTotals(o, num(fd.get('discount')));
+    const pay = readPayment(o, fd);
+    if (pay.error) { App.printAfterPay = false; return formError(pay.error); }
+    const t = pay.t;
+    if (pay.method === 'comp') audit('comp', { no: o.no, table: o.table, amount: t.sub, reason: pay.extra.compReason });
     if (o.printed && t.total < o.printed.total - 0.009) audit('lowered', { no: o.no, table: o.table, printed: o.printed.total, paid: t.total, amount: round2(o.printed.total - t.total) });
-    Object.assign(o, { status: 'paid', paidAt: Date.now(), method: fd.get('method') || 'cash', subtotal: t.sub, discount: t.discount, tax: t.tax, total: t.total, receiptPrinted: !!App.printAfterPay });
+    Object.assign(o, { status: 'paid', paidAt: Date.now(), method: pay.method, subtotal: t.sub, discount: t.discount, tax: t.tax, total: t.total, receiptPrinted: !!App.printAfterPay, ...pay.extra });
     // Pay-first orders (self-service, takeaway): the bill gets a token and the order goes to the kitchen now
     const token = tokenAfterPay(o, fd);
     if (!token) S.kots.forEach((k) => { if (k.orderId === o.id && k.status === 'ready') { k.status = 'served'; k.updatedAt = Date.now(); useStockFor(k); } });
@@ -366,7 +370,7 @@ const Forms = {
       S.tableState = S.tableState || {};
       if (S.tableState[o.table]?.status !== 'blocked') S.tableState[o.table] = { status: 'cleaning', note: 'Bill paid — guests leaving', by: 'Auto (bill paid)', at: Date.now() };
     }
-    save(); toast(token ? `Paid ${money(t.total)} ✓ Token ${token}` : `Paid ${money(t.total)} ✓`);
+    save(); toast(pay.method === 'credit' ? `Saved on credit — ${money(t.total)} to collect from ${pay.extra.credit.name}` : pay.method === 'comp' ? 'Free bill saved' : token ? `Paid ${money(t.total)} ✓ Token ${token}` : `Paid ${money(t.total)} ✓`);
     if (token) openSheet(tokenSheet(o));
     if (App.printAfterPay) { App.printAfterPay = false; setTimeout(() => printBill(receiptHtml(o)), 50); }
   },
@@ -412,7 +416,7 @@ const Forms = {
     if (!String(fd.get('name') || '').trim()) return formError('Please enter the name of your place.');
     Object.assign(S.settings, {
       name: fd.get('name').trim(), tagline: fd.get('tagline').trim(), type: fd.get('type'), currency: fd.get('currency'),
-      tables: clamp(num(fd.get('tables')), 0, 99), tax: num(fd.get('tax')),
+      tables: fd.has('tables') ? clamp(num(fd.get('tables')), 0, 99) : S.settings.tables, tax: num(fd.get('tax')),
       openHour: clamp(num(fd.get('openHour')), 0, 23), closeHour: clamp(num(fd.get('closeHour')), 0, 23),
       footer: fd.get('footer').trim(), accent: fd.get('accent'), theme: fd.get('theme'), look: 4,
       short: shortCode(fd.get('short') || fd.get('name')),
@@ -431,6 +435,7 @@ const Forms = {
 const Inputs = {
   menuSearch(el) { App.ui.q = el.value; const g = $('#menu-grid'); if (g) g.innerHTML = menuGrid(); },
   billDiscount(el) {
+    if (typeof billLive === 'function') return billLive(el);
     const o = byId(S.orders, App.params.o); if (!o) return;
     const err = discountError(el.value, orderSubtotal(o));
     const e = el.form?.querySelector('#form-err'); if (e) e.textContent = err;

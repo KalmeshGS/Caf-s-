@@ -67,7 +67,7 @@ Views.dashboard = () => {
 function moneyReceivedCard(paid) {
   const pm = payMethods();
   const by = {};
-  paid.forEach((o) => { const k = o.method || 'other'; (by[k] = by[k] || { amt: 0, n: 0 }); by[k].amt += Number(o.total) || 0; by[k].n += 1; });
+  paid.forEach((o) => payParts(o).forEach(([k, a]) => { if (k === 'credit') return; (by[k] = by[k] || { amt: 0, n: 0 }); by[k].amt += Number(a) || 0; by[k].n += 1; }));
   const keys = [...Object.keys(pm), ...Object.keys(by).filter((k) => !pm[k])];
   const total = sum(Object.values(by), (x) => x.amt);
   const ICON = { cash: 'cash', upi: 'phone', card: 'card' };
@@ -117,17 +117,17 @@ const dishImg = (m, cls = '') => (m.photo && /^data:image\/(jpeg|png|webp);base6
   : `<span class="dish-img ph ${cls}" aria-hidden="true">${esc((m.name || '?').trim()[0] || '?').toUpperCase()}</span>`);
 function menuGrid() {
   const q = App.ui.q.trim().toLowerCase();
-  const items = S.menu.filter((m) => (App.ui.cat === 'All' || m.cat === App.ui.cat) && (!q || m.name.toLowerCase().includes(q)));
+  const items = S.menu.filter((m) => (App.ui.cat === 'All' || (App.ui.cat === '★' ? m.fav : m.cat === App.ui.cat)) && (!q || m.name.toLowerCase().includes(q))).sort((a, b) => (b.fav ? 1 : 0) - (a.fav ? 1 : 0));
   if (!items.length) return empty(S.menu.length ? 'Nothing matches.' : 'Your menu is empty — add items in Settings → Menu.');
   return items.map((m) => `<button class="menu-item" data-act="addItem" data-id="${m.id}" ${m.available === false ? 'disabled' : ''}>
-      ${dishImg(m)}<span>${esc(m.name)}</span><small>${m.available === false ? 'Not available' : money(m.price)}</small></button>`).join('');
+      ${dishImg(m)}<span>${dietDot(m)}${esc(m.name)}${m.fav ? ' <b class="fav-s" aria-label="Favourite">★</b>' : ''}</span><small>${m.available === false ? 'Not available' : money(m.price)}</small></button>`).join('');
 }
 
 function orderEditor(p) {
   const o = currentOrder(p);
   if (p.o && !o) return empty('This order no longer exists.', btn('Back to tables', 'toTables'));
   const label = o ? orderLabel(o) : p.t;
-  const cats = ['All', ...new Set(S.menu.map((m) => m.cat))];
+  const cats = ['All', ...(S.menu.some((m) => m.fav) ? ['★'] : []), ...new Set(S.menu.map((m) => m.cat))];
   if (!cats.includes(App.ui.cat)) App.ui.cat = 'All';
   const lines = o ? o.items : [];
   const unsent = sum(lines, (l) => Math.max(0, l.qty - l.sent));
@@ -139,7 +139,7 @@ function orderEditor(p) {
   <div class="order-layout">
     <section class="menu-pane">
       <div class="search">${icon('search')}<input type="search" placeholder="Search menu" value="${esc(App.ui.q)}" data-input="menuSearch" aria-label="Search menu"></div>
-      <div class="chip-row scroll">${cats.map((c) => `<button class="chip ${c === App.ui.cat ? 'on' : ''}" data-act="setCat" data-cat="${esc(c)}">${esc(c)}</button>`).join('')}</div>
+      <div class="chip-row scroll">${cats.map((c) => `<button class="chip ${c === App.ui.cat ? 'on' : ''}" data-act="setCat" data-cat="${esc(c)}">${c === '★' ? '★ Favourites' : esc(c)}</button>`).join('')}</div>
       <div class="menu-grid" id="menu-grid">${menuGrid()}</div>
     </section>
     <aside class="card ticket">
@@ -182,7 +182,7 @@ Views.kitchen = () => {
     return `<section class="k-col"><div class="k-col-h"><span>${esc(title)}</span><b>${list.length}</b></div>
       ${list.length ? list.map((k) => `<article class="kot card ${status}">
         <div class="kot-h"><strong>${k.token ? `<span class="tok">Token ${esc(k.token)}</span>` : esc(k.table === 'Takeaway' ? 'TA #' + k.no : k.table)}</strong>${k.parcel ? '<span class="badge">Parcel</span>' : ''}${k.custName ? `<small class="muted">${esc(k.custName)}</small>` : ''}${status === 'new' ? (k.changedAt ? '<span class="badge changed">Changed</span>' : '<span class="badge warm">New</span>') : `<small class="muted">#${k.no}</small>`}</div>
-        <ul>${k.items.map((i) => `<li><b>${i.qty}×</b> ${esc(i.name)}${i.note ? `<span class="knote">${esc(i.note)}</span>` : ''}</li>`).join('')}</ul>
+        <ul>${k.items.map((i) => `<li><b>${i.qty}×</b> ${esc(i.name)}${i.note ? `<span class="knote ${hasAllergy(i.note) ? 'allergy' : ''}">${hasAllergy(i.note) ? '⚠ ' : ''}${esc(i.note)}</span>` : ''}</li>`).join('')}</ul>
         <div class="kot-f"><span class="timer" data-since="${k.createdAt}">${icon('clock')}<span>${elapsed(k.createdAt)}</span></span>
         <button class="btn ${status === 'ready' ? 'ghost' : 'primary'} sm" data-act="kotNext" data-id="${k.id}">${esc(status === 'ready' && k.token ? 'Collected' : next)}</button></div>
       </article>`).join('') : `<p class="muted k-empty">—</p>`}</section>`;
@@ -216,9 +216,10 @@ Views.billing = (p) => {
         <div class="seg">${[['0', 'Eat here'], ['1', 'Parcel']].map(([v, l]) => `<label><input type="radio" name="parcel" value="${v}" ${(sel.table === 'Takeaway' && !feat('prepaid_flow')) === (v === '1') ? 'checked' : ''}><span>${l}</span></label>`).join('')}</div>
         <label class="field"><span>Customer name <em>(optional — shown with the token)</em></span><input name="custName" maxlength="24" value="${esc(sel.custName || '')}" autocomplete="off"></label>
         <p class="muted sm">${icon('receipt')} After payment the bill gets <b>token ${S.seq?.tday === dayKey() ? (Number(S.seq.token) || 0) + 1 : 1}</b> and the order goes to the kitchen with the same token.</p></div>` : ''}
-      <div class="seg">${Object.entries(pm).map(([k, m], i) => `<label><input type="radio" name="method" value="${k}" ${i === 1 ? 'checked' : ''}><span>${esc(m.label)}</span></label>`).join('')}</div>
+      ${payOptionsHtml(sel)}
       <button class="btn primary block" type="submit">${icon('check')}<span>${isPrepaid(sel) ? (feat('kitchen') === 'none' ? 'Paid — give token' : 'Paid — send to kitchen') : 'Mark as paid'}</span></button>
       <div class="row-2">${btn('Print bill', 'printBill', { cls: 'ghost', ic: 'printer', data: `data-id="${sel.id}"` })}${btn('Paid & print', 'payPrint', { cls: 'ghost', ic: 'receipt' })}</div>
+      <button type="button" class="link-btn danger-link" data-act="billCancelOpen" data-id="${sel.id}">${icon('x')} Cancel this bill</button>
     </form>`;
   } else if (sel && sel.status === 'paid') {
     bill = `<div class="card bill paid">
@@ -226,9 +227,9 @@ Views.billing = (p) => {
       ${sel.token ? `<div class="token-big"><small>Token</small><b>${esc(sel.token)}</b>${sel.parcel ? '<em>Parcel</em>' : ''}</div>` : ''}
       <h2>Total ${money(sel.total)}</h2>
       ${sel.items.map((l) => `<div class="line-row"><span>${esc(l.name)} × ${l.qty}</span><span>${money(l.qty * l.price)}</span></div>`).join('')}
-      ${billRows({ sub: sel.subtotal ?? orderSubtotal(sel), discount: sel.discount || 0, tax: sel.tax || 0, total: sel.total }).map(([k, v]) => `<div class="line-row"><span>${esc(k)}</span><span>${money(v, true)}</span></div>`).join('')}
+      ${billRows({ sub: sel.subtotal ?? orderSubtotal(sel), discount: sel.discount || 0, tax: sel.tax || 0, packing: sel.packingAmt || 0, service: sel.serviceAmt || 0, total: sel.total }).map(([k, v]) => `<div class="line-row"><span>${esc(k)}</span><span>${money(v, true)}</span></div>`).join('')}
       <div class="line-row"><b>Total</b><b>${money(sel.total)}</b></div>
-      <div class="line-row"><span>Paid by</span><b>${esc(pm[sel.method]?.label || sel.method)} · ${fmtTime(sel.paidAt)}</b></div>
+      <div class="line-row"><span>Paid by</span><b>${esc(paidByText(sel))} · ${fmtTime(sel.paidAt)}</b></div>
       ${typeof billProfitLine === 'function' ? billProfitLine(sel) : ''}
       <div class="row-2">${btn('Print receipt', 'printReceipt', { cls: 'ghost', ic: 'printer', data: `data-id="${sel.id}"` })}${btn('Done', 'closeBill', { cls: 'primary' })}</div>
     </div>`;
@@ -239,13 +240,14 @@ Views.billing = (p) => {
     : empty('No open bills. Orders from tables show up here.');
 
   const closing = S.journal[today]?.closing;
-  return `${pageHead('Billing', 'Bills', '')}
+  return `${pageHead('Billing', 'Bills', btn('Day summary', 'daySummary', { cls: 'ghost sm', ic: 'printer' }))}
   <div class="grid-2 wide-left">
     <div class="stack">
       ${bill}
       <section class="card">${eyebrow('Open bills')}<div class="list">${openList}</div></section>
     </div>
     <div class="stack">
+      ${creditCard()}
       <section class="card">
         <div class="card-head">${eyebrow(`Day closing · ${fmtDate(new Date())}`)}<b>${money(total)}</b></div>
         ${Object.entries(pm).map(([k, m]) => `<div class="meter-row"><span>${esc(m.label)}</span>${meter(total ? (bm[k] / total) * 100 : 0, m.color)}<b>${money(bm[k])}</b></div>`).join('')}
@@ -467,7 +469,7 @@ Views.journal = () => {
 
 /* ---------------- Settings ---------------- */
 Views.settings = () => {
-  const tabs = { business: 'Business', data: 'Data' };
+  const tabs = { business: 'Business', ...(Session.role() === 'owner' ? { floor: 'Floor & bills' } : {}), data: 'Data' };
   if (!tabs[App.ui.settingsTab]) App.ui.settingsTab = 'business';
   const tab = App.ui.settingsTab;
   const st = S.settings;
@@ -480,7 +482,7 @@ Views.settings = () => {
       <div class="row-3">
         <label class="field"><span>Type</span><select name="type">${Object.entries(BUSINESS_TYPES).map(([k, v]) => `<option value="${k}" ${k === st.type ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select></label>
         <label class="field"><span>Currency</span><select name="currency">${CURRENCIES.map((c) => `<option value="${c.code}" ${c.code === st.currency ? 'selected' : ''}>${c.code} · ${esc(c.symbol.trim())}</option>`).join('')}</select></label>
-        <label class="field"><span>Tables</span><input name="tables" type="number" min="0" max="99" value="${esc(st.tables)}"></label>
+        ${Array.isArray(st.areas) && st.areas.length ? `<div class="field"><span>Tables</span><button type="button" class="btn ghost sm" data-act="settingsTab" data-tab="floor">${pl(tableNames().length, 'table')} · ${pl(st.areas.length, 'area')} — edit</button></div>` : `<label class="field"><span>Tables <em>(or set areas in Floor & bills)</em></span><input name="tables" type="number" min="0" max="99" value="${esc(st.tables)}"></label>`}
       </div>
       <div class="row-3">
         <label class="field"><span>Tax %</span><input name="tax" type="number" min="0" max="40" step="0.5" value="${esc(st.tax)}"></label>
@@ -492,6 +494,8 @@ Views.settings = () => {
       <div class="field"><span>Appearance</span><div class="seg">${['auto', 'light', 'dark'].map((t) => `<label><input type="radio" name="theme" value="${t}" ${t === lookOf(st).theme ? 'checked' : ''}><span>${t[0].toUpperCase() + t.slice(1)}</span></label>`).join('')}</div></div>
       <div class="form-actions"><span></span><button class="btn primary" type="submit">Save changes</button></div>
     </form>`;
+  } else if (tab === 'floor') {
+    body = floorSettings();
   } else {
     const size = (JSON.stringify(S).length / 1024).toFixed(0);
     if (typeof Cloud !== 'undefined' && Cloud.on) {
@@ -527,7 +531,8 @@ Views.menu = () => {
     ${!S.stock.length ? `<div class="banner info">${icon('box')}<span>Add your stock items first (milk, sugar, tea powder…) so dishes can use them.</span>${can('stock') ? `<a class="btn primary sm" href="#/stock">Go to Stock</a>` : ''}</div>` : ''}
     ${noRecipe && S.stock.length ? `<div class="banner info">${icon('box')}<span>${pl(noRecipe, 'item')} ${noRecipe === 1 ? 'has' : 'have'} no ingredients yet, so stock won't reduce when ${noRecipe === 1 ? 'it is' : 'they are'} served. Tap an item to add them, or "Fill all from recipe library" (280+ common dishes built in).</span></div>` : ''}
     ${cats.map((c) => `<section class="card">${eyebrow(c)}${S.menu.filter((m) => m.cat === c).map((m) => `<div class="menu-row ${m.available === false ? 'off' : ''}">
-        ${dishImg(m)}<span>${esc(m.name)}${m.recipe && m.recipe.length ? `<small class="muted rec-sum">${esc(recipeText(m.recipe))}</small>` : `<small class="neg rec-sum">No ingredients set</small>`}${typeof costLine === 'function' ? costLine(m) : ''}</span><b>${money(m.price)}</b>
+        ${dishImg(m)}<span>${dietDot(m)}${esc(m.name)}${m.recipe && m.recipe.length ? `<small class="muted rec-sum">${esc(recipeText(m.recipe))}</small>` : `<small class="neg rec-sum">No ingredients set</small>`}${typeof costLine === 'function' ? costLine(m) : ''}</span><b>${money(m.price)}</b>
+        <button class="icon-btn sm fav-btn ${m.fav ? 'on' : ''}" data-act="menuFav" data-id="${m.id}" aria-pressed="${m.fav ? 'true' : 'false'}" aria-label="${m.fav ? 'Remove from' : 'Add to'} favourites" title="Favourite — shown first when ordering">${m.fav ? '★' : '☆'}</button>
         <label class="switch" title="Available today"><input type="checkbox" data-act="menuToggle" data-id="${m.id}" ${m.available !== false ? 'checked' : ''}><i></i></label>
         <button class="icon-btn sm" data-act="menuEdit" data-id="${m.id}" aria-label="Edit ${esc(m.name)}">${icon('edit')}</button></div>`).join('')}</section>`).join('') || empty('No menu yet.', btn('Add first item', 'menuAdd', { cls: 'ghost', ic: 'plus' }))}
     <p class="fine">The switch marks an item available / not available today (e.g. sold out).</p>`;
@@ -547,6 +552,7 @@ function menuForm(m = {}) {
     <label class="field"><span>Item name</span><input name="name" required maxlength="40" value="${esc(m.name || '')}"></label>
     <div class="row-2">
       <label class="field"><span>Price</span><input name="price" type="number" min="0" step="any" required value="${esc(m.price ?? '')}"></label>
+      <label class="field"><span>Veg / non-veg</span><select name="diet"><option value="">${m.id ? '—' : 'Guess from the name'}</option>${Object.entries(DIETS).map(([k, l]) => `<option value="${k}" ${m.diet === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
       <label class="field"><span>Category</span><input name="cat" required maxlength="24" list="cat-list" value="${esc(m.cat || cats[0] || '')}"><datalist id="cat-list">${cats.map((c) => `<option value="${esc(c)}">`).join('')}</datalist></label>
     </div>
     ${recipeEditor(m)}
@@ -559,7 +565,7 @@ function menuForm(m = {}) {
 /** Printable bill. `draft` (totals) = bill printed before payment */
 function receiptHtml(o, draft) {
   const st = S.settings, pm = payMethods();
-  const t = draft || { sub: o.subtotal, discount: o.discount, tax: o.tax, total: o.total };
+  const t = draft || { sub: o.subtotal, discount: o.discount, tax: o.tax, packing: o.packingAmt || 0, service: o.serviceAmt || 0, total: o.total };
   return `<div class="receipt">
     <h2>${esc(st.name)}</h2>${st.tagline ? `<p>${esc(st.tagline)}</p>` : ''}
     ${st.gstin ? `<p>GSTIN: ${esc(st.gstin)}</p>` : ''}${st.fssai ? `<p>FSSAI: ${esc(st.fssai)}</p>` : ''}${st.taxProfile ? `<p><b>${esc(st.taxProfile.billTitle || 'Tax Invoice')}</b></p>` : ''}
@@ -568,5 +574,5 @@ function receiptHtml(o, draft) {
     ${o.items.map((l) => `<div class="r"><span>${esc(l.name)} × ${l.qty}</span><span>${money(l.qty * l.price)}</span></div>`).join('')}<hr>
     ${billRows(t, st).map(([k, v]) => `<div class="r"><span>${esc(k)}</span><span>${money(v, true)}</span></div>`).join('')}
     <div class="r b"><span>Total</span><span>${money(t.total)}</span></div>
-    <p>${draft ? 'Payment pending' : `Paid by ${esc(pm[o.method]?.label || o.method)}`}</p><hr><p>${esc(st.footer || 'Thank you, visit again!')}</p></div>`;
+    <p>${draft ? 'Payment pending' : `Paid by ${esc(paidByText(o))}`}</p><hr><p>${esc(st.footer || 'Thank you, visit again!')}</p></div>`;
 }

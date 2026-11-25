@@ -95,11 +95,15 @@ service cloud.firestore {
         function isNum(v) { return v is int || v is float; }
         // The payment fields must be sane: discount within the subtotal, total = subtotal - discount + tax
         function validPayment(d) {
+          // split = several ways, credit = pay later, comp = free (discount = whole subtotal)
+          // charges = packing + service charge (0 when none)
           return d.status == 'paid'
-            && d.method in ['cash', 'upi', 'card']
+            && d.method in ['cash', 'upi', 'card', 'split', 'credit', 'comp']
             && isNum(d.paidAt) && isNum(d.subtotal) && isNum(d.discount) && isNum(d.tax) && isNum(d.total)
+            && isNum(d.get('charges', 0)) && d.get('charges', 0) >= 0
             && d.subtotal >= 0 && d.discount >= 0 && d.discount <= d.subtotal && d.tax >= 0
-            && math.abs(d.total - (d.subtotal - d.discount + d.tax)) < 0.01;
+            && (d.method != 'comp' || d.discount == d.subtotal)
+            && math.abs(d.total - (d.subtotal - d.discount + d.tax + d.get('charges', 0))) < 0.01;
         }
         allow read: if ok(cid);
         // New bills always start open (the owner may also upload old paid bills, e.g. moving an offline café online)
@@ -108,7 +112,13 @@ service cloud.firestore {
           // open bill stays open: add / change items, notes, table
           || (floor() && resource.data.status == 'open' && request.resource.data.status == 'open')
           // open bill gets paid: billing roles only, with valid amounts
-          || (can(cid, ['manager', 'cashier']) && resource.data.status == 'open' && validPayment(request.resource.data));
+          || (can(cid, ['manager', 'cashier']) && resource.data.status == 'open' && validPayment(request.resource.data))
+          // cancel an open bill (kept, with a reason, for the owner's leakage check)
+          || (can(cid, ['manager', 'cashier']) && resource.data.status == 'open' && request.resource.data.status == 'cancelled'
+              && request.resource.data.cancelReason is string && request.resource.data.cancelReason.size() > 0)
+          // credit bill: the money is collected later
+          || (can(cid, ['manager', 'cashier']) && resource.data.status == 'paid' && resource.data.method == 'credit'
+              && !('creditPaid' in resource.data) && onlyKeys(['creditPaid']));
         // Floor staff may only remove an open bill that has no items left (what the app does)
         allow delete: if owner(cid)
           || (floor() && resource.data.status == 'open' && resource.data.get('items', []).size() == 0);
@@ -122,7 +132,10 @@ service cloud.firestore {
           // while the kitchen hasn't started, floor staff may change the ticket (items, quantities, instructions)
           || (can(cid, ['manager', 'cashier', 'waiter']) && resource.data.status == 'new' && request.resource.data.status == 'new')
           || (can(cid, ['manager', 'cashier', 'waiter']) && resource.data.status == 'ready'
-              && request.resource.data.status == 'served' && onlyKeys(['status', 'updatedAt', 'stockDone']));
+              && request.resource.data.status == 'served' && onlyKeys(['status', 'updatedAt', 'stockDone']))
+          // guests moved to another table: the ticket follows them
+          || (can(cid, ['manager', 'cashier', 'waiter']) && request.resource.data.status == resource.data.status
+              && onlyKeys(['table', 'movedFrom', 'updatedAt']));
         allow delete: if can(cid, ['owner', 'kitchen', 'captain'])
           || (can(cid, ['manager', 'cashier', 'waiter']) && resource.data.status == 'new');
       }

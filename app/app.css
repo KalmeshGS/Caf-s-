@@ -1124,3 +1124,41 @@ small.muted, .fine { font-size: max(12px, .85em); }
 .pur-rows { display: grid; gap: 10px; }
 .pur-row { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) auto; gap: 10px; align-items: end; padding: 10px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface-2); }
 @media (max-width: 560px) { .pur-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; } .pur-row > .field:first-child { grid-column: 1 / -1; } }
+
+/* ---------- Orders & billing extras ---------- */
+.area-list { display: grid; gap: 6px; }
+.area-h { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; font-size: 15px; margin: 10px 2px 2px; }
+.area-h small { font-family: var(--font, inherit); font-size: 12.5px; font-weight: 500; color: var(--muted); }
+.area-rows { display: grid; gap: 10px; }
+.area-row { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 2fr) minmax(0, .8fr) auto; gap: 10px; align-items: end; padding: 10px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface-2); }
+@media (max-width: 560px) { .area-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; } .area-row > .field:nth-child(2) { grid-column: 1 / -1; grid-row: 2; } }
+.pay-opts { display: flex; flex-wrap: wrap; gap: 8px; }
+.pay-opts .chip-radio span { min-width: 64px; justify-content: center; }
+.pay-x { display: grid; gap: 8px; padding: 12px; border-radius: 14px; background: var(--surface-2); border: 1px solid var(--line); }
+.pay-x[hidden] { display: none; }
+.check.svc { font-size: 14px; }
+.pos { color: var(--ok-text); font-weight: 600; }
+.danger-link { color: var(--danger); justify-self: center; margin-top: 4px; }
+.btn.danger { background: var(--danger); border-color: var(--danger); color: #fff; }
+.credit-row { gap: 10px; } .credit-row span { flex: 1; } .credit-row small { display: block; font-size: 12px; }
+.allergy-chips .chip { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 35%, var(--line)); }
+.allergy-chips .chip.on { background: var(--danger); color: #fff; border-color: var(--danger); }
+.knote.allergy { background: var(--danger); color: #fff; }
+/* Indian food symbol: a square with a dot — green veg, brown non-veg, amber egg */
+.diet { display: inline-block; width: 12px; height: 12px; border: 1.5px solid currentColor; border-radius: 2px; margin-right: 6px; vertical-align: -1px; position: relative; flex: none; }
+.diet::after { content: ""; position: absolute; inset: 2px; border-radius: 50%; background: currentColor; }
+.diet.veg { color: #1e8e3e; } .diet.nonveg { color: #8b2a1d; } .diet.egg { color: #b7791f; }
+.diet.nonveg::after { border-radius: 0; inset: 2px 1.5px; clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.fav-s { color: #b7791f; font-size: 12px; }
+.fav-btn { font-size: 18px; color: var(--muted); }
+.fav-btn.on { color: #b7791f; }
+.receipt.summary .r span:last-child { text-align: right; }
+.kpi-tap { all: unset; display: grid; cursor: pointer; border-radius: var(--r, 16px); }
+.kpi-tap > .kpi { height: 100%; transition: border-color .15s; }
+.kpi-tap:hover > .kpi { border-color: var(--accent); }
+.kpi-tap:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.kpis.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 640px) { .kpis.three { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .kpis.three > :first-child { grid-column: 1 / -1; } }
+.pur-card { padding: 12px 14px; margin-top: 10px; box-shadow: none; background: var(--surface-2); }
+.pur-card small { display: block; font-size: 12px; }
+.line-row.sm { font-size: 13.5px; padding: 3px 0; color: var(--ink-2); }

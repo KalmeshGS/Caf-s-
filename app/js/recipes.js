@@ -296,7 +296,7 @@ Object.assign(Forms, {
   menuItem(fd) {
     const photo = String(fd.get('photo') || '');
     const { recipe, newStock, blocked } = readRecipe(fd);
-    const d = { photo: /^data:image\/jpeg;base64,/.test(photo) && photo.length < 120000 ? photo : '', name: String(fd.get('name') || '').trim(), price: num(fd.get('price')), cat: String(fd.get('cat') || '').trim() || 'General', recipe };
+    const d = { photo: /^data:image\/jpeg;base64,/.test(photo) && photo.length < 120000 ? photo : '', name: String(fd.get('name') || '').trim(), price: num(fd.get('price')), cat: String(fd.get('cat') || '').trim() || 'General', recipe, diet: DIETS[fd.get('diet')] ? fd.get('diet') : '' };
     if (!d.name) return formError('Please enter the item name.');
     if (blocked.length) return formError(`${blocked.join(', ')} ${blocked.length === 1 ? 'is' : 'are'} not in stock. Ask the owner or a manager to add ${blocked.length === 1 ? 'it' : 'them'} to Stock, or clear ${blocked.length === 1 ? 'that row' : 'those rows'}.`);
     newStock.forEach((s) => S.stock.push(s));
