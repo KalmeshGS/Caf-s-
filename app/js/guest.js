@@ -50,7 +50,7 @@
     a.q_gst = 'regular'; a.q_gstin = '29ABCDE1234F1Z5'; a.q_fssai = '10012345678901';
     return {
       name: `Demo ${p.label.split(' / ')[0]}`, short: 'DM', tagline: 'Guest demo · sample data', currency: 'INR',
-      openHour: 8, closeHour: 22, accent: 'clay', theme: 'light', look: 3, footer: 'Thank you, visit again!',
+      openHour: 8, closeHour: 22, accent: 'ink', theme: 'light', look: 4, footer: 'Thank you, visit again!',
       ...profileSettings(a, 'Guest'),
     };
   }

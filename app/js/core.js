@@ -44,9 +44,11 @@ const CURRENCIES = [
   { code: 'PKR', symbol: 'Rs ', locale: 'en-IN', dec: 0, scale: 3.3, wallet: 'Wallet' },
 ];
 /** Older cafés kept the first default (green, auto) — they get the new house look until they choose one in Settings */
-/** The house look (cream + clay) is used until the owner picks a colour / appearance in Settings (look: 3) */
-const lookOf = (st = {}) => (st.look === 3 ? { accent: st.accent || 'clay', theme: st.theme || 'light' } : { accent: 'clay', theme: 'light' });
-const ACCENTS = { clay: '#b5562a', red: '#c8372d', olive: '#6b6f4c', green: '#1f7a4d', coffee: '#8a5a33', indigo: '#4f46e5', terracotta: '#c2410c', teal: '#0f766e', charcoal: '#3f3f46' };
+/** The house look (porcelain + ink blue) is used until the owner picks a colour / appearance in Settings (look: 4).
+    Cafés saved with the earlier cream + clay house look (look 3, accent clay) move to the new house look. */
+const lookOf = (st = {}) => (st.look === 4 || (st.look === 3 && st.accent && st.accent !== 'clay')
+  ? { accent: st.accent || 'ink', theme: st.theme || 'light' } : { accent: 'ink', theme: 'light' });
+const ACCENTS = { ink: '#1f4e79', clay: '#b5562a', red: '#c8372d', olive: '#6b6f4c', green: '#1f7a4d', coffee: '#8a5a33', indigo: '#4f46e5', terracotta: '#c2410c', teal: '#0f766e', charcoal: '#3f3f46' };
 const EXPENSE_CATS = { Rent: '#6366f1', Utilities: '#eab308', Vendor: '#c2783c', Kitchen: '#16a34a', Salary: '#0ea5e9', Maintenance: '#a855f7', Marketing: '#ec4899', Other: '#94a3b8' };
 /** Common job titles for the Designation dropdown ("Other" lets you type your own) */
 const DESIGNATIONS = ['Manager', 'Assistant Manager', 'Head Chef', 'Chef', 'Cook', 'Kitchen Helper', 'Barista', 'Cashier', 'Captain', 'Waiter', 'Steward', 'Bartender', 'Baker', 'Housekeeping', 'Dishwasher', 'Delivery', 'Security', 'Accountant', 'Helper'];

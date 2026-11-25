@@ -9,7 +9,7 @@ function applyTheme() {
   const st = S.settings || {};
   const root = document.documentElement;
   const look = lookOf(st);
-  root.style.setProperty('--accent', ACCENTS[look.accent] || ACCENTS.red);
+  root.style.setProperty('--accent', ACCENTS[look.accent] || ACCENTS.ink);
   if (look.theme === 'light' || look.theme === 'dark') root.dataset.theme = look.theme; else delete root.dataset.theme;
   document.title = st.name ? `${st.name} · Cafe Journal` : 'Cafe Journal';
 }
@@ -406,7 +406,7 @@ const Forms = {
       name: fd.get('name').trim(), tagline: fd.get('tagline').trim(), type: fd.get('type'), currency: fd.get('currency'),
       tables: clamp(num(fd.get('tables')), 0, 99), tax: num(fd.get('tax')),
       openHour: clamp(num(fd.get('openHour')), 0, 23), closeHour: clamp(num(fd.get('closeHour')), 0, 23),
-      footer: fd.get('footer').trim(), accent: fd.get('accent'), theme: fd.get('theme'), look: 3,
+      footer: fd.get('footer').trim(), accent: fd.get('accent'), theme: fd.get('theme'), look: 4,
       short: shortCode(fd.get('short') || fd.get('name')),
     });
     save(); toast('Saved');
