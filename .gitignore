@@ -1,2 +1,5 @@
 worker/node_modules/
 worker/.wrangler/
+tests/node_modules/
+tests/*.log
+tests/package-lock.json
