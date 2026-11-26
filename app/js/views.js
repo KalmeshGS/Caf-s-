@@ -138,7 +138,7 @@ function orderEditor(p) {
   return `<div class="crumb"><button class="icon-btn" data-act="toTables" aria-label="Back">${icon('left')}</button><span>${esc(ROLES[role].label)} · Order</span></div>
   <div class="order-layout">
     <section class="menu-pane">
-      <div class="search">${icon('search')}<input type="search" placeholder="Search menu" value="${esc(App.ui.q)}" data-input="menuSearch" aria-label="Search menu"></div>
+      <div class="search-row"><div class="search">${icon('search')}<input type="search" placeholder="Search menu or scan a barcode" value="${esc(App.ui.q)}" data-input="menuSearch" aria-label="Search menu"></div>${FLOOR_SELLERS.includes(Session.role()) ? `<button class="icon-btn scan-btn" data-act="sellScanOpen" aria-label="Scan a barcode with the camera" title="Scan with the camera">${icon('camera')}</button>` : ''}</div>
       <div class="chip-row scroll">${cats.map((c) => `<button class="chip ${c === App.ui.cat ? 'on' : ''}" data-act="setCat" data-cat="${esc(c)}">${c === '★' ? '★ Favourites' : esc(c)}</button>`).join('')}</div>
       <div class="menu-grid" id="menu-grid">${menuGrid()}</div>
     </section>
@@ -240,7 +240,7 @@ Views.billing = (p) => {
     : empty('No open bills. Orders from tables show up here.');
 
   const closing = S.journal[today]?.closing;
-  return `${pageHead('Billing', 'Bills', btn('Day summary', 'daySummary', { cls: 'ghost sm', ic: 'printer' }))}
+  return `${pageHead('Billing', 'Bills', `<div class="btn-row tight">${btn('Scan to bill', 'sellScanOpen', { cls: 'ghost sm', ic: 'camera' })}${btn('Day summary', 'daySummary', { cls: 'ghost sm', ic: 'printer' })}</div>`)}
   <div class="grid-2 wide-left">
     <div class="stack">
       ${bill}
@@ -253,7 +253,7 @@ Views.billing = (p) => {
         ${Object.entries(pm).map(([k, m]) => `<div class="meter-row"><span>${esc(m.label)}</span>${meter(total ? (bm[k] / total) * 100 : 0, m.color)}<b>${money(bm[k])}</b></div>`).join('')}
         <p class="muted sm">${pl(paid.length, 'bill')} paid today${closing ? ` · closed at ${fmtTime(closing.at)}` : ''}</p>
         ${btn(closing ? 'Update day closing' : 'Close day & save to journal', 'closeDay', { cls: 'ghost block', ic: 'book' })}
-        ${canReport() ? btn('Download daily report (PDF / Word / Excel)', 'reportOpen', { cls: 'ghost block', ic: 'download' }) : ''}
+        ${canReport() ? btn('Download report — day / week / month / year', 'reportOpen', { cls: 'ghost block', ic: 'download' }) : ''}
       </section>
       <section class="card">${eyebrow('Paid today')}
         <div class="list compact">${paid.length ? paid.slice(0, 12).map((o) => `<button class="list-btn" data-act="selectBill" data-id="${o.id}">
@@ -269,7 +269,7 @@ Views.stock = () => {
   const low = S.stock.filter(isLow);
   const list = (f === 'low' ? low : S.stock).slice().sort((a, b) => (isLow(b) - isLow(a)) || a.name.localeCompare(b.name));
   const costs = typeof seesCost === 'function' && seesCost();
-  const head = pageHead('Stock · live', 'Inventory', `<div class="btn-row tight">${costs ? btn('Wastage', 'wasteOpen', { cls: 'ghost sm', ic: 'trash' }) : ''}${btn('Add item', 'stockAdd', { cls: 'ghost sm', ic: 'plus' })}${costs ? btn('Purchase', 'purchaseOpen', { cls: 'primary', ic: 'download' }) : ''}</div>`);
+  const head = pageHead('Stock · live', 'Inventory', `<div class="btn-row tight">${costs ? btn('Scan', 'stockScanOpen', { cls: 'ghost sm', ic: 'camera' }) : ''}${costs ? btn('Wastage', 'wasteOpen', { cls: 'ghost sm', ic: 'trash' }) : ''}${btn('Add item', 'stockAdd', { cls: 'ghost sm', ic: 'plus' })}${costs ? btn('Purchase', 'purchaseOpen', { cls: 'primary', ic: 'download' }) : ''}</div>`);
   const chips = `<div class="chip-row"><button class="chip ${f === 'all' ? 'on' : ''}" data-act="stockFilter" data-f="all">All (${S.stock.length})</button><button class="chip ${f === 'low' ? 'on' : ''}" data-act="stockFilter" data-f="low">Low (${low.length})</button>${costs ? `<button class="chip ${f === 'move' ? 'on' : ''}" data-act="stockFilter" data-f="move">Movement & value</button>` : ''}</div>`;
   if (f === 'move' && costs) return `${head}${stockKpis()}${chips}${movementCard(App.ui.month)}`;
   return `${head}
@@ -389,42 +389,7 @@ const vendorForm = () => `${sheetHead('Vendors', 'Add vendor')}
   </form>`;
 
 /* ---------------- 08 Reports ---------------- */
-Views.reports = () => {
-  const mk = App.ui.month;
-  const paid = paidInMonth(mk);
-  const exps = expensesInMonth(mk);
-  const sales = sum(paid, (o) => o.total), spend = sum(exps, (e) => e.amount), profit = sales - spend;
-  const d = keyToDate(mk);
-  const daysIn = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
-  const daily = Array.from({ length: daysIn }, (_, i) => sum(paid.filter((o) => new Date(o.paidAt).getDate() === i + 1), (o) => o.total));
-  const top = topItems(paid).slice(0, 6);
-  const maxQ = Math.max(1, ...top.map((t) => t.qty));
-  const cats = Object.entries(EXPENSE_CATS).map(([c, color]) => ({ c, color, v: sum(exps.filter((e) => e.cat === c), (e) => e.amount) })).filter((x) => x.v).sort((a, b) => b.v - a.v);
-  const bm = byMethod(paid), pm = payMethods();
-  const best = daily.indexOf(Math.max(...daily));
-
-  return `${pageHead(`Report · ${monthLabel(mk)}`, 'Month at a glance', `<div class="btn-row tight">${btn('Daily report', 'reportOpen', { cls: 'ghost', ic: 'download' })}<button class="btn ghost" data-act="exportCsv">${icon('download')}<span>CSV</span></button></div>`)}
-  ${monthNav(mk)}
-  <div class="kpis">
-    ${kpi('Sales', money(sales), `${pl(paid.length, 'bill')}`)}
-    ${kpi('Expenses', money(spend), `${exps.length} ${exps.length === 1 ? 'entry' : 'entries'}`, 'neg')}
-    ${kpi('Avg. bill', money(paid.length ? sales / paid.length : 0), daily.some(Boolean) ? `Best day: ${best + 1} ${fmtDate(d, { month: 'short' })}` : '')}
-    <div class="kpi card profit"><p class="eyebrow">Real profit · ${esc(fmtDate(d, { month: 'long' }))}</p><p class="kpi-v">${money(profit)}</p><p class="kpi-s">${sales ? Math.round((profit / sales) * 100) + '% margin' : '—'}</p></div>
-  </div>
-  <section class="card">${eyebrow('Daily sales')}${barChart(daily, daily.map((_, i) => String(i + 1)), { hi: mk === monthKey() ? new Date().getDate() - 1 : -1 })}</section>
-  <div class="grid-2">
-    <section class="card">${eyebrow('Best sellers')}
-      ${top.length ? top.map((t, i) => `<div class="meter-row"><span>${i === 0 ? '★ ' : ''}${esc(t.name)}</span>${meter((t.qty / maxQ) * 100, i === 0 ? 'var(--accent)' : 'var(--warm)')}<b>${t.qty} sold</b></div>`).join('') : empty('No sales this month.')}
-    </section>
-    <section class="card">${eyebrow('Where the money went')}
-      ${cats.length ? cats.map((x) => `<div class="meter-row"><span>${esc(x.c)}</span>${meter((x.v / spend) * 100, x.color)}<b>${Math.round((x.v / spend) * 100)}%</b></div>`).join('') : empty('No expenses this month.')}
-    </section>
-  </div>
-  ${typeof seesCost === 'function' && seesCost() ? `<div class="grid-2">${foodCostCard(mk)}${leakageCard(mk)}</div>` : ''}
-  <section class="card">${eyebrow('How customers paid')}
-    ${Object.entries(pm).map(([k, m]) => `<div class="meter-row"><span>${esc(m.label)}</span>${meter(sales ? (bm[k] / sales) * 100 : 0, m.color)}<b>${money(bm[k])}</b></div>`).join('')}
-  </section>`;
-};
+/* Views.reports lives in periods.js (any day / week / month / year / dates) */
 
 /* ---------------- Journal ---------------- */
 const JOURNAL_TAGS = ['Busy', 'Slow', 'Festival', 'Event', 'Rain', 'Holiday', 'Short-staffed', 'New item'];
@@ -439,7 +404,7 @@ Views.journal = () => {
   const recent = Object.entries(S.journal).filter(([k, v]) => k !== dk && (v.note || v.tags?.length || v.closing)).sort((a, b) => b[0].localeCompare(a[0])).slice(0, 10);
   const c = e.closing;
   const pm = payMethods();
-  return `${pageHead('Journal', 'Daybook', canReport() ? btn('Daily report', 'reportOpen', { cls: 'ghost', ic: 'download' }) : '')}
+  return `${pageHead('Journal', 'Daybook', canReport() ? btn('Download report', 'reportOpen', { cls: 'ghost', ic: 'download' }) : '')}
   <div class="stepper">
     <button class="icon-btn" data-act="dayNav" data-d="-1" aria-label="Previous day">${icon('left')}</button>
     <span>${dk === dayKey() ? 'Today · ' : ''}${fmtDate(keyToDate(dk), { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}</span>
@@ -554,6 +519,7 @@ function menuForm(m = {}) {
     <label class="field"><span>Item name</span><input name="name" required maxlength="40" value="${esc(m.name || '')}"></label>
     <div class="row-2">
       <label class="field"><span>Price</span><input name="price" type="number" min="0" step="any" required value="${esc(m.price ?? '')}"></label>
+      <label class="field"><span>Barcode <em>(packaged items · optional)</em></span><input name="barcode" maxlength="120" autocomplete="off" value="${esc(m.barcode || '')}" placeholder="Scan or type"></label>
       <label class="field"><span>Veg / non-veg</span><select name="diet"><option value="">${m.id ? '—' : 'Guess from the name'}</option>${Object.entries(DIETS).map(([k, l]) => `<option value="${k}" ${m.diet === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
       <label class="field"><span>Category</span><input name="cat" required maxlength="24" list="cat-list" value="${esc(m.cat || cats[0] || '')}"><datalist id="cat-list">${cats.map((c) => `<option value="${esc(c)}">`).join('')}</datalist></label>
     </div>

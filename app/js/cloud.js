@@ -296,6 +296,11 @@ Cloud.ensureMonth = async (mk) => {
   const o = SPEC.find((s) => s.key === 'orders'), e = SPEC.find((s) => s.key === 'expenses');
   jobs.push(fetchInto(o, FB.query(ccol('orders'), FB.where('createdAt', '>=', start.getTime()), FB.where('createdAt', '<', end.getTime()))));
   if (readable(e, role)) jobs.push(fetchInto(e, FB.query(ccol('expenses'), FB.where('date', '>=', dayKey(start)), FB.where('date', '<', dayKey(end)))));
+  // purchases, wastage and leakage records of that month (owner / manager)
+  for (const key of ['stockLog', 'audit']) {
+    const sp = SPEC.find((s) => s.key === key);
+    if (sp && readable(sp, role) && !(Cloud.rulesOutdated && NEW_RULE_KEYS.includes(key))) jobs.push(fetchInto(sp, FB.query(ccol(sp.coll), FB.where('date', '>=', dayKey(start)), FB.where('date', '<', dayKey(end)))));
+  }
   try { await Promise.all(jobs); } catch (err) { toast(friendly(err)); }
   render();
 };

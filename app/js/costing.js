@@ -66,7 +66,11 @@ function usedBySales(orders) {
   }));
   return use;
 }
-const logsInMonth = (mk, type) => (S.stockLog || []).filter((x) => String(x.date || '').startsWith(mk) && (!type || x.type === type));
+/** A month key ("2026-11") or a period { from, to } → { from, to } */
+const asRange = (x) => (typeof x === 'string' ? { from: `${x}-01`, to: `${x}-31`, month: x } : x);
+const inRng = (dk, r) => !!dk && dk >= r.from && dk <= r.to;
+const logsInMonth = (mk, type) => { const r = asRange(mk); return (S.stockLog || []).filter((x) => inRng(String(x.date || ''), r) && (!type || x.type === type)); };
+const paidIn = (x) => { const r = asRange(x); return paidOrders().filter((o) => inRng(dayKey(o.paidAt), r)); };
 
 /** Stock movement for a month, per item */
 function stockMovement(mk) {
@@ -74,7 +78,7 @@ function stockMovement(mk) {
   logsInMonth(mk, 'purchase').forEach((p) => (p.lines || []).forEach((l) => { const r = rows.get(l.stockId); if (r) { r.bought += Number(l.qty) || 0; r.boughtAmt += Number(l.amount) || 0; } }));
   logsInMonth(mk, 'waste').forEach((w) => { const r = rows.get(w.stockId); if (r) r.waste += Number(w.qty) || 0; });
   logsInMonth(mk, 'count').forEach((c) => { const r = rows.get(c.stockId); if (r) r.fix += Number(c.qty) || 0; });
-  Object.entries(usedBySales(paidInMonth(mk))).forEach(([id, q]) => { const r = rows.get(id); if (r) r.used += q; });
+  Object.entries(usedBySales(paidIn(mk))).forEach(([id, q]) => { const r = rows.get(id); if (r) r.used += q; });
   return [...rows.values()];
 }
 
@@ -103,10 +107,11 @@ function audit(type, d = {}) {
 
 /* ---------------- 5. leakage check ---------------- */
 function leakage(mk) {
-  const paid = paidInMonth(mk);
-  const ev = (S.audit || []).filter((x) => String(x.date || '').startsWith(mk));
+  const rr = asRange(mk);
+  const paid = paidIn(rr);
+  const ev = (S.audit || []).filter((x) => inRng(String(x.date || ''), rr));
   const disc = paid.filter((o) => (o.discount || 0) > 0 && o.method !== 'comp');
-  const stale = mk === monthKey() ? S.orders.filter((o) => o.status === 'open' && o.items.some((l) => l.sent > 0) && Date.now() - o.createdAt > 4 * 3600e3) : [];
+  const stale = inRng(dayKey(), rr) ? S.orders.filter((o) => o.status === 'open' && o.items.some((l) => l.sent > 0) && Date.now() - o.createdAt > 4 * 3600e3) : [];
   const staleAmt = (o) => round2(sum(o.items, (l) => Math.min(l.sent, l.qty) * l.price));
   const waste = logsInMonth(mk, 'waste');
   const missing = logsInMonth(mk, 'count').filter((c) => c.qty < 0);
@@ -136,16 +141,16 @@ function leakageCard(mk) {
   const groups = leakage(mk);
   const total = round2(sum(groups, (g) => g.amt));
   return `<section class="card leak-card">${eyebrow('Leakage check')}
-    <div class="leak-total"><b class="${total ? 'neg' : ''}">${money(total)}</b><span class="muted sm">may have slipped away this month — tap a line to see each case</span></div>
+    <div class="leak-total"><b class="${total ? 'neg' : ''}">${money(total)}</b><span class="muted sm">may have slipped away in this period — tap a line to see each case</span></div>
     ${groups.map((g) => `<details class="leak-g ${g.items.length ? '' : 'none'}"><summary><span><strong>${esc(g.title)}</strong><small class="muted">${esc(g.hint)}</small></span><b>${g.items.length}${g.amt ? ` · ${money(g.amt)}` : ''}</b></summary>
-      ${g.items.length ? `<div class="list compact">${g.items.slice(0, 30).map((i) => `<div class="line-row leak-i"><span>${esc(i.what)}<small class="muted">${fmtDate(new Date(i.when), { day: 'numeric', month: 'short' })} ${fmtTime(i.when)}${i.who ? ` · ${esc(i.who)}` : ''}</small></span><b>${i.amt ? money(i.amt) : ''}</b></div>`).join('')}</div>` : '<p class="muted sm">Nothing this month.</p>'}
+      ${g.items.length ? `<div class="list compact">${g.items.slice(0, 30).map((i) => `<div class="line-row leak-i"><span>${esc(i.what)}<small class="muted">${fmtDate(new Date(i.when), { day: 'numeric', month: 'short' })} ${fmtTime(i.when)}${i.who ? ` · ${esc(i.who)}` : ''}</small></span><b>${i.amt ? money(i.amt) : ''}</b></div>`).join('')}</div>` : '<p class="muted sm">Nothing in this period.</p>'}
     </details>`).join('')}
   </section>`;
 }
 
 /* ---------------- Reports: food costing card ---------------- */
 function foodCostCard(mk) {
-  const paid = paidInMonth(mk);
+  const paid = paidIn(mk);
   const sales = sum(paid, (o) => (o.subtotal ?? orderSubtotal(o)) - (o.discount || 0));
   const fc = round2(sum(paid, billFoodCost));
   const dishes = S.menu.filter((m) => m.recipe && m.recipe.length).map((m) => ({ m, c: dishCost(m) })).filter((x) => x.c.cost > 0 && x.m.price > 0)
