@@ -460,12 +460,7 @@ const Inputs = {
 
 /* ---------------- utils ---------------- */
 const slug = (s) => String(s || 'cafe').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'cafe';
-function download(name, text, type) {
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([text], { type }));
-  a.download = name; document.body.appendChild(a); a.click();
-  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
-}
+function download(name, text, type) { saveBlob(name, new Blob([text], { type })); }
 
 /* ---------------- events ---------------- */
 document.addEventListener('click', (e) => {

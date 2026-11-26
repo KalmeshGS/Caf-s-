@@ -38,16 +38,31 @@ function shiftPeriod(rep, n) {
 const paidInRange = (R) => paidOrders().filter((o) => inR(dayKey(o.paidAt), R));
 const expensesInRange = (R) => (S.expenses || []).filter((e) => inR(e.date, R));
 /** Online: make sure every month of the period is loaded (bills, expenses, purchases, wastage, leakage records) */
-async function ensureRange(R) {
-  if (typeof Cloud === 'undefined' || !Cloud.on || !Cloud.ensureMonth || App.repLoading) return;
+async function ensureRange(R, quiet) {
+  if (App.repLoading) return App.repLoading;
   // Only months older than the live window need loading (recent ones are always on the device)
-  const liveFrom = Date.now() - (typeof WINDOW_DAYS === 'number' ? WINDOW_DAYS : 62) * 864e5;
-  const months = []; for (let mk = R.from.slice(0, 7); mk <= R.to.slice(0, 7) && mk <= monthKey(); mk = shiftMonth(mk, 1)) months.push(mk);
-  const todo = months.filter((mk) => keyToDate(mk).getTime() < liveFrom && !Cloud.loadedMonths?.has(mk));
+  const todo = monthsToLoad(R);
   if (!todo.length) return;
-  App.repLoading = true;
-  setTimeout(render, 0); // never re-render from inside a render
-  try { for (const mk of todo) await Cloud.ensureMonth(mk); } finally { App.repLoading = false; setTimeout(render, 0); }
+  if (App.repFailedAt && Date.now() - App.repFailedAt < 30000) return; // no retry storm while offline
+  if (!quiet) setTimeout(() => calmRender(), 0); // show "Loading…" (never re-render from inside a render)
+  // all months at once (a year used to load one month after another: 20–30 s online)
+  App.repLoading = (async () => {
+    try {
+      await Promise.race([Promise.all(todo.map((mk) => Cloud.ensureMonth(mk, true))), new Promise((_, no) => setTimeout(() => no(new Error('timeout')), 25000))]);
+    } catch (e) { App.repFailedAt = Date.now(); toast('Could not load the older records — check the internet and try again.'); }
+    finally { App.repLoading = null; calmRender(); }
+  })();
+  return App.repLoading;
+}
+/** Redraw the screen once — but not while a date picker / year list is open (that closed it and the tap was lost) */
+function calmRender() {
+  const a = document.activeElement;
+  if (a && a.closest && a.closest('#app') && a.matches('input, select, textarea')) {
+    if (a._calm) return; a._calm = true;
+    a.addEventListener('blur', () => { a._calm = false; setTimeout(render, 0); }, { once: true });
+    return;
+  }
+  render();
 }
 /** Sales chart buckets for the period */
 function periodChart(R, paid) {
@@ -65,6 +80,34 @@ function periodChart(R, paid) {
   return { title: R.mode === 'week' ? 'Sales by day' : 'Daily sales', values: days.map((k) => sum(paid.filter((o) => dayKey(o.paidAt) === k), (o) => o.total)), labels: days.map((k) => (R.mode === 'week' ? keyToDate(k).toLocaleDateString(undefined, { weekday: 'short' }) : String(Number(k.slice(8))))), full: days.map((k) => fmtDate(keyToDate(k), { weekday: 'short', day: 'numeric', month: 'short' })), hi: days.indexOf(dayKey()) };
 }
 
+/** Day / Week / Month / Year / Dates as plain buttons */
+const modeButtons = (mode, act) => Object.entries(PERIODS).map(([k, l]) => `<button type="button" class="seg-btn" data-act="${act}" data-m="${k}" aria-pressed="${mode === k}"><span>${l}</span></button>`).join('');
+/** Switch period type, keeping the dates you were looking at (never a future or a far-away date) */
+function switchMode(old, m) {
+  const R = periodRange(old), today = dayKey(), end = minKey(R.to, today);
+  if (m === 'range') {
+    if (old.mode === 'range') return old;
+    const from = old.mode === 'day' || old.mode === 'week' ? R.from : `${end.slice(0, 7)}-01`;
+    return { mode: 'range', from, to: end < from ? from : end, anchor: from };
+  }
+  return { mode: m, anchor: old.mode === 'day' ? old.anchor : (end < R.from ? R.from : end) };
+}
+/** Phones: apply a picked date only once the date wheel / calendar is closed, so the screen never
+    changes under an open picker (on iPhone that left the next taps doing nothing) */
+function afterPick(el, fn) {
+  const touch = window.matchMedia && matchMedia('(pointer: coarse)').matches;
+  if (!touch || document.activeElement !== el) { setTimeout(() => fn(el.value), 0); return; }
+  if (el._wait) return; el._wait = true;
+  el.addEventListener('blur', () => { el._wait = false; setTimeout(() => fn(el.value), 0); }, { once: true });
+}
+/** Months of the period that still have to be fetched from the online database */
+function monthsToLoad(R) {
+  if (typeof Cloud === 'undefined' || !Cloud.on || !Cloud.ensureMonth) return [];
+  const liveFrom = Date.now() - (typeof WINDOW_DAYS === 'number' ? WINDOW_DAYS : 62) * 864e5;
+  const months = []; for (let mk = R.from.slice(0, 7); mk <= R.to.slice(0, 7) && mk <= monthKey(); mk = shiftMonth(mk, 1)) months.push(mk);
+  return months.filter((mk) => keyToDate(mk).getTime() < liveFrom && !Cloud.loadedMonths?.has(mk));
+}
+
 /* ---------------- the Reports screen ---------------- */
 function periodBar(rep, R) {
   const today = dayKey();
@@ -75,7 +118,7 @@ function periodBar(rep, R) {
           : `<input type="date" class="inline-input rep-date" value="${R.from}" max="${today}" data-change="repFrom" aria-label="From"><span class="muted">to</span><input type="date" class="inline-input rep-date" value="${R.to}" max="${today}" data-change="repTo" aria-label="To">`;
   const atEnd = R.to >= today;
   return `<div class="rep-bar">
-    <div class="seg rep-modes" role="tablist">${Object.entries(PERIODS).map(([k, l]) => `<label><input type="radio" name="repMode" value="${k}" ${rep.mode === k ? 'checked' : ''} data-change="repMode"><span>${l}</span></label>`).join('')}</div>
+    <div class="seg rep-modes" role="group" aria-label="Period">${modeButtons(rep.mode, 'repMode')}</div>
     <div class="rep-nav">
       <button class="icon-btn" data-act="repShift" data-d="-1" aria-label="Previous">${icon('left')}</button>
       <div class="rep-pick">${pick}</div>
@@ -184,7 +227,7 @@ function periodSheet(start) {
   const R = periodRange(rep);
   return `${sheetHead('Download report', R.label)}
     <div class="form">
-      <div class="seg" role="radiogroup" aria-label="Period">${Object.entries(PERIODS).map(([k, l]) => `<label><input type="radio" name="dlMode" value="${k}" ${rep.mode === k ? 'checked' : ''} data-change="dlMode"><span>${l}</span></label>`).join('')}</div>
+      <div class="seg dl-modes" role="group" aria-label="Period">${modeButtons(rep.mode, 'dlMode')}</div>
       <div class="row-2" id="dl-dates">${dlDates(rep, R)}</div>
       <p class="muted sm" id="dl-label">${esc(R.label)} · sales, every bill, items sold, payment split, discounts, tax, expenses${R.days > 1 ? ', day-by-day totals' : ''}. Saved as <b>${esc(periodFile(R, '…'))}</b>.</p>
       <div class="btn-row">${btn('PDF', 'periodDl', { cls: 'primary', ic: 'download', data: 'data-f="pdf"' })}${btn('Word', 'periodDl', { cls: 'ghost', ic: 'download', data: 'data-f="docx"' })}${btn('Excel', 'periodDl', { cls: 'ghost', ic: 'download', data: 'data-f="xlsx"' })}${btn('CSV', 'periodDl', { cls: 'ghost', ic: 'download', data: 'data-f="csv"' })}</div>
@@ -209,6 +252,7 @@ function dlRead() {
 }
 function dlRefresh() {
   const rep = dlRead(), R = periodRange(rep);
+  ensureRange(R, true); // fetch older records now, so the download is instant
   const box = $('#dl-dates'); if (box && !box.contains(document.activeElement)) box.innerHTML = dlDates(rep, R);
   const l = $('#dl-label'); if (l) l.innerHTML = `${esc(R.label)} · sales, every bill, items sold, payment split, discounts, tax, expenses${R.days > 1 ? ', day-by-day totals' : ''}. Saved as <b>${esc(periodFile(R, '…'))}</b>.`;
   const h = $('#sheet .sheet-head h2'); if (h) h.textContent = R.label;
@@ -224,13 +268,27 @@ Object.assign(Actions, {
     const h = location.hash;
     openSheet(periodSheet(h.startsWith('#/reports') ? App.ui.rep : { mode: 'day', anchor: h.startsWith('#/journal') ? (App.ui.day || dayKey()) : dayKey() }));
   },
+  repMode(el) { App.ui.rep = switchMode(App.ui.rep || { mode: 'month', anchor: dayKey() }, el.dataset.m); render(); },
+  dlMode(el) {
+    const rep = switchMode(dlRead(), el.dataset.m); App.dl = rep;
+    $$('#sheet .dl-modes .seg-btn').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.m === rep.mode)));
+    const box = $('#dl-dates'); if (box) box.innerHTML = dlDates(rep, periodRange(rep));
+    dlRefresh();
+  },
   async periodDl(el) {
     if (typeof canReport === 'function' && !canReport()) return;
     const rep = dlRead(), R = periodRange(rep);
     if (R.from > dayKey()) return formError('Pick today or an earlier date.');
     if (R.days > 400) return formError('Choose up to about one year at a time.');
-    for (let i = 0; App.repLoading && i < 100; i++) await new Promise((r) => setTimeout(r, 100)); // a load already running
-    await ensureRange(R);
+    if (App.repLoading || monthsToLoad(R).length) {
+      // older records are not on this device yet: fetch them (a few seconds), then the next tap saves at once
+      // (phones only allow saving a file straight from a tap)
+      const err = $('#form-err'); if (err) { err.className = 'muted sm'; err.textContent = 'Loading older records…'; }
+      App.repFailedAt = 0;
+      await App.repLoading; await ensureRange(R, true);
+      if (err) { err.className = monthsToLoad(R).length ? 'neg sm' : 'pos sm'; err.textContent = monthsToLoad(R).length ? 'Could not load the older records — check the internet and tap again.' : `Ready — tap ${el.textContent.trim()} again to save the report.`; }
+      return;
+    }
     const d = periodData(R), f = el.dataset.f;
     if (f === 'pdf') saveBlob(periodFile(R, 'pdf'), writePdf(periodBlocks(d), `${S.settings?.name || 'Cafe'} - ${R.label}`));
     else if (f === 'docx') saveBlob(periodFile(R, 'docx'), writeDocx(periodBlocks(d)));
@@ -240,16 +298,15 @@ Object.assign(Actions, {
         ...expensesInRange(R).map((e) => ['Expense', e.date, '', '', e.title, e.cat, -e.amount])];
       saveBlob(periodFile(R, 'csv'), new Blob([rows.map((r) => r.map((c) => `"${String(c ?? '').replace(/"/g, '""')}"`).join(',')).join('\n')], { type: 'text/csv' }));
     } else saveBlob(periodFile(R, 'xlsx'), writeXlsx([{ name: 'Summary', rows: [[d.title], [d.date], ...d.meta.map((m) => [m]), [], ...d.xl.summary], header: false }, ...(d.multi ? [{ name: d.per[0][0] === 'Month' ? 'By month' : 'By day', rows: d.xl.per }] : []), { name: 'Bills', rows: d.xl.bills }, { name: 'Items sold', rows: d.xl.items }, { name: 'Expenses', rows: d.xl.expenses }]));
-    toast(`Report saved: ${periodFile(R, f)}`);
+    const err = $('#form-err'); if (err) { err.className = 'neg sm'; err.textContent = ''; }
+    toast(`Report ready: ${periodFile(R, f)}`);
   },
 });
 Object.assign(Changes, {
-  repMode(el) { const old = App.ui.rep || { mode: 'month', anchor: dayKey() }; const R = periodRange(old); App.ui.rep = el.value === 'range' ? (old.mode === 'day' || old.mode === 'week' ? { mode: 'range', from: R.from, to: minKey(R.to, dayKey()), anchor: R.from } : { mode: 'range', from: `${minKey(R.to, dayKey()).slice(0, 7)}-01`, to: minKey(R.to, dayKey()), anchor: `${minKey(R.to, dayKey()).slice(0, 7)}-01` }) : { mode: el.value, anchor: minKey(R.to, dayKey()) < R.from ? R.from : (old.mode === 'day' ? old.anchor : minKey(R.to, dayKey())) }; render(); },
-  repDate(el) { if (el.value) { App.ui.rep = { ...App.ui.rep, anchor: el.value }; render(); } },
-  repMonth(el) { if (el.value) { App.ui.rep = { ...App.ui.rep, anchor: `${el.value}-01` }; render(); } },
-  repYear(el) { App.ui.rep = { ...App.ui.rep, anchor: `${el.value}-01-01` }; render(); },
-  repFrom(el) { if (el.value) { App.ui.rep = { ...App.ui.rep, from: el.value, anchor: el.value }; render(); } },
-  repTo(el) { if (el.value) { App.ui.rep = { ...App.ui.rep, to: el.value }; render(); } },
-  dlMode(el) { App.dl = { ...dlRead(), mode: el.value }; if (el.value === 'range') { const R = periodRange({ ...App.dl, mode: 'month' }); App.dl.from = R.from; App.dl.to = minKey(R.to, dayKey()); } const box = $('#dl-dates'); if (box) box.innerHTML = dlDates(App.dl, periodRange(App.dl)); dlRefresh(); },
-  dlDate() { dlRefresh(); },
+  repDate(el) { afterPick(el, (v) => { if (v && v !== App.ui.rep.anchor) { App.ui.rep = { ...App.ui.rep, anchor: minKey(v, dayKey()) }; render(); } }); },
+  repMonth(el) { afterPick(el, (v) => { if (v) { App.ui.rep = { ...App.ui.rep, anchor: `${v}-01` }; render(); } }); },
+  repYear(el) { afterPick(el, (v) => { App.ui.rep = { ...App.ui.rep, anchor: `${v}-01-01` }; render(); }); },
+  repFrom(el) { afterPick(el, (v) => { if (v) { App.ui.rep = { ...App.ui.rep, from: minKey(v, dayKey()), anchor: minKey(v, dayKey()) }; render(); } }); },
+  repTo(el) { afterPick(el, (v) => { if (v) { App.ui.rep = { ...App.ui.rep, to: minKey(v, dayKey()) }; render(); } }); },
+  dlDate(el) { afterPick(el, () => dlRefresh()); },
 });
