@@ -296,8 +296,9 @@ Object.assign(Forms, {
   menuItem(fd) {
     const photo = String(fd.get('photo') || '');
     const { recipe, newStock, blocked } = readRecipe(fd);
-    const d = { photo: /^data:image\/jpeg;base64,/.test(photo) && photo.length < 120000 ? photo : '', name: String(fd.get('name') || '').trim(), price: num(fd.get('price')), cat: String(fd.get('cat') || '').trim() || 'General', recipe, diet: DIETS[fd.get('diet')] ? fd.get('diet') : '' };
+    const d = { photo: /^data:image\/jpeg;base64,/.test(photo) && photo.length < 120000 ? photo : '', name: String(fd.get('name') || '').trim(), price: num(fd.get('price')), cat: String(fd.get('cat') || '').trim() || 'General', recipe, diet: DIETS[fd.get('diet')] ? fd.get('diet') : '', ...(fd.has('barcode') ? { barcode: [...new Set(String(fd.get('barcode') || '').split(',').map((x) => x.trim().replace(/\s+/g, '')).filter(Boolean))].join(', ') } : {}) };
     if (!d.name) return formError('Please enter the item name.');
+    { const clash = String(d.barcode || '').split(', ').filter(Boolean).map((c) => [c, S.menu.find((x) => x.id !== fd.get('id') && String(x.barcode || '').split(',').map((y) => y.trim()).includes(c))]).find(([, x]) => x); if (clash) return formError(`Barcode ${clash[0]} already belongs to ${clash[1].name}.`); }
     if (blocked.length) return formError(`${blocked.join(', ')} ${blocked.length === 1 ? 'is' : 'are'} not in stock. Ask the owner or a manager to add ${blocked.length === 1 ? 'it' : 'them'} to Stock, or clear ${blocked.length === 1 ? 'that row' : 'those rows'}.`);
     newStock.forEach((s) => S.stock.push(s));
     const m = byId(S.menu, fd.get('id'));

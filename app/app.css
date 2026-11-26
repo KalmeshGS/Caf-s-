@@ -1184,3 +1184,29 @@ small.muted, .fine { font-size: max(12px, .85em); }
 label.state-btn input { position: absolute; opacity: 0; pointer-events: none; }
 label.state-btn:has(input:checked) { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
 label.state-btn span { display: inline-flex; align-items: center; gap: 8px; }
+
+/* ---------- Reports: any period ---------- */
+.rep-bar { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; justify-content: space-between; }
+.rep-modes { flex: 0 1 auto; }
+.rep-modes span { min-width: 58px; }
+.rep-nav { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.rep-pick { display: flex; align-items: center; gap: 8px; }
+.rep-date { min-height: 44px; padding: 0 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); font-weight: 600; }
+.rep-nav .icon-btn[disabled] { opacity: .35; }
+@media (max-width: 560px) { .rep-bar { flex-direction: column; align-items: stretch; } .rep-modes { display: grid; grid-template-columns: repeat(5, 1fr); } .rep-modes span { min-width: 0; padding: 8px 2px; } .rep-nav { justify-content: space-between; } .rep-pick { flex: 1; justify-content: center; } .rep-pick input, .rep-pick select { flex: 1; min-width: 0; } }
+
+/* ---------- scanning everywhere ---------- */
+.search-row { display: flex; gap: 8px; align-items: center; }
+.search-row .search { flex: 1; min-width: 0; }
+.scan-btn { flex: none; color: var(--accent); }
+#sell-scan-msg:empty { display: none; }
+
+.rep-date { font-size: 15px; font-variant-numeric: tabular-nums; }
+input[type=date].rep-date { min-width: 10.5em; }
+input[type=month].rep-date { min-width: 11em; }
+@media (max-width: 560px) { input[type=date].rep-date, input[type=month].rep-date { min-width: 0; font-size: 14px; padding: 0 8px; } .rep-pick { gap: 6px; } }
+@media (max-width: 560px) { .rep-pick { order: 3; flex-basis: 100%; } .rep-nav .link-btn { margin-left: auto; } }
+@media (max-width: 560px) { .rep-pick .rep-date { width: auto; max-width: none; flex: 1 1 0; } }
+/* page headers with several buttons wrap on small screens */
+.page-head .btn-row { flex-wrap: wrap; justify-content: flex-end; }
+@media (max-width: 560px) { .page-head .btn-row { justify-content: flex-start; } }

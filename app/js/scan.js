@@ -57,7 +57,7 @@ function loadScript(src) {
 function camHit(code) {
   const c = normCode(code); const now = Date.now();
   if (c === Cam.last && now - Cam.lastAt < 2000) return; // the same pack held in front of the camera
-  Cam.last = c; Cam.lastAt = now; handleScan(c);
+  Cam.last = c; Cam.lastAt = now; routeScan(c);
 }
 function camStop() {
   clearInterval(Cam.timer); Cam.timer = null;
@@ -99,7 +99,7 @@ async function camStart() {
 
 // A barcode scanner "types" the code and presses Enter: catch Enter in the scan box so it doesn't save the form
 document.addEventListener('keydown', (e) => {
-  if (e.target && e.target.id === 'scan-in' && e.key === 'Enter') { e.preventDefault(); handleScan(e.target.value); e.target.value = ''; }
+  if (e.target && e.target.id === 'scan-in' && e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); routeScan(e.target.value); e.target.value = ''; }
 }, true);
 // Typing a bill amount yourself stops scans from overwriting it
 document.addEventListener('input', (e) => { if (e.target && e.target.name === 'p_amt') e.target.dataset.manual = '1'; }, true);
@@ -152,4 +152,118 @@ Object.assign(Forms, {
     Object.assign(k, { status: 'served', outcome: fate, updatedAt: Date.now() });
     closeSheet(); save(); toast(`Saved — ${FOOD_FATE[fate].toLowerCase()}`);
   },
+});
+
+/* =========================================================
+   Retail-style scanning everywhere
+   · A barcode scanner machine (USB / Bluetooth) works on every screen —
+     no box to click first. It "types" very fast and presses Enter; that is
+     how it is told apart from a person typing.
+       Orders / Billing → the item is added to the bill (a new counter bill
+       if none is open)   ·   Stock → a purchase starts with the item
+   · Camera scanning from the order screen and the Stock screen
+   · Menu items can carry barcodes (packaged goods: water, soft drinks…)
+   ========================================================= */
+const menuByCode = (code) => S.menu.find((m) => String(m.barcode || '').split(',').map((x) => x.trim()).includes(normCode(code))) || null;
+const FLOOR_SELLERS = ['owner', 'manager', 'cashier', 'waiter', 'captain'];
+const onView = (v) => (location.hash.replace(/^#\/?/, '').split('?')[0] || 'dashboard') === v;
+
+/** Add one menu item to an open bill (same rules as tapping it on the menu) */
+function sellAdd(o, m) {
+  if (m.available === false) return toast(`${m.name} is switched off (not available today).`);
+  const l = o.items.find((x) => x.menuId === m.id && !x.note);
+  if (l) l.qty += 1; else o.items.push({ id: uid('l'), menuId: m.id, name: m.name, price: m.price, qty: 1, sent: 0, note: '' });
+  save(); try { beep(); } catch (e) { /* ignore */ }
+  const q = o.items.find((x) => x.menuId === m.id && !x.note)?.qty || 1;
+  const box = $('#sell-scan-msg');
+  if (box) box.innerHTML = `${icon('check')} <b>${esc(m.name)}</b> × ${q} · ${money(m.price)}`; else toast(`Scanned: ${m.name} × ${q}`);
+}
+/** The bill a scan should go to: the open order on screen, else a new counter bill */
+function sellTarget() {
+  if (onView('orders') && (App.params.o || App.params.t)) {
+    let o = currentOrder(App.params);
+    if (o && o.status !== 'open') return null;
+    if (!o) { o = { id: uid('o'), no: nextBillNo(), table: App.params.t || 'Takeaway', items: [], status: 'open', createdAt: Date.now(), by: Session.user()?.name || Session.role(), byId: Session.user()?.id || null }; S.orders.push(o); }
+    return o;
+  }
+  const o = { id: uid('o'), no: nextBillNo(), table: 'Takeaway', items: [], status: 'open', createdAt: Date.now(), by: Session.user()?.name || Session.role(), byId: Session.user()?.id || null };
+  S.orders.push(o); persist(); go('orders', { o: o.id });
+  return o;
+}
+function sellScan(code) {
+  const m = menuByCode(code);
+  if (m) { const o = sellTarget(); if (o) sellAdd(o, m); else toast('This bill is already paid.'); return; }
+  const s = stockByCode(code);
+  if (canEditMenu()) return openSheet(linkMenuSheet(code, s));
+  toast(`Barcode ${normCode(code)} is not on the menu${s ? ` (it is the stock item ${s.name})` : ''} — ask the owner to add it to a menu item.`);
+}
+function linkMenuSheet(code, s) {
+  const items = S.menu.slice().sort((a, b) => a.name.localeCompare(b.name));
+  return `${sheetHead('New barcode', normCode(code))}
+    <p class="muted sm">This barcode is not on your menu yet${s ? ` (it belongs to the stock item <b>${esc(s.name)}</b>)` : ''}. Which menu item is it? It is remembered — next time the scan adds it straight to the bill.</p>
+    <label class="field"><span>Menu item</span><select id="link-menu"><option value="">Choose…</option>${items.map((m) => `<option value="${m.id}">${esc(m.name)} · ${money(m.price)}</option>`).join('')}</select></label>
+    <div class="btn-row">${btn('Link & add to bill', 'linkMenu', { cls: 'primary', ic: 'check', data: `data-code="${esc(normCode(code))}"` })}${btn('New menu item', 'linkMenuNew', { cls: 'ghost', ic: 'plus', data: `data-code="${esc(normCode(code))}"` })}</div>`;
+}
+/** Camera sheet for selling: every scan adds to the bill; stays open for the next one */
+function sellScanSheet() {
+  return `${sheetHead('Scan to bill', 'Point the camera at the barcode')}
+    <div id="scan-cam" class="scan-cam"><video playsinline muted aria-label="Camera"></video><i class="scan-aim" aria-hidden="true"></i></div>
+    <div id="scan-msg" class="scan-msg" role="status" aria-live="polite"></div>
+    <p id="sell-scan-msg" class="scan-msg ok" role="status" aria-live="polite"></p>
+    <label class="scan-in">${icon('grid')}<input id="scan-in" placeholder="…or type the barcode and press Enter" autocomplete="off" aria-label="Barcode"></label>
+    <p class="fine">Have a barcode scanner machine? Just scan — on the Orders, Billing or Stock screen. No setup needed.</p>
+    <div class="form-actions"><span></span>${btn('Done', 'scanDone', { cls: 'primary' })}</div>`;
+}
+/** Where a scan goes, from wherever it came (scanner machine, camera, typed) */
+function routeScan(raw) {
+  const code = normCode(raw); if (!code) return;
+  const sheetOpen = !$('#sheet').hidden;
+  if (sheetOpen && $('#sheet form[data-form=purchase]')) return handleScan(code);   // receiving stock
+  if (sheetOpen && $('#sell-scan-msg')) return sellScan(code);                    // camera / box on "Scan to bill"
+  if (sheetOpen) return;                                                           // some other form is open: don't act behind it
+  const role = Session.role();
+  if ((onView('orders') || onView('billing') || onView('dashboard')) && FLOOR_SELLERS.includes(role)) return sellScan(code);
+  if (onView('stock') && typeof seesCost === 'function' && seesCost()) { openSheet(purchaseForm(), { wide: true }); setTimeout(() => handleScan(code), 30); return; }
+  const m = menuByCode(code), s = stockByCode(code);
+  toast(m ? `Scanned: ${m.name} (${money(m.price)}) — open Orders to sell it` : s ? `Scanned: ${s.name} — open Stock to receive it` : `Scanned ${code} — not on the menu or in stock`);
+}
+
+/* The scanner machine: fast key bursts ending with Enter, while nobody is typing in a box */
+const Wedge = { buf: '', last: 0, gaps: [] };
+document.addEventListener('keydown', (e) => {
+  if (e.ctrlKey || e.altKey || e.metaKey) return;
+  const t = e.target;
+  if (t && t.id === 'scan-in') return; // the scan box handles itself
+  const typing = t && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable);
+  const now = performance.now();
+  if (e.key === 'Enter') {
+    const fast = Wedge.buf.length >= 4 && Wedge.gaps.length && Wedge.gaps.reduce((a, b) => a + b, 0) / Wedge.gaps.length < 45;
+    if (fast && !typing) { e.preventDefault(); e.stopPropagation(); const code = Wedge.buf; Wedge.buf = ''; Wedge.gaps = []; routeScan(code); return; }
+    // the menu search box on the order screen: a scanned code there adds the item
+    if (t && t.matches && t.matches('[data-input=menuSearch]') && menuByCode(t.value)) { e.preventDefault(); const v = t.value; t.value = ''; App.ui.q = ''; sellScan(v); const g = $('#menu-grid'); if (g) g.innerHTML = menuGrid(); return; }
+    Wedge.buf = ''; Wedge.gaps = []; return;
+  }
+  if (e.key.length !== 1 || typing) { if (typing) { Wedge.buf = ''; Wedge.gaps = []; } return; }
+  if (Wedge.buf && now - Wedge.last > 80) { Wedge.buf = ''; Wedge.gaps = []; }
+  if (Wedge.buf) Wedge.gaps.push(now - Wedge.last);
+  Wedge.buf += e.key; Wedge.last = now;
+}, true);
+
+Object.assign(Actions, {
+  sellScanOpen() {
+    if (!FLOOR_SELLERS.includes(Session.role())) return;
+    openSheet(sellScanSheet());
+    setTimeout(() => camStart(), 50);
+  },
+  scanDone() { camStop(); closeSheet(); },
+  stockScanOpen() { openSheet(purchaseForm(), { wide: true }); setTimeout(() => { $('#scan-in')?.focus(); }, 60); },
+  linkMenu(el) {
+    const m = byId(S.menu, $('#link-menu')?.value); const code = normCode(el.dataset.code);
+    if (!m) return toast('Choose the menu item first.');
+    const other = menuByCode(code); if (other && other !== m) return toast(`That barcode already belongs to ${other.name}.`);
+    m.barcode = [...String(m.barcode || '').split(',').map((x) => x.trim()).filter(Boolean), code].join(', ');
+    closeSheet(); persist();
+    const o = sellTarget(); if (o) sellAdd(o, m);
+  },
+  linkMenuNew(el) { const code = normCode(el.dataset.code); openSheet(menuForm({ barcode: code }), { wide: true }); },
 });
