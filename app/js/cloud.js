@@ -285,7 +285,7 @@ Cloud.changed = () => {
   if (!$('#sheet').hidden || busyTyping) { Cloud.pending = true; return; }
   render();
 };
-Cloud.ensureMonth = async (mk) => {
+Cloud.ensureMonth = async (mk, quiet) => {
   if (!Cloud.attached || Cloud.loadedMonths.has(mk)) return;
   const start = keyToDate(mk), end = keyToDate(shiftMonth(mk, 1));
   if (start.getTime() >= Date.now() - WINDOW_DAYS * 864e5) return;
@@ -301,8 +301,8 @@ Cloud.ensureMonth = async (mk) => {
     const sp = SPEC.find((s) => s.key === key);
     if (sp && readable(sp, role) && !(Cloud.rulesOutdated && NEW_RULE_KEYS.includes(key))) jobs.push(fetchInto(sp, FB.query(ccol(sp.coll), FB.where('date', '>=', dayKey(start)), FB.where('date', '<', dayKey(end)))));
   }
-  try { await Promise.all(jobs); } catch (err) { toast(friendly(err)); }
-  render();
+  try { await Promise.all(jobs); } catch (err) { Cloud.loadedMonths.delete(mk); if (quiet) throw err; toast(friendly(err)); }
+  if (!quiet) render();
 };
 
 /* ---------------- signing in & out ---------------- */

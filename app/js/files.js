@@ -209,9 +209,24 @@ function writePdf(blocks, title = 'Report') {
   return new Blob([pdf], { type: 'application/pdf' });
 }
 /** Save a Blob as a file */
+const IS_IOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+/** Save a file. iPhone / iPad: open the share sheet (Save to Files, WhatsApp, Mail…) — a plain download
+    there opens the file over the app with no way back, and from the home-screen app it does nothing. */
 function saveBlob(name, blob) {
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
-  document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  if (IS_IOS && navigator.canShare && navigator.share) {
+    try {
+      const file = new File([blob], name, { type: blob.type || 'application/octet-stream' });
+      if (navigator.canShare({ files: [file] })) {
+        navigator.share({ files: [file], title: name }).catch((e) => { if (!e || e.name !== 'AbortError') plainSave(name, blob); });
+        return;
+      }
+    } catch (e) { /* fall back to a normal download */ }
+  }
+  plainSave(name, blob);
+}
+function plainSave(name, blob) {
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.rel = 'noopener';
+  document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 60000);
 }
 
 Object.assign(Actions, { printPick(el) { const k = el.dataset.p; closeSheet(); printOn(k); } });
