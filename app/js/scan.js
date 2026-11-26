@@ -19,6 +19,7 @@ function scanBarHtml() {
   return `<div class="scan-bar">
       <label class="scan-in">${icon('grid')}<input id="scan-in" placeholder="Scan a barcode — or type it and press Enter" autocomplete="off" aria-label="Barcode"></label>
       <button type="button" class="btn ghost sm" data-act="scanCam">${icon('camera')}<span>Camera</span></button>
+      <label class="btn ghost sm" title="Take a photo of the barcode">${icon('upload')}<span>Photo</span><input type="file" accept="image/*" capture="environment" hidden data-change="scanPhoto"></label>
     </div>
     <div id="scan-cam" class="scan-cam" hidden><video playsinline muted aria-label="Camera"></video><i class="scan-aim" aria-hidden="true"></i><button type="button" class="btn light sm" data-act="scanStop">${icon('x')}<span>Stop camera</span></button></div>
     <div id="scan-msg" class="scan-msg" role="status" aria-live="polite"></div>`;
@@ -43,14 +44,92 @@ function handleScan(raw) {
   const code = normCode(raw); if (!code) return;
   const s = stockByCode(code);
   if (s) return addScanned(s);
-  scanMsg(`<div class="scan-new"><span><b>New barcode ${esc(code)}</b> — which stock item is it? It is remembered for next time.</span>
-    <div class="row-3"><select id="scan-link-item" aria-label="Stock item"><option value="">Choose…</option>${stockOptions()}</select>
-    <input id="scan-link-pack" type="number" min="0" step="any" placeholder="Each scan adds (e.g. 0.5)" aria-label="Each scan adds">
-    <button type="button" class="btn primary sm" data-act="scanLink" data-code="${esc(code)}">Link & add</button></div></div>`, 'warn');
+  newProduct(code);
+}
+
+/* ---------------- a new product: look its barcode up, create the stock item ---------------- */
+const productCache = {};
+/** Free public product database (Open Food Facts). Only the barcode number is sent. → { name, unit, size } or null */
+async function lookupProduct(code) {
+  if (code in productCache) return productCache[code];
+  let out = null;
+  try {
+    const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 6000);
+    const r = await fetch(`https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(code)}.json?fields=product_name,product_name_en,brands,quantity,categories_tags`, { signal: ctl.signal, credentials: 'omit' });
+    clearTimeout(t);
+    const j = r.ok ? await r.json() : null;
+    const p = j && j.status === 1 ? j.product : null;
+    if (p) {
+      const brand = String(p.brands || '').split(',')[0].trim();
+      let name = String(p.product_name_en || p.product_name || '').trim();
+      if (brand && name && !name.toLowerCase().includes(brand.toLowerCase())) name = `${brand} ${name}`;
+      if (!name) name = brand;
+      const size = String(p.quantity || '').trim();
+      if (size && name && !name.toLowerCase().replace(/\s/g, '').includes(size.toLowerCase().replace(/\s/g, ''))) name = `${name} ${size}`;
+      const drink = (p.categories_tags || []).some((c) => /beverage|water|drink|juice|soda/.test(c));
+      if (name) out = { name: name.replace(/\s+/g, ' ').slice(0, 40), unit: drink ? 'bottles' : 'pcs', size };
+    }
+  } catch (e) { out = null; }
+  productCache[code] = out; return out;
+}
+/** Create a stock item for a scanned barcode and put it in the purchase */
+function createScannedStock(code, info) {
+  const same = S.stock.find((x) => x.name.toLowerCase() === info.name.toLowerCase());
+  const s = same || { id: uid('s'), name: info.name.slice(0, 40), unit: info.unit || 'pcs', qty: 0, max: 24, low: 2, step: 1, pack: 1 };
+  s.barcode = [...codesOf(s), code].join(', ');
+  if (!same) S.stock.push(s);
+  persist();
+  // the item list in every row now needs the new item
+  $$('#pur-rows select[name=p_item], #pur-tpl').forEach(() => {});
+  $$('#pur-rows select[name=p_item]').forEach((sel) => { if (!sel.querySelector(`option[value="${s.id}"]`)) sel.insertAdjacentHTML('beforeend', `<option value="${s.id}">${esc(s.name)} (${esc(s.unit)})</option>`); });
+  const tpl = $('#pur-tpl'); if (tpl) tpl.innerHTML = purchaseRow();
+  addScanned(s);
+  const m = $('#scan-msg'); if (m) m.insertAdjacentHTML('beforeend', `<div class="scan-sub">${same ? 'Matched to your stock item' : 'New stock item created'}${info.from ? ' from the product database' : ''} — type the bill amount below.</div>`);
+}
+async function newProduct(code) {
+  scanMsg(`${icon('clock')} Looking up barcode <b>${esc(code)}</b>…`);
+  const info = await lookupProduct(code);
+  if (stockByCode(code)) return addScanned(stockByCode(code)); // linked meanwhile (a second scan)
+  if (info) return createScannedStock(code, { ...info, from: true });
+  scanMsg(`<div class="scan-new"><span><b>New product</b> · barcode ${esc(code)} isn't in the product database. Type its name once — it is remembered.</span>
+    <div class="row-2"><input id="scan-new-name" maxlength="40" placeholder="e.g. Bisleri water 1 L" aria-label="Product name" autocomplete="off">
+    <button type="button" class="btn primary sm" data-act="scanNewAdd" data-code="${esc(code)}">Add to stock</button></div>
+    ${S.stock.length ? `<details class="scan-or"><summary>It's one of my stock items</summary><div class="row-2"><select id="scan-link-item" aria-label="Stock item"><option value="">Choose…</option>${stockOptions()}</select><button type="button" class="btn ghost sm" data-act="scanLink" data-code="${esc(code)}">Link</button></div></details>` : ''}</div>`, 'warn');
+  setTimeout(() => $('#scan-new-name')?.focus(), 30);
 }
 
 /* ---------------- camera ---------------- */
 const Cam = { stream: null, timer: null, reader: null, last: '', lastAt: 0 };
+// Back camera, sharp enough for the thin bars of a product barcode, focusing continuously where the phone allows
+const CAM_VIDEO = { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 }, advanced: [{ focusMode: 'continuous' }] };
+/** ZXing settings: only product barcodes (faster, fewer misreads) and try harder on blurry / tilted ones */
+function zxHints() {
+  const Z = window.ZXing, F = Z.BarcodeFormat, h = new Map();
+  h.set(Z.DecodeHintType.POSSIBLE_FORMATS, [F.EAN_13, F.EAN_8, F.UPC_A, F.UPC_E, F.CODE_128, F.CODE_39, F.ITF, F.QR_CODE]);
+  h.set(Z.DecodeHintType.TRY_HARDER, true);
+  return h;
+}
+/** Read a barcode from a photo (the phone's own camera app focuses and takes a sharp picture) */
+async function decodePhoto(file) {
+  const url = URL.createObjectURL(file);
+  try {
+    if ('BarcodeDetector' in window) {
+      try { const bmp = await createImageBitmap(file); const got = await new window.BarcodeDetector({ formats: SCAN_FORMATS }).detect(bmp); if (got[0]?.rawValue) return got[0].rawValue; } catch (e) { /* fall back to ZXing */ }
+    }
+    await loadScript('vendor/zxing.min.js');
+    const Z = window.ZXing, reader = new Z.BrowserMultiFormatReader(zxHints());
+    const img = new Image(); img.src = url; await img.decode();
+    // phones take very large photos: try a few sizes (smaller is often easier for the 1D reader)
+    for (const w of [1600, 1000, 2400]) {
+      const sc = Math.min(1, w / img.naturalWidth), c = document.createElement('canvas');
+      c.width = Math.round(img.naturalWidth * sc); c.height = Math.round(img.naturalHeight * sc);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      const im = new Image(); im.src = c.toDataURL('image/jpeg', 0.92); await im.decode();
+      try { return (await reader.decodeFromImageElement(im)).getText(); } catch (e) { /* next size */ }
+    }
+    return null;
+  } finally { URL.revokeObjectURL(url); }
+}
 function loadScript(src) {
   return new Promise((res, rej) => { if ([...document.scripts].some((x) => x.src.endsWith(src))) return res(); const sc = document.createElement('script'); sc.src = src; sc.onload = res; sc.onerror = () => rej(new Error('Could not load the barcode reader — check the internet and try again.')); document.head.appendChild(sc); });
 }
@@ -76,7 +155,7 @@ async function camStart() {
     if ('BarcodeDetector' in window) {
       const supported = await (window.BarcodeDetector.getSupportedFormats?.() || Promise.resolve(SCAN_FORMATS));
       const det = new window.BarcodeDetector({ formats: SCAN_FORMATS.filter((f) => supported.includes(f)) });
-      Cam.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false });
+      Cam.stream = await navigator.mediaDevices.getUserMedia({ video: CAM_VIDEO, audio: false });
       video.srcObject = Cam.stream; await video.play();
       Cam.timer = setInterval(async () => {
         watch(); if (!Cam.stream || video.readyState < 2) return;
@@ -85,8 +164,8 @@ async function camStart() {
     } else {
       scanMsg('Starting the camera…');
       await loadScript('vendor/zxing.min.js');
-      Cam.reader = new window.ZXing.BrowserMultiFormatReader();
-      await Cam.reader.decodeFromConstraints({ video: { facingMode: { ideal: 'environment' } }, audio: false }, video, (res) => { if (res) camHit(res.getText()); });
+      Cam.reader = new window.ZXing.BrowserMultiFormatReader(zxHints(), 150);
+      await Cam.reader.decodeFromConstraints({ video: CAM_VIDEO, audio: false }, video, (res) => { if (res) camHit(res.getText()); });
       Cam.stream = video.srcObject;
       Cam.timer = setInterval(watch, 500);
       scanMsg('Point the camera at the barcode…');
@@ -211,7 +290,8 @@ function sellScanSheet() {
     <div id="scan-msg" class="scan-msg" role="status" aria-live="polite"></div>
     <p id="sell-scan-msg" class="scan-msg ok" role="status" aria-live="polite"></p>
     <label class="scan-in">${icon('grid')}<input id="scan-in" placeholder="…or type the barcode and press Enter" autocomplete="off" aria-label="Barcode"></label>
-    <p class="fine">Have a barcode scanner machine? Just scan — on the Orders, Billing or Stock screen. No setup needed.</p>
+    <p class="fine">Have a barcode scanner machine? Just scan — on the Orders or Stock screen. No setup needed.</p>
+    <label class="btn ghost sm">${icon('upload')}<span>Take a photo of the barcode instead</span><input type="file" accept="image/*" capture="environment" hidden data-change="scanPhoto"></label>
     <div class="form-actions"><span></span>${btn('Done', 'scanDone', { cls: 'primary' })}</div>`;
 }
 /** Where a scan goes, from wherever it came (scanner machine, camera, typed) */
@@ -222,10 +302,10 @@ function routeScan(raw) {
   if (sheetOpen && $('#sell-scan-msg')) return sellScan(code);                    // camera / box on "Scan to bill"
   if (sheetOpen) return;                                                           // some other form is open: don't act behind it
   const role = Session.role();
-  if ((onView('orders') || onView('billing') || onView('dashboard')) && FLOOR_SELLERS.includes(role)) return sellScan(code);
+  if (onView('orders') && FLOOR_SELLERS.includes(role)) return sellScan(code);
   if (onView('stock') && typeof seesCost === 'function' && seesCost()) { openSheet(purchaseForm(), { wide: true }); setTimeout(() => handleScan(code), 30); return; }
   const m = menuByCode(code), s = stockByCode(code);
-  toast(m ? `Scanned: ${m.name} (${money(m.price)}) — open Orders to sell it` : s ? `Scanned: ${s.name} — open Stock to receive it` : `Scanned ${code} — not on the menu or in stock`);
+  toast(m ? `Scanned: ${m.name} (${money(m.price)}) — open Orders to add it to a bill` : s ? `Scanned: ${s.name} — open Stock to receive it` : `Scanned ${code} — not on the menu or in stock`);
 }
 
 /* The scanner machine: fast key bursts ending with Enter, while nobody is typing in a box */
@@ -266,4 +346,21 @@ Object.assign(Actions, {
     const o = sellTarget(); if (o) sellAdd(o, m);
   },
   linkMenuNew(el) { const code = normCode(el.dataset.code); openSheet(menuForm({ barcode: code }), { wide: true }); },
+});
+
+Object.assign(Actions, {
+  scanNewAdd(el) {
+    const name = String($('#scan-new-name')?.value || '').trim();
+    if (!name) { $('#scan-new-name')?.focus(); return scanMsg('Type the product name first.', 'warn'); }
+    createScannedStock(normCode(el.dataset.code), { name, unit: /water|bisleri|kinley|aquafina|bottle|cola|soda|juice/i.test(name) ? 'bottles' : 'pcs' });
+  },
+});
+Object.assign(Changes, {
+  async scanPhoto(el) {
+    const f = el.files && el.files[0]; el.value = ''; if (!f) return;
+    scanMsg(`${icon('clock')} Reading the barcode in the photo…`);
+    const code = await decodePhoto(f).catch(() => null);
+    if (!code) return scanMsg('No barcode found in that photo. Hold the phone 10–15 cm away, keep the bars straight and sharp, and try again — or type the number.', 'warn');
+    routeScan(code);
+  },
 });

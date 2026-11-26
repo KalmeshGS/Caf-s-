@@ -1210,3 +1210,9 @@ input[type=month].rep-date { min-width: 11em; }
 /* page headers with several buttons wrap on small screens */
 .page-head .btn-row { flex-wrap: wrap; justify-content: flex-end; }
 @media (max-width: 560px) { .page-head .btn-row { justify-content: flex-start; } }
+
+.scan-sub { font-size: 13px; color: var(--muted); margin-top: 4px; }
+.scan-or summary { cursor: pointer; font-size: 13.5px; color: var(--accent-text, var(--accent)); min-height: 32px; display: flex; align-items: center; }
+.scan-or .row-2 { margin-top: 6px; }
+.scan-bar { flex-wrap: wrap; }
+.scan-bar .scan-in { min-width: 200px; }
