@@ -240,7 +240,7 @@ Views.billing = (p) => {
     : empty('No open bills. Orders from tables show up here.');
 
   const closing = S.journal[today]?.closing;
-  return `${pageHead('Billing', 'Bills', `<div class="btn-row tight">${btn('Scan to bill', 'sellScanOpen', { cls: 'ghost sm', ic: 'camera' })}${btn('Day summary', 'daySummary', { cls: 'ghost sm', ic: 'printer' })}</div>`)}
+  return `${pageHead('Billing', 'Bills', btn('Day summary', 'daySummary', { cls: 'ghost sm', ic: 'printer' }))}
   <div class="grid-2 wide-left">
     <div class="stack">
       ${bill}
