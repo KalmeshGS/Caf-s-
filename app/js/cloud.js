@@ -30,7 +30,7 @@ const WINDOW_DAYS = 62;
 const SPEC = [
   { key: 'settings', kind: 'doc', path: ['meta', 'settings'], read: ALL_ROLES, write: ['owner'] },
   { key: 'seq', kind: 'doc', path: ['meta', 'seq'], read: ALL_ROLES, write: FLOOR_ROLES },
-  { key: 'menu', kind: 'items', coll: 'menu', read: ALL_ROLES, write: ['owner', 'manager', 'kitchen'] },
+  { key: 'menu', kind: 'items', coll: 'menu', read: ALL_ROLES, write: ['owner', 'manager', 'kitchen', 'cashier', 'waiter', 'captain'] }, // floor staff: only "finished today" (firestore.rules)
   { key: 'orders', kind: 'items', coll: 'orders', read: ALL_ROLES, write: FLOOR_ROLES, since: { field: 'createdAt', days: WINDOW_DAYS, num: true } },
   { key: 'kots', kind: 'items', coll: 'kots', read: ALL_ROLES, write: ALL_ROLES, since: { field: 'updatedAt', days: 2, num: true } }, // finer limits in firestore.rules
   { key: 'stock', kind: 'items', coll: 'stock', read: ['owner', 'manager', 'kitchen', 'captain'], write: ['owner', 'manager'] },
@@ -42,6 +42,9 @@ const SPEC = [
   { key: 'journal', kind: 'map', coll: 'journal', read: ['owner', 'manager', 'cashier'], write: ['owner', 'manager', 'cashier'], days: WINDOW_DAYS },
   { key: 'requests', kind: 'items', coll: 'requests', read: ['owner'], write: ['owner'], where: ['status', '==', 'open'] },
   { key: 'tableState', kind: 'map', coll: 'tables', read: ALL_ROLES, write: [...FLOOR_ROLES, 'housekeeping'] },
+  // Running the floor: who is on duty today (each person their own line) and today's sections & waiters
+  { key: 'duty', kind: 'map', coll: 'duty', read: ALL_ROLES, write: FLOOR_ROLES },
+  { key: 'floor', kind: 'doc', path: ['meta', 'floor'], read: ALL_ROLES, write: ['owner', 'manager', 'captain'] },
   { key: 'notices', kind: 'items', coll: 'notices', read: ALL_ROLES, write: ['owner', 'manager'], since: { field: 'at', days: 30, num: true } },
   { key: 'reservations', kind: 'items', coll: 'reservations', read: [...FLOOR_ROLES, 'housekeeping'], write: FLOOR_ROLES, since: { field: 'date', days: 7 } },
   // Stock & profit: purchases, wastage, corrections (kitchen may only add wastage — see firestore.rules)
@@ -49,7 +52,7 @@ const SPEC = [
   // Leakage check: everyone adds events, only the owner / manager can read them
   { key: 'audit', kind: 'items', coll: 'audit', read: ['owner', 'manager'], write: ALL_ROLES, since: { field: 'date', days: WINDOW_DAYS } },
 ];
-const NEW_RULE_KEYS = ['tableState', 'reservations', 'notices', 'stockLog', 'audit']; // need the v3.3 security rules
+const NEW_RULE_KEYS = ['tableState', 'reservations', 'notices', 'stockLog', 'audit', 'duty', 'floor']; // need the v3.3 security rules
 
 /* ---------------- small helpers ---------------- */
 function canon(v) { // JSON with sorted keys, so the same data always gives the same text
@@ -321,7 +324,7 @@ function rebuildUsers() {
 }
 Cloud.changed = () => {
   if (!Cloud.attached) return;
-  if (Session.user()) { checkReady(); checkNotices(); checkLowStock(); checkCleaning(); }
+  if (Session.user()) { checkReady(); checkNotices(); checkLowStock(); checkCleaning(); checkBillReq(); }
   if (!liveRender()) Cloud.pending = true;
 };
 Cloud.ensureMonth = async (mk, quiet) => {

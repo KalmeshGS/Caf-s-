@@ -1223,3 +1223,33 @@ input[type=month].rep-date { min-width: 11em; }
 .seg > .seg-btn:focus-visible span { outline: 2px solid var(--accent); outline-offset: 2px; }
 .dl-modes { margin-bottom: 4px; }
 @media (max-width: 560px) { .dl-modes .seg-btn span { padding: 8px 2px; } }
+
+/* ---------- running the floor ---------- */
+.tt-who { display: inline-block; margin-top: 4px; font-size: 11.5px; font-weight: 600; padding: 1px 7px; border-radius: 999px; background: var(--surface-2); color: var(--muted); }
+.table-tile.mine .tt-who { background: var(--accent); color: #fff; }
+.table-tile.mine { box-shadow: inset 0 0 0 2px var(--accent); }
+.bill-line { display: block; color: var(--accent-text, var(--accent)); font-weight: 600; }
+.table-tile.bill-asked { box-shadow: inset 0 0 0 2px #c2783c; }
+.menu-item.sold-out { opacity: .55; }
+.menu-item.sold-out small { color: var(--neg, #c0392b); font-weight: 600; }
+.ghost-chip { border-style: dashed; }
+.so-list { display: grid; gap: 2px; max-height: 52vh; overflow: auto; }
+.so-row { align-items: center; min-height: 48px; cursor: pointer; }
+.so-row.off span:first-child { text-decoration: line-through; opacity: .7; }
+.so-state { display: flex; align-items: center; gap: 10px; }
+.sec-area { border-top: 1px solid var(--line); padding-top: 10px; margin-top: 6px; }
+.sec-tables { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-top: 8px; }
+.fb-kpis { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+.fb-kpis .kpi.warn { box-shadow: inset 0 0 0 2px #d97706; }
+.fb-kpis .kpi.ok { box-shadow: inset 0 0 0 2px #22a06b; }
+.kpi-v small { font-size: .55em; color: var(--muted); font-weight: 600; }
+.fb-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; margin-top: 14px; }
+.fb-block .card-head { display: flex; justify-content: space-between; align-items: center; }
+.fb-n { font-size: 15px; min-width: 26px; text-align: center; border-radius: 999px; background: var(--surface-2); padding: 1px 8px; }
+.fb-block.late .fb-n { background: #d97706; color: #fff; }
+.fb-block.ready .fb-n { background: #22a06b; color: #fff; }
+.fb-block.bill .fb-n { background: #c2783c; color: #fff; }
+.fb-row { width: 100%; }
+.fb-row .timer { margin-left: auto; white-space: nowrap; }
+.fb-row.late .timer { color: #d97706; font-weight: 700; }
+@media (max-width: 560px) { .fb-grid { grid-template-columns: 1fr; } }

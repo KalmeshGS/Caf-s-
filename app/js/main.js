@@ -66,7 +66,7 @@ function render() {
   }
   const role = Session.role();
   if (!role) { root.innerHTML = Session.locked && Session.account() ? Views.lockScreen() : Views.login(); return; }
-  checkReady(); checkNotices();
+  checkReady(); checkNotices(); checkDuty(); checkBillReq();
   if ((App.setup.mode === 'later' || App.setup.mode === 'profile') && App.setup.step > 0 && role === 'owner') { root.innerHTML = Views.setup(); return; }
   let { view, params } = parseHash();
   const allowed = viewsFor(role).concat('inbox', canTokens() ? ['tokens'] : []); // everyone has the notifications inbox
@@ -122,6 +122,7 @@ const Actions = {
   setCat(el) { App.ui.cat = el.dataset.cat; render(); },
   addItem(el) {
     const m = byId(S.menu, el.dataset.id); if (!m) return;
+    if (!isAvail(m)) return toast(`${m.name} is ${soldOutToday(m) ? 'finished for today' : 'not available'}.`);
     let o = currentOrder(App.params);
     if (!o) {
       o = { id: uid('o'), no: nextBillNo(), table: App.params.t || 'Takeaway', items: [], status: 'open', createdAt: Date.now(), by: Session.user()?.name || Session.role(), byId: Session.user()?.id || null };

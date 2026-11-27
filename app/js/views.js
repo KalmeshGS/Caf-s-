@@ -119,8 +119,8 @@ function menuGrid() {
   const q = App.ui.q.trim().toLowerCase();
   const items = S.menu.filter((m) => (App.ui.cat === 'All' || (App.ui.cat === '★' ? m.fav : m.cat === App.ui.cat)) && (!q || m.name.toLowerCase().includes(q))).sort((a, b) => (b.fav ? 1 : 0) - (a.fav ? 1 : 0));
   if (!items.length) return empty(S.menu.length ? 'Nothing matches.' : 'Your menu is empty — add items in Settings → Menu.');
-  return items.map((m) => `<button class="menu-item" data-act="addItem" data-id="${m.id}" ${m.available === false ? 'disabled' : ''}>
-      ${dishImg(m)}<span>${dietDot(m)}${esc(m.name)}${m.fav ? ' <b class="fav-s" aria-label="Favourite">★</b>' : ''}</span><small>${m.available === false ? 'Not available' : money(m.price)}</small></button>`).join('');
+  return items.map((m) => `<button class="menu-item ${soldOutToday(m) ? 'sold-out' : ''}" data-act="addItem" data-id="${m.id}" ${isAvail(m) ? '' : 'disabled'}>
+      ${dishImg(m)}<span>${dietDot(m)}${esc(m.name)}${m.fav ? ' <b class="fav-s" aria-label="Favourite">★</b>' : ''}</span><small>${m.available === false ? 'Not available' : soldOutToday(m) ? 'Finished today' : money(m.price)}</small></button>`).join('');
 }
 
 function orderEditor(p) {
@@ -139,7 +139,7 @@ function orderEditor(p) {
   <div class="order-layout">
     <section class="menu-pane">
       <div class="search-row"><div class="search">${icon('search')}<input type="search" placeholder="Search menu or scan a barcode" value="${esc(App.ui.q)}" data-input="menuSearch" aria-label="Search menu"></div>${FLOOR_SELLERS.includes(Session.role()) ? `<button class="icon-btn scan-btn" data-act="sellScanOpen" aria-label="Scan a barcode with the camera" title="Scan with the camera">${icon('camera')}</button>` : ''}</div>
-      <div class="chip-row scroll">${cats.map((c) => `<button class="chip ${c === App.ui.cat ? 'on' : ''}" data-act="setCat" data-cat="${esc(c)}">${c === '★' ? '★ Favourites' : esc(c)}</button>`).join('')}</div>
+      <div class="chip-row scroll">${cats.map((c) => `<button class="chip ${c === App.ui.cat ? 'on' : ''}" data-act="setCat" data-cat="${esc(c)}">${c === '★' ? '★ Favourites' : esc(c)}</button>`).join('')}${canSoldOut() ? `<button class="chip ghost-chip" data-act="soldOutOpen">${icon('x')} Finished today${S.menu.some(soldOutToday) ? ` (${S.menu.filter(soldOutToday).length})` : ''}</button>` : ''}</div>
       <div class="menu-grid" id="menu-grid">${menuGrid()}</div>
     </section>
     <aside class="card ticket">
@@ -165,7 +165,9 @@ function orderEditor(p) {
         ${prepaid
           ? `<button class="btn primary block" data-act="payFirst" ${o && lines.length ? '' : 'disabled'}>${icon('receipt')}<span>${can('billing') ? 'Take payment & get token' : 'Send to counter for payment'}</span></button>`
           : `<button class="btn primary block" data-act="sendKitchen" ${unsent ? '' : 'disabled'}>${icon(unsent ? 'send' : 'check')}<span>${unsent ? `Send to kitchen (${unsent})` : o && lines.length ? 'Sent to kitchen' : 'Send to kitchen'}</span></button>
-        ${o && can('billing') && lines.length ? btn('Go to bill', 'toBill', { cls: 'ghost block', ic: 'receipt', data: `data-id="${o.id}"` }) : ''}`}
+        ${o && can('billing') && lines.length ? btn('Go to bill', 'toBill', { cls: 'ghost block', ic: 'receipt', data: `data-id="${o.id}"` }) : ''}
+        ${o && !can('billing') && lines.length ? `<div class="row-2">${btn(billAsked(o) ? 'Bill asked ✓ (undo)' : 'Request bill', 'billRequest', { cls: billAsked(o) ? 'ghost' : 'ghost', ic: 'receipt', data: `data-id="${o.id}"` })}${btn('Print bill', 'printBillFloor', { cls: 'ghost', ic: 'printer', data: `data-id="${o.id}"` })}</div>
+        ${billAsked(o) ? `<p class="muted sm">${icon('clock')} Bill asked ${esc(ago(o.billReq.at))}${o.billReq.by ? ` by ${esc(o.billReq.by)}` : ''} — the cashier is alerted.</p>` : ''}` : ''}`}
       </div>
     </aside>
   </div>
@@ -187,7 +189,7 @@ Views.kitchen = () => {
         ${status === 'ready' && typeof canFoodFate === 'function' && canFoodFate() ? `<button class="link-btn" data-act="kotUnclaimed" data-id="${k.id}">Not collected</button>` : ''}<button class="btn ${status === 'ready' ? 'ghost' : 'primary'} sm" data-act="kotNext" data-id="${k.id}">${esc(status === 'ready' && k.token ? 'Collected' : next)}</button></div>
       </article>`).join('') : `<p class="muted k-empty">—</p>`}</section>`;
   };
-  return `${pageHead('Kitchen', 'Kitchen screen', `<div class="btn-row tight">${['owner', 'manager', 'kitchen'].includes(Session.role()) && S.stock.length ? btn('Wastage', 'wasteOpen', { cls: 'ghost sm', ic: 'trash' }) : ''}${btn('Token TV screen', 'openTokens', { cls: 'ghost sm', ic: 'grid' })}${live()}</div>`)}
+  return `${pageHead('Kitchen', 'Kitchen screen', `<div class="btn-row tight">${canSoldOut() ? btn('Finished today', 'soldOutOpen', { cls: 'ghost sm', ic: 'x' }) : ''}${['owner', 'manager', 'kitchen'].includes(Session.role()) && S.stock.length ? btn('Wastage', 'wasteOpen', { cls: 'ghost sm', ic: 'trash' }) : ''}${btn('Token TV screen', 'openTokens', { cls: 'ghost sm', ic: 'grid' })}${live()}</div>`)}
     <div class="kitchen">${col('new', 'New', 'Start cooking')}${col('cooking', 'Cooking', 'Mark ready')}${col('ready', 'Ready to serve', 'Served')}</div>
     <p class="fine">Tip: open this screen on the kitchen tablet. New tickets ping and the timer turns amber after 10 min, red after 20.</p>`;
 };

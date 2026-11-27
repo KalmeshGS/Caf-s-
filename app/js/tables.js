@@ -58,10 +58,13 @@ function tablesView() {
       ? `<span>${money(orderSubtotal(o))}</span><small>${pl(sum(o.items, (l) => l.qty), 'item')} · ${elapsedMin(o.createdAt)}</small>`
       : st ? `<em class="st-label">${icon(st.ic)} ${esc(st.label)}</em>${ms.note ? `<small>${esc(ms.note)}</small>` : ''}`
         : '<small>Free</small>';
-    return `<div class="table-tile ${o ? 'busy' : st ? st.cls : ''}">
+    const w = waiterOf(t), mine = w && w.id === Session.user()?.id;
+    return `<div class="table-tile ${o ? 'busy' : st ? st.cls : ''} ${billAsked(o) ? 'bill-asked' : ''} ${mine ? 'mine' : ''}">
       <button class="tt-main" data-act="openTable" data-t="${t}" aria-label="${esc(tableTitle(t))}">
         <strong>${esc(t)}</strong>${body}
         ${res ? `<small class="res-line">${icon('clock')} ${esc(hm(res.time))} · ${esc(res.name)} (${res.guests})</small>` : ''}
+        ${billAsked(o) ? `<small class="bill-line">${icon('receipt')} Bill asked</small>` : ''}
+        ${w ? `<small class="tt-who">${mine ? 'You' : esc(firstName(w.name))}</small>` : ''}
       </button>
       <button class="tt-more" data-act="tableMenu" data-t="${t}" aria-label="Status of ${esc(tableTitle(t))}" title="Table status">${icon('more')}</button>
       ${pending ? '<i class="dot" title="Not sent to kitchen"></i>' : ''}
@@ -73,7 +76,8 @@ function tablesView() {
   const takeaways = open.filter((o) => o.table === 'Takeaway' && (o.items.length || Date.now() - o.createdAt < 10 * 60000));
   const withTables = feat('tables');
   const newLabel = withTables ? 'New takeaway' : feat('takeaway') ? 'New order' : 'New order';
-  return `${pageHead('Orders', withTables ? 'Tables' : 'Counter', btn(newLabel, 'newTakeaway', { cls: 'primary', ic: 'plus' }))}
+  const headBtns = withTables && canAssign() && tableNames().length ? `<div class="btn-row tight">${btn('Sections & waiters', 'sectionsOpen', { cls: 'ghost sm', ic: 'users' })}${btn(newLabel, 'newTakeaway', { cls: 'primary', ic: 'plus' })}</div>` : btn(newLabel, 'newTakeaway', { cls: 'primary', ic: 'plus' });
+  return `${pageHead('Orders', withTables ? 'Tables' : 'Counter', headBtns)}
     ${ordersTabs('tables')}
     ${rulesNotice()}
     ${readyCard()}
