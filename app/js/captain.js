@@ -24,10 +24,20 @@ function checkDuty() {
   setTimeout(save, 0); // never save from inside a render
 }
 /** People on the floor today (waiters first) */
+/** Everyone who can serve tables: the staff list (kept by the owner's app) + who logged in today */
 function onDuty() {
-  const today = dayKey();
-  return Object.entries(S.duty || {}).filter(([, d]) => d && d.day === today && SERVER_ROLES.includes(d.role))
-    .map(([id, d]) => ({ id, ...d })).sort((a, b) => SERVER_ROLES.indexOf(a.role) - SERVER_ROLES.indexOf(b.role) || a.name.localeCompare(b.name));
+  const today = dayKey(), people = {};
+  (S.team?.people || []).forEach((p) => { if (p && SERVER_ROLES.includes(p.role)) people[p.id] = { ...p, duty: false }; });
+  Object.entries(S.duty || {}).forEach(([id, d]) => { if (d && SERVER_ROLES.includes(d.role)) people[id] = { ...(people[id] || {}), id, name: d.name, role: d.role, duty: d.day === today }; });
+  return Object.values(people).sort((a, b) => (b.duty ? 1 : 0) - (a.duty ? 1 : 0) || SERVER_ROLES.indexOf(a.role) - SERVER_ROLES.indexOf(b.role) || a.name.localeCompare(b.name));
+}
+/** Owner's app: keep a plain staff list (name + role only) that the captain can read */
+function syncTeam() {
+  const me = Session.user(); if (!me || me.role !== 'owner') return;
+  const people = (S.users || []).filter((u) => u && u.active !== false && SERVER_ROLES.includes(u.role)).map((u) => ({ id: u.id, name: u.name, role: u.role })).sort((a, b) => a.id.localeCompare(b.id));
+  if (JSON.stringify(people) === JSON.stringify(S.team?.people || null)) return;
+  S.team = { people, at: Date.now() };
+  setTimeout(save, 0);
 }
 const firstName = (n) => String(n || '').split(' ')[0];
 
@@ -39,16 +49,16 @@ function floorPlan() { const f = S.floor; return f && f.day === dayKey() ? f : {
 function waiterOf(t) {
   const f = floorPlan(); const id = (f.table || {})[t] || (f.area || {})[areaKey(areaOf(t))];
   if (!id) return null;
-  return { id, name: (S.duty || {})[id]?.name || 'Waiter' };
+  return { id, name: (S.duty || {})[id]?.name || (S.team?.people || []).find((p) => p.id === id)?.name || 'Waiter' };
 }
 const myTables = () => { const me = Session.user(); return me ? tableNames().filter((t) => waiterOf(t)?.id === me.id) : []; };
 function sectionsSheet() {
   const people = onDuty(), f = floorPlan(), areas = tableAreas();
-  const opts = (sel, none) => `<option value="">${none}</option>${people.map((p) => `<option value="${esc(p.id)}" ${sel === p.id ? 'selected' : ''}>${esc(p.name)} · ${esc(ROLES[p.role]?.label || p.role)}</option>`).join('')}`;
+  const opts = (sel, none) => `<option value="">${none}</option>${people.map((p) => `<option value="${esc(p.id)}" ${sel === p.id ? 'selected' : ''}>${esc(p.name)} · ${esc(ROLES[p.role]?.label || p.role)}${p.duty ? ' · on duty' : ''}</option>`).join('')}`;
   return `${sheetHead('Sections & waiters', `Today · ${fmtDate(new Date(), { weekday: 'long', day: 'numeric', month: 'short' })}`)}
     <form class="form" data-form="sections">
-      ${people.length ? `<p class="muted sm">${icon('users')} On duty today: ${people.map((p) => esc(p.name)).join(', ')}. Staff appear here once they log in today.</p>`
-        : `<div class="banner info">${icon('users')}<span>Nobody is on duty yet — waiters appear here as soon as they log in today.</span></div>`}
+      ${people.some((p) => p.duty) ? `<p class="muted sm">${icon('users')} Logged in today: ${people.filter((p) => p.duty).map((p) => esc(p.name)).join(', ')}.</p>` : ''}
+      ${people.length ? '' : `<div class="banner info">${icon('users')}<span>No waiters yet — the owner adds staff logins in Team &amp; access. Staff also appear here once they log in.</span></div>`}
       ${areas.map((a) => `<section class="sec-area">
         <label class="field"><span><b>${esc(areaTitle(a))}</b> — whole area</span><select name="area:${esc(areaKey(a))}">${opts(f.area?.[areaKey(a)], '— nobody —')}</select></label>
         <details${a.tables.some((t) => f.table?.[t]) ? ' open' : ''}><summary class="muted sm">Give single tables to someone else</summary>

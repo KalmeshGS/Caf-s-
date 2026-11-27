@@ -111,6 +111,9 @@ await each('open a bill that is already "approved"', ['owner', 'manager'], (db) 
 await each('rate a paid bill (guest feedback)', FLOOR, (db) => updateDoc(ref(db, 'orders', 'o_paid'), { rating: 4, feedback: '' }));
 await each('rate with 9 stars', ['owner'], (db) => updateDoc(ref(db, 'orders', 'o_paid'), { rating: 9 }));
 
+await each('update the staff name list', ['owner'], (db) => setDoc(ref(db, 'meta', 'team'), { people: [{ id: 'u', name: 'x', role: 'waiter' }] }));
+await each('read the staff name list', ALL, (db) => getDoc(ref(db, 'meta', 'team')));
+
 await env.cleanup();
 const byLabel = {};
 results.forEach((r) => { const label = r.slice(23).split(' — ')[0]; (byLabel[label] = byLabel[label] || []).push(r.startsWith('ok') ? '✓' : '✗'); });
