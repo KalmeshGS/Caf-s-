@@ -215,7 +215,10 @@ service cloud.firestore {
       allow read: if signedIn() && request.auth.uid == uid;
       allow create: if signedIn() && request.auth.uid == uid
                     && get(/databases/$(database)/documents/cafes/$(request.resource.data.cafeId)).data.ownerUid == uid;
-      allow update, delete: if false;
+      // the owner's own list of branches (each branch is still protected by its own members list)
+      allow update: if signedIn() && request.auth.uid == uid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['branches'])
+                    && request.resource.data.branches is list && request.resource.data.branches.size() <= 25;
+      allow delete: if false;
     }
   }
 }

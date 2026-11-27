@@ -34,7 +34,7 @@ Views.dashboard = () => {
   return `${typeof homeHero === 'function' ? homeHero() : ''}${pageHead(Session.role() === 'owner' ? 'Owner dashboard' : 'Dashboard', `Today · ${fmtDate(new Date(), { weekday: 'short', day: 'numeric', month: 'short' })}`, live())}
   ${requestsCard()}
   ${typeof setupBanner === 'function' ? setupBanner() : ''}
-  <div class="btn-row dash-acts">${btn("Today's report on WhatsApp", 'dayReportShare', { cls: 'ghost sm', ic: 'send' })}${canDrawer() ? btn('Cash drawer', 'drawerOpenSheet', { cls: 'ghost sm', ic: 'cash' }) : ''}</div>
+  <div class="btn-row dash-acts">${btn("Today's report on WhatsApp", 'dayReportShare', { cls: 'ghost sm', ic: 'send' })}${canDrawer() ? btn('Cash drawer', 'drawerOpenSheet', { cls: 'ghost sm', ic: 'cash' }) : ''}${btn('Guests', 'guestsOpen', { cls: 'ghost sm', ic: 'users' })}${isOwner() ? btn('Payroll', 'payrollOpen', { cls: 'ghost sm', ic: 'wallet' }) + btn('Change history', 'changesOpen', { cls: 'ghost sm', ic: 'clock' }) : ''}</div>
   ${alertsCard()}
   <div class="kpis">
     ${kpi("Today's sales", money(sales), `${pl(paid.length, 'bill')}${diff !== null && sales ? ` · ${diff >= 0 ? '+' : ''}${diff}% vs yesterday` : ''}`)}
@@ -43,6 +43,8 @@ Views.dashboard = () => {
     ${typeof feat !== 'function' || feat('tables') ? kpi('Running tables', String(open.length), open.length ? money(sum(open, orderSubtotal)) + ' on tables' : 'All clear') : kpi('Open orders', String(open.length), open.length ? money(sum(open, orderSubtotal)) + ' not paid yet' : 'All clear')}
   </div>
   ${targetsCard()}
+  ${typeof branchCard === 'function' ? branchCard() : ''}
+  ${licenceCard()}
   ${moneyReceivedCard(paid)}
   <div class="grid-2 wide-left">
     <section class="card">
@@ -224,6 +226,7 @@ Views.billing = (p) => {
       <div class="bill-lines">${sel.items.map((l) => `<div class="line-row"><span>${esc(l.name)} × ${l.qty}</span><span>${money(l.qty * l.price)}</span></div>`).join('')}</div>
       <div class="line-row"><span>Subtotal</span><span>${money(t.sub)}</span></div>
       ${sel.discReq?.status === 'approved' ? `<p class="sm disc-st approved">${icon('check')} Approved discount: ${esc(sel.discReq.what)} — ${esc(sel.discReq.reason)} (${esc(sel.discReq.decidedBy || '')})</p>` : sel.discReq?.status === 'pending' ? `<p class="sm disc-st pending">${icon('clock')} Discount asked: ${esc(sel.discReq.what)} — waiting for approval</p>` : ''}
+      ${loyalty().on && sel.guest?.phone && !sel.pointsUsed && pointsOf(sel.guest.phone) > 0 ? `<p class="sm">${icon('star')} ${esc(sel.guest.name || 'Guest')} has <b>${pointsOf(sel.guest.phone)} points</b> (${money(pointsOf(sel.guest.phone) * loyalty().value)}) ${btn('Use points', 'usePoints', { cls: 'ghost sm', data: `data-id="${sel.id}"` })}</p>` : sel.pointsUsed ? `<p class="sm disc-st approved">${icon('star')} ${sel.pointsUsed} points used (${money(sel.pointsUsed * loyalty().value)} off)</p>` : ''}
       <label class="line-row"><span>Discount</span><input class="inline-input" name="discount" type="number" min="0" max="${t.sub}" step="any" value="${sel.discount || ''}" placeholder="0" data-input="billDiscount"></label>
       <div id="bill-tax">${billTaxRowsHtml(t)}</div>
       <p class="neg sm" id="form-err" role="alert"></p>

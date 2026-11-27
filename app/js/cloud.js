@@ -760,7 +760,9 @@ function installOverrides() {
           const cred = await FB.signInWithEmailAndPassword(Cloud.auth, who, pw);
           const prof = await FB.getDoc(FB.doc(Cloud.db, 'profiles', cred.user.uid));
           if (!prof.exists()) { await FB.signOut(Cloud.auth); return formError('This email has no café yet — if sign-up stopped half-way, tap Sign up and use the same email and password to finish it. Staff: log in with your Employee ID.'); }
-          return await afterSignIn(prof.data().cafeId, cred.user);
+          const pd = prof.data(), mine = [pd.cafeId, ...(pd.branches || [])];
+          let last = ''; try { last = localStorage.getItem('cj.cafe') || ''; } catch (e) { /* ignore */ }
+          return await afterSignIn(mine.includes(last) ? last : pd.cafeId, cred.user);
         }
         if (!code) return formError('Enter your café code (ask the owner).');
         const loginId = who.toLowerCase();

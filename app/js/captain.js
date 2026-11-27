@@ -28,7 +28,8 @@ function checkDuty() {
 function onDuty() {
   const today = dayKey(), people = {};
   (S.team?.people || []).forEach((p) => { if (p && SERVER_ROLES.includes(p.role)) people[p.id] = { ...p, duty: false }; });
-  Object.entries(S.duty || {}).forEach(([id, d]) => { if (d && SERVER_ROLES.includes(d.role)) people[id] = { ...(people[id] || {}), id, name: d.name, role: d.role, duty: d.day === today }; });
+  const known = S.team?.people ? new Set(S.team.people.map((p) => p.id)) : null; // a login reset gives a new ID: skip old ones
+  Object.entries(S.duty || {}).forEach(([id, d]) => { if (d && SERVER_ROLES.includes(d.role) && (!known || known.has(id))) people[id] = { ...(people[id] || {}), id, name: d.name, role: d.role, duty: d.day === today }; });
   return Object.values(people).sort((a, b) => (b.duty ? 1 : 0) - (a.duty ? 1 : 0) || SERVER_ROLES.indexOf(a.role) - SERVER_ROLES.indexOf(b.role) || a.name.localeCompare(b.name));
 }
 /** Owner's app: keep a plain staff list (name + role only) that the captain can read */

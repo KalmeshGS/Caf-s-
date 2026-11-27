@@ -65,6 +65,7 @@ function ownerAlerts(dk = dayKey()) {
   const d = drawerOf(dk);
   if (d?.close && d.close.diff <= -c.shortMin) out.push({ key: `c:${dk}`, title: `Cash short by ${money(-d.close.diff)}`, body: `Counted ${money(d.close.counted)}, should be ${money(d.close.expected)} — closed by ${d.close.by}`, at: d.close.at, link: '#/billing' });
   priceRises(10).filter((r) => r.to.date === dk).forEach((r) => out.push({ key: `p:${r.s.id}:${r.to.at}`, title: `${r.s.name} costs ${r.pct}% more`, body: `${money(r.from.unit)} → ${money(r.to.unit)} per ${r.s.unit} from ${r.to.vendor}`, at: r.to.at, link: '#/stock' }));
+  licDue().forEach((l) => { const n = daysTo(l.due); out.push({ key: `l:${l.id}:${l.due}`, title: `${l.name} ${n < 0 ? `overdue by ${-n} day${n === -1 ? '' : 's'}` : n === 0 ? 'due today' : `due in ${n} day${n === 1 ? '' : 's'}`}`, body: `${l.no ? `No. ${l.no} · ` : ''}${fmtDate(keyToDate(l.due), { day: 'numeric', month: 'short', year: 'numeric' })}`, at: Math.min(Date.now(), keyToDate(l.due).getTime()), link: '#/dashboard' }); });
   const drop = salesDrop(dk);
   if (drop) out.push({ key: `s:${dk}`, title: `Sales down ${drop.pct}% today`, body: `${money(drop.now)} so far vs ${money(drop.then)} by this time last ${fmtDate(keyToDate(dk), { weekday: 'long' })}`, at: drop.at, link: '#/dashboard' });
   return out.sort((a, b) => b.at - a.at);
@@ -330,4 +331,234 @@ function priceHistSheet(s) {
 Object.assign(Actions, {
   gstDl() { if (!seesCost()) return; const R = periodRange(App.ui.rep || { mode: 'month', anchor: dayKey() }); saveBlob(`${slug(S.settings?.name)}-gst-${R.short}.xlsx`, gstWorkbook(R)); toast('GST Excel saved — share it with your CA'); },
   priceHist(el) { const s = byId(S.stock, el.dataset.id); if (s) openSheet(priceHistSheet(s)); },
+});
+
+/* =========================================================
+   For the owner (batch C)
+   · Licences & due dates (FSSAI, GST returns, fire NOC…) with reminders
+   · Payroll from attendance: absent days, advances, net pay, payslip PDF
+   · Guests: visits, spend, birthdays, WhatsApp wishes / offers, loyalty points
+   · Change history: who changed a price, a setting, a login or stock, and when
+   ========================================================= */
+
+/* ---------------- licences & due dates ---------------- */
+const LICENCE_PRESETS = [
+  ['FSSAI licence', 12, 60], ['GST return (GSTR-1)', 1, 5], ['GST return (GSTR-3B)', 1, 5], ['Trade licence', 12, 30], ['Fire NOC', 12, 30],
+  ['Shop & establishment', 12, 30], ['Pest control', 1, 3], ['Staff medical certificates', 12, 30], ['Water test', 6, 15], ['Weights & measures', 12, 30], ['Liquor licence', 12, 60], ['Signage licence', 12, 30],
+];
+const licences = () => S.settings?.licences || [];
+const daysTo = (k) => Math.round((keyToDate(k) - keyToDate(dayKey())) / 864e5);
+const addMonths = (k, n) => { const d = keyToDate(k); const day = d.getDate(); d.setDate(1); d.setMonth(d.getMonth() + n); d.setDate(Math.min(day, new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate())); return dayKey(d.getTime()); };
+const licDue = () => licences().filter((l) => l.due && daysTo(l.due) <= (Number(l.remind) || 30)).sort((a, b) => a.due.localeCompare(b.due));
+function licenceCard() {
+  if (!isOwner()) return '';
+  const list = licences().slice().sort((a, b) => String(a.due).localeCompare(String(b.due)));
+  const when = (l) => { const n = daysTo(l.due); return n < 0 ? `<b class="neg">overdue ${-n} day${n === -1 ? '' : 's'}</b>` : n === 0 ? '<b class="neg">today</b>' : n <= (Number(l.remind) || 30) ? `<b class="warn-t">in ${n} day${n === 1 ? '' : 's'}</b>` : `<span class="muted">${esc(fmtDate(keyToDate(l.due), { day: 'numeric', month: 'short', year: 'numeric' }))}</span>`; };
+  return `<section class="card"><div class="card-head">${eyebrow('Licences & due dates')}${btn(list.length ? 'Manage' : 'Add', 'licOpen', { cls: 'ghost sm' })}</div>
+    ${list.length ? list.slice(0, 5).map((l) => `<div class="line-row"><span>${esc(l.name)}${l.no ? ` <small class="muted">· ${esc(l.no)}</small>` : ''}</span>${when(l)}</div>`).join('')
+      : '<p class="muted sm">Add your FSSAI licence, GST filing dates, fire NOC, trade licence, pest control… and get a reminder before each one is due.</p>'}</section>`;
+}
+function licSheet() {
+  const list = licences().slice().sort((a, b) => String(a.due).localeCompare(String(b.due)));
+  return `${sheetHead('Licences & due dates', 'You get a reminder before each one')}
+    ${list.map((l) => `<div class="line-row lic-row"><span><b>${esc(l.name)}</b><small class="muted">${l.no ? ` · ${esc(l.no)}` : ''} · due ${esc(fmtDate(keyToDate(l.due), { day: 'numeric', month: 'short', year: 'numeric' }))}${l.every ? ` · every ${l.every} month${l.every > 1 ? 's' : ''}` : ''}</small></span>
+      <span class="btn-row tight">${btn(l.every ? 'Done' : 'Renewed', 'licDone', { cls: 'ghost sm', data: `data-id="${l.id}"` })}<button class="icon-btn sm" data-act="licDel" data-id="${l.id}" aria-label="Remove">${icon('trash')}</button></span></div>`).join('')}
+    <form class="form" data-form="licAdd">
+      ${eyebrow('Add')}
+      <label class="field"><span>What</span><select name="preset" data-change="licPreset"><option value="">Choose…</option>${LICENCE_PRESETS.map(([n]) => `<option>${esc(n)}</option>`).join('')}<option value="__other">Something else…</option></select></label>
+      <label class="field" id="lic-name" hidden><span>Name</span><input name="name" maxlength="40"></label>
+      <div class="row-2"><label class="field"><span>Next due date</span><input name="due" type="date" required></label>
+      <label class="field"><span>Licence / ref. no. <em>(optional)</em></span><input name="no" maxlength="30"></label></div>
+      <div class="row-2"><label class="field"><span>Repeats every (months, 0 = once)</span><input name="every" type="number" min="0" max="60" value="12"></label>
+      <label class="field"><span>Remind me (days before)</span><input name="remind" type="number" min="0" max="180" value="30"></label></div>
+      <button class="btn primary block" type="submit">${icon('plus')}<span>Add</span></button>
+    </form>`;
+}
+
+/* ---------------- payroll ---------------- */
+function payrollRows(mk) {
+  const dim = new Date(Number(mk.slice(0, 4)), Number(mk.slice(5, 7)), 0).getDate();
+  return (S.staff || []).filter((p) => p.active !== false && Number(p.salary) > 0).map((p) => {
+    const c = { P: 0, L: 0, Lv: 0, A: 0 };
+    Object.entries(S.attendance || {}).forEach(([dk, day]) => { if (dk.startsWith(mk) && day && day[p.id]) c[day[p.id]] = (c[day[p.id]] || 0) + 1; });
+    const salary = Number(p.salary) || 0, perDay = salary / dim;
+    const deduct = round2(perDay * c.A);
+    const exp = (S.expenses || []).filter((e) => e.staffId === p.id && e.forMonth === mk);
+    const adv = round2(sum(exp.filter((e) => e.advance), (e) => e.amount));
+    const paidE = exp.find((e) => !e.advance);
+    const net = round2(Math.max(0, salary - deduct - adv));
+    return { p, c, salary, deduct, adv, net, paid: paidE || null, dim, advances: exp.filter((e) => e.advance) };
+  });
+}
+function payrollSheet() {
+  const mk = App.ui.payMonth || monthKey(), rows = payrollRows(mk);
+  return `${sheetHead('Payroll', monthLabel(mk))}
+    <div class="row-2"><label class="field"><span>Month</span><input type="month" value="${mk}" max="${monthKey()}" data-change="payMonth"></label></div>
+    ${rows.length ? rows.map((r) => `<div class="card pay-row">
+      <div class="line-row"><span><b>${esc(r.p.name)}</b><small class="muted"> · ${esc(r.p.empId || '')} · ${money(r.salary)}/month</small></span>${r.paid ? `<span class="badge ok">${icon('check')} Paid ${money(r.paid.amount)}</span>` : `<b>${money(r.net)}</b>`}</div>
+      <small class="muted">Present ${r.c.P} · Late ${r.c.L} · Leave ${r.c.Lv} (paid) · Absent ${r.c.A} (−${money(r.deduct)})${r.adv ? ` · Advance −${money(r.adv)}` : ''} · days not marked count as present</small>
+      <div class="btn-row tight">${r.paid ? '' : btn(`Pay ${money(r.net)}`, 'payrollPay', { cls: 'primary sm', data: `data-id="${r.p.id}" data-m="${mk}"` })}${btn('Advance', 'payrollAdvOpen', { cls: 'ghost sm', data: `data-id="${r.p.id}" data-m="${mk}"` })}${btn('Payslip', 'payslip', { cls: 'ghost sm', ic: 'download', data: `data-id="${r.p.id}" data-m="${mk}"` })}</div>
+    </div>`).join('') : '<p class="muted">Add staff with a monthly salary (Staff) to run payroll.</p>'}
+    ${rows.length ? `<p class="line-row total"><span>Total to pay</span><b>${money(sum(rows.filter((r) => !r.paid), (r) => r.net))}</b></p>` : ''}
+    <p class="fine">Absent days are cut at salary ÷ days in the month; leave is paid. Paying records the amount in Expenses → Salary.</p>`;
+}
+function payslipPdf(r, mk) {
+  const st = S.settings || {};
+  return writePdf([
+    { h: `${st.name || ''} — Payslip` }, { p: `${monthLabel(mk)} · ${r.p.name}${r.p.empId ? ` (${r.p.empId})` : ''}${r.p.role ? ` · ${r.p.role}` : ''}` },
+    { table: [['Item', 'Amount'], ['Monthly salary', money(r.salary, true)], [`Absent ${r.c.A} day(s)`, `-${money(r.deduct, true)}`], ['Advance taken', `-${money(r.adv, true)}`], ['Net pay', money(r.net, true)]] },
+    { p: `Days: present ${r.c.P}, late ${r.c.L}, leave ${r.c.Lv}, absent ${r.c.A} of ${r.dim}.` },
+    { p: r.paid ? `Paid on ${fmtDate(keyToDate(r.paid.date), { day: 'numeric', month: 'short', year: 'numeric' })}.` : 'Not paid yet.' },
+    { p: 'Signature (employee): ____________________     Signature (employer): ____________________' },
+  ], `Payslip ${r.p.name} ${mk}`);
+}
+
+/* ---------------- guests & loyalty ---------------- */
+const phone10 = (p) => String(p || '').replace(/\D/g, '').slice(-10);
+const loyalty = () => ({ on: false, per100: 1, value: 1, ...(S.settings?.loyalty || {}) });
+function guestsList() {
+  const g = {}; const L = loyalty();
+  S.orders.filter((o) => o.status === 'paid' && (o.guest?.phone || o.credit?.phone)).forEach((o) => {
+    const ph = phone10(o.guest?.phone || o.credit?.phone); if (ph.length < 10) return;
+    const x = g[ph] = g[ph] || { phone: ph, name: '', visits: 0, spend: 0, last: 0, first: o.paidAt, bday: '', anniv: '', earned: 0, used: 0, note: '' };
+    x.visits++; x.spend = round2(x.spend + o.total); x.first = Math.min(x.first, o.paidAt);
+    if (o.paidAt >= x.last) { x.last = o.paidAt; x.name = o.guest?.name || o.credit?.name || x.name; }
+    if (o.guest?.bday) x.bday = o.guest.bday; if (o.guest?.anniv) x.anniv = o.guest.anniv; if (o.guest?.note) x.note = o.guest.note;
+    if (o.method !== 'comp') x.earned += Math.floor((o.total || 0) / 100) * L.per100;
+    x.used += Number(o.pointsUsed) || 0;
+  });
+  return Object.values(g).map((x) => ({ ...x, points: Math.max(0, x.earned - x.used) }));
+}
+const pointsOf = (phone) => { const x = guestsList().find((g) => g.phone === phone10(phone)); return x ? x.points : 0; };
+const nextDate = (md) => { if (!md) return null; const t = dayKey(); const y = t.slice(0, 4); let k = `${y}-${md.slice(5)}`; if (k < t) k = `${Number(y) + 1}-${md.slice(5)}`; return k; };
+function guestsSheet() {
+  const tab = App.ui.gTab || 'all', L = loyalty(), all = guestsList();
+  const soon = (k) => { const n = nextDate(k); return n && daysTo(n) <= 7; };
+  const list = (tab === 'bday' ? all.filter((g) => soon(g.bday) || soon(g.anniv)) : tab === 'away' ? all.filter((g) => Date.now() - g.last > 30 * 864e5) : all).sort((a, b) => (tab === 'all' ? b.spend - a.spend : a.last - b.last));
+  const msg = (g) => (soon(g.bday) ? `Happy birthday ${g.name || ''}! 🎂 Come celebrate at ${S.settings?.name || 'our place'} — a sweet on us.` : soon(g.anniv) ? `Happy anniversary ${g.name || ''}! Celebrate with us at ${S.settings?.name || 'our place'}.` : tab === 'away' ? `Hello ${g.name || ''}, we miss you at ${S.settings?.name || 'our place'}! Come by this week.` : `Hello ${g.name || ''}, thank you for visiting ${S.settings?.name || 'us'}!`);
+  const wa = (g) => `https://wa.me/${cur().code === 'INR' ? '91' : ''}${g.phone}?text=${encodeURIComponent(msg(g) + (L.on && g.points ? ` You have ${g.points} points (${money(g.points * L.value)}).` : ''))}`;
+  return `${sheetHead('Guests', `${all.length} guests with a mobile number`)}
+    <div class="seg">${[['all', 'Top guests'], ['bday', 'Birthdays this week'], ['away', 'Not seen 30+ days']].map(([k, l]) => `<button type="button" class="seg-btn" data-act="gTab" data-k="${k}" aria-pressed="${tab === k}"><span>${l}</span></button>`).join('')}</div>
+    <div class="g-list">${list.slice(0, 100).map((g) => `<div class="line-row g-row"><span><b>${esc(g.name || 'Guest')}</b><small class="muted"> · ${esc(g.phone)} · ${pl(g.visits, 'visit')} · ${money(g.spend)} · last ${esc(fmtDate(g.last, { day: 'numeric', month: 'short' }))}${g.bday ? ` · 🎂 ${esc(fmtDate(keyToDate(g.bday), { day: 'numeric', month: 'short' }))}` : ''}${L.on ? ` · ${g.points} pts` : ''}${g.note ? ` · ${esc(g.note)}` : ''}</small></span><a class="btn ghost sm" href="${esc(wa(g))}" target="_blank" rel="noopener">WhatsApp</a></div>`).join('') || '<p class="muted">Nobody here yet. Save the guest\'s mobile on an order (Guest details) to build this list.</p>'}</div>
+    <form class="form loy-form" data-form="loyalty"><details${L.on ? ' open' : ''}><summary>${eyebrow('Loyalty points')}</summary>
+      <label class="check"><input type="checkbox" name="on" ${L.on ? 'checked' : ''}><span>Give points on every bill (guest's mobile needed)</span></label>
+      <div class="row-2"><label class="field"><span>Points per ₹100</span><input name="per100" type="number" min="1" max="100" value="${L.per100}"></label>
+      <label class="field"><span>1 point is worth (₹)</span><input name="value" type="number" min="0.1" step="0.1" value="${L.value}"></label></div>
+      <button class="btn ghost" type="submit">Save</button></details></form>`;
+}
+
+/* ---------------- change history ---------------- */
+function logChange(area, what, from, to) { audit('change', { area, what, from: from == null ? '' : String(from), to: to == null ? '' : String(to) }); }
+function changesSheet() {
+  const f = App.ui.chArea || 'all';
+  const all = (S.audit || []).filter((a) => a.type === 'change').sort((a, b) => b.at - a.at);
+  const list = all.filter((a) => f === 'all' || a.area === f);
+  const areas = ['all', ...new Set(all.map((a) => a.area))];
+  return `${sheetHead('Change history', 'Who changed what, and when')}
+    <div class="chip-row">${areas.map((a) => `<button class="chip ${a === f ? 'on' : ''}" data-act="chArea" data-k="${esc(a)}">${esc(a === 'all' ? 'All' : a)}</button>`).join('')}</div>
+    ${list.slice(0, 200).map((a) => `<div class="line-row ch-row"><span><b>${esc(a.what)}</b>${a.from || a.to ? `<small class="muted"> · ${esc(a.from || '—')} → ${esc(a.to || '—')}</small>` : ''}</span><small class="muted">${esc(a.by)} · ${esc(fmtDate(a.at, { day: 'numeric', month: 'short' }))} ${esc(fmtTime(a.at))}</small></div>`).join('') || '<p class="muted">No changes recorded yet. From now on, price, menu, settings, staff, login and stock changes are listed here.</p>'}`;
+}
+/** Wrap a form so its changes are recorded: snap() before and after, diff() → [[area, what, from, to]] */
+function watchForm(name, snap, diff) {
+  const f = Forms[name]; if (typeof f !== 'function' || f.__watched) return;
+  const w = function (...args) {
+    const before = snap(); const r = f.apply(this, args);
+    const fin = () => { try { const d = diff(before, snap()); if (d.length) { d.forEach((x) => logChange(...x)); setTimeout(save, 0); } } catch (e) { /* never block a save */ } };
+    if (r && typeof r.then === 'function') return r.then((v) => { fin(); return v; });
+    fin(); return r;
+  };
+  w.__watched = true; Forms[name] = w;
+}
+const mapBy = (list, pick) => Object.fromEntries((list || []).map((x) => [x.id, pick(x)]));
+function installWatches() {
+  watchForm('menuItem', () => mapBy(S.menu, (m) => ({ name: m.name, price: m.price, cat: m.cat })), (a, b) => {
+    const out = [];
+    Object.entries(b).forEach(([id, n]) => { const o = a[id]; if (!o) out.push(['Menu', `New dish: ${n.name}`, '', money(n.price)]); else { if (o.price !== n.price) out.push(['Menu', `Price · ${n.name}`, money(o.price), money(n.price)]); if (o.name !== n.name) out.push(['Menu', 'Dish renamed', o.name, n.name]); } });
+    Object.entries(a).forEach(([id, o]) => { if (!b[id]) out.push(['Menu', `Dish removed: ${o.name}`, money(o.price), '']); });
+    return out;
+  });
+  const KEYS = { name: 'Name', tax: 'Tax %', tables: 'Tables', currency: 'Currency', openHour: 'Opening hour', closeHour: 'Closing hour', footer: 'Bill footer', gstin: 'GSTIN', fssai: 'FSSAI no.' };
+  ['business', 'floorSettings', 'charges', 'billSettings'].forEach((n) => watchForm(n, () => JSON.parse(JSON.stringify(S.settings || {})), (a, b) => {
+    const out = [];
+    Object.entries(KEYS).forEach(([k, l]) => { if (JSON.stringify(a[k]) !== JSON.stringify(b[k])) out.push(['Settings', l, a[k] ?? '', b[k] ?? '']); });
+    if (JSON.stringify(a.charges) !== JSON.stringify(b.charges)) out.push(['Settings', 'Packing / service charge', JSON.stringify(a.charges || {}), JSON.stringify(b.charges || {})]);
+    if (JSON.stringify(a.areas) !== JSON.stringify(b.areas)) out.push(['Settings', 'Tables & areas', (a.areas || []).map((x) => x.name).join(', '), (b.areas || []).map((x) => x.name).join(', ')]);
+    return out;
+  }));
+  ['access', 'setPw', 'userEdit', 'userSave'].forEach((n) => watchForm(n, () => mapBy(S.users, (u) => ({ name: u.name, role: u.role, active: u.active !== false, must: !!u.mustChange })), (a, b) => {
+    const out = [];
+    Object.entries(b).forEach(([id, n]) => { const o = a[id]; if (!o) out.push(['Team', `Login given: ${n.name}`, '', ROLES[n.role]?.label || n.role]); else { if (o.role !== n.role) out.push(['Team', `Role · ${n.name}`, ROLES[o.role]?.label || o.role, ROLES[n.role]?.label || n.role]); if (o.active !== n.active) out.push(['Team', `Login ${n.active ? 'switched on' : 'switched off'}: ${n.name}`, '', '']); if (!o.must && n.must) out.push(['Team', `Password reset: ${n.name}`, '', '']); } });
+    Object.entries(a).forEach(([id, o]) => { if (!b[id] && !Object.values(b).some((x) => x.name === o.name)) out.push(['Team', `Login removed: ${o.name}`, '', '']); });
+    return out;
+  }));
+  watchForm('staff', () => mapBy(S.staff, (p) => ({ name: p.name, salary: Number(p.salary) || 0, active: p.active !== false })), (a, b) => {
+    const out = [];
+    Object.entries(b).forEach(([id, n]) => { const o = a[id]; if (!o) out.push(['Staff', `New staff: ${n.name}`, '', '']); else { if (o.salary !== n.salary) out.push(['Staff', `Salary · ${n.name}`, money(o.salary), money(n.salary)]); if (o.active !== n.active) out.push(['Staff', `${n.name} ${n.active ? 'back at work' : 'left'}`, '', '']); } });
+    return out;
+  });
+  watchForm('stockItem', () => mapBy(S.stock, (s) => ({ name: s.name, qty: Number(s.qty), unit: s.unit, cost: Number(s.cost) || 0 })), (a, b) => {
+    const out = [];
+    Object.entries(b).forEach(([id, n]) => { const o = a[id]; if (!o) out.push(['Stock', `New stock item: ${n.name}`, '', `${n.qty} ${n.unit}`]); else { if (o.qty !== n.qty) out.push(['Stock', `Stock count · ${n.name}`, `${o.qty} ${n.unit}`, `${n.qty} ${n.unit}`]); if (o.cost !== n.cost) out.push(['Stock', `Cost · ${n.name}`, money(o.cost), money(n.cost)]); } });
+    return out;
+  });
+}
+window.addEventListener('load', installWatches); // after every module (and the online mode) has set up its forms
+
+/* ---------------- actions ---------------- */
+Object.assign(Actions, {
+  licOpen() { if (isOwner()) openSheet(licSheet()); },
+  licDone(el) {
+    const l = licences().find((x) => x.id === el.dataset.id); if (!l) return;
+    if (l.every) { const was = l.due; l.due = addMonths(l.due, Number(l.every)); logChange('Licences', `${l.name} done`, was, l.due); }
+    else { const d = prompt(`New expiry date for ${l.name} (YYYY-MM-DD)`, addMonths(l.due, 12)); if (!d || !/^\d{4}-\d{2}-\d{2}$/.test(d)) return; logChange('Licences', `${l.name} renewed`, l.due, d); l.due = d; }
+    save(); openSheet(licSheet());
+  },
+  licDel(el) { if (!confirm('Remove this reminder?')) return; S.settings.licences = licences().filter((x) => x.id !== el.dataset.id); save(); openSheet(licSheet()); },
+  payrollOpen() { if (!isOwner()) return; App.ui.payMonth = App.ui.payMonth || monthKey(); openSheet(payrollSheet(), { wide: true }); },
+  payrollPay(el) {
+    const r = payrollRows(el.dataset.m).find((x) => x.p.id === el.dataset.id); if (!r || r.paid) return;
+    if (!confirm(`Pay ${r.p.name} ${money(r.net)} for ${monthLabel(el.dataset.m)}?`)) return;
+    S.expenses.push({ id: uid('e'), date: dayKey(), cat: 'Salary', title: `Salary · ${r.p.name} · ${monthLabel(el.dataset.m)}`, amount: r.net, staffId: r.p.id, forMonth: el.dataset.m });
+    save(); openSheet(payrollSheet(), { wide: true }); toast(`Paid ${money(r.net)} to ${r.p.name}`);
+  },
+  payrollAdvOpen(el) {
+    const p = byId(S.staff, el.dataset.id); if (!p) return;
+    const a = Number(prompt(`Advance for ${p.name} (₹)`, '')); if (!(a > 0)) return;
+    S.expenses.push({ id: uid('e'), date: dayKey(), cat: 'Salary', title: `Advance · ${p.name}`, amount: round2(a), staffId: p.id, forMonth: el.dataset.m, advance: true });
+    logChange('Staff', `Advance · ${p.name}`, '', money(a));
+    save(); openSheet(payrollSheet(), { wide: true }); toast('Advance recorded — it comes off this month\'s salary');
+  },
+  payslip(el) { const r = payrollRows(el.dataset.m).find((x) => x.p.id === el.dataset.id); if (r) saveBlob(`payslip-${slug(r.p.name)}-${el.dataset.m}.pdf`, payslipPdf(r, el.dataset.m)); },
+  guestsOpen() { App.ui.gTab = App.ui.gTab || 'all'; openSheet(guestsSheet(), { wide: true }); },
+  gTab(el) { App.ui.gTab = el.dataset.k; openSheet(guestsSheet(), { wide: true }); },
+  changesOpen() { if (!isOwner()) return; openSheet(changesSheet(), { wide: true }); },
+  chArea(el) { App.ui.chArea = el.dataset.k; openSheet(changesSheet(), { wide: true }); },
+  usePoints(el) {
+    const o = byId(S.orders, el.dataset.id); if (!o || o.status !== 'open') return;
+    const L = loyalty(), pts = pointsOf(o.guest?.phone), sub = orderSubtotal(o);
+    const n = Math.min(pts, Math.floor((sub - (o.discount || 0)) / L.value)); if (n <= 0) return;
+    o.pointsUsed = n; o.discount = round2((o.discount || 0) + n * L.value);
+    save(); toast(`${n} points used — ${money(n * L.value)} off`);
+  },
+});
+Object.assign(Changes, {
+  licPreset(el) { const box = $('#lic-name'); const p = LICENCE_PRESETS.find(([n]) => n === el.value); if (box) box.hidden = el.value !== '__other'; if (p) { const f = el.form; f.every.value = p[1]; f.remind.value = p[2]; } },
+  payMonth(el) { if (el.value) { App.ui.payMonth = el.value; openSheet(payrollSheet(), { wide: true }); } },
+});
+Object.assign(Forms, {
+  licAdd(fd) {
+    const preset = fd.get('preset'), name = String(preset === '__other' ? fd.get('name') : preset || '').trim();
+    if (!name) return formError('Choose what it is.');
+    const due = fd.get('due'); if (!due) return formError('Pick the next due date.');
+    S.settings.licences = [...licences(), { id: uid('lic'), name: name.slice(0, 40), no: String(fd.get('no') || '').trim().slice(0, 30), due, every: Math.max(0, Number(fd.get('every')) || 0), remind: Math.max(0, Number(fd.get('remind')) || 0) }];
+    logChange('Licences', `Added: ${name}`, '', due);
+    save(); openSheet(licSheet()); toast('Reminder added');
+  },
+  loyalty(fd) {
+    if (!isOwner()) return;
+    const was = loyalty().on;
+    S.settings.loyalty = { on: fd.get('on') === 'on', per100: Math.max(1, Number(fd.get('per100')) || 1), value: Math.max(0.1, Number(fd.get('value')) || 1) };
+    if (was !== S.settings.loyalty.on) logChange('Settings', 'Loyalty points', was ? 'on' : 'off', S.settings.loyalty.on ? 'on' : 'off');
+    save(); openSheet(guestsSheet(), { wide: true }); toast('Loyalty points saved');
+  },
 });
