@@ -1253,3 +1253,30 @@ input[type=month].rep-date { min-width: 11em; }
 .fb-row .timer { margin-left: auto; white-space: nowrap; }
 .fb-row.late .timer { color: #d97706; font-weight: 700; }
 @media (max-width: 560px) { .fb-grid { grid-template-columns: 1fr; } }
+
+.hold-seg { margin: 8px 0 4px; }
+.hold-seg .seg-btn span { font-size: 13px; padding: 6px 4px; }
+.tline em.held { color: #7c5cbf; font-style: normal; font-weight: 600; }
+.fire-btn { background: #fff4e5; color: #9a4d00; border: 1px solid #f0c48a; margin-top: 8px; }
+.bill-parts { margin: 6px 0; }
+.split-row { align-items: center; }
+.split-n { width: 46px; text-align: center; }
+
+.wl-row { align-items: center; gap: 8px; flex-wrap: wrap; }
+.wl-row .timer.over { color: #c0392b; font-weight: 700; }
+.warn-chip { border-color: #d97706; }
+.appr-row { align-items: center; gap: 8px; flex-wrap: wrap; }
+.disc-st { margin: 6px 0; display: flex; gap: 6px; align-items: center; }
+.disc-st.pending { color: #9a4d00; }
+.disc-st.approved { color: #1a7f4b; }
+.disc-st.rejected { color: #c0392b; }
+.ck-btn { width: 100%; }
+.ck-btn.done b { color: #1a7f4b; }
+.ck-list { display: grid; gap: 4px; }
+.ck-row { min-height: 44px; align-items: center; }
+.ck-edit { margin-top: 10px; }
+.fbk { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.stars { display: inline-flex; gap: 2px; }
+.star { background: none; border: 0; font-size: 26px; line-height: 1; color: #c9ced6; cursor: pointer; min-width: 36px; min-height: 40px; }
+.star.on { color: #f5a623; }
+.fbk-note { flex: 1 1 180px; }

@@ -66,7 +66,7 @@ function render() {
   }
   const role = Session.role();
   if (!role) { root.innerHTML = Session.locked && Session.account() ? Views.lockScreen() : Views.login(); return; }
-  checkReady(); checkNotices(); checkDuty(); checkBillReq();
+  checkReady(); checkNotices(); checkDuty(); checkBillReq(); checkApprovals();
   if ((App.setup.mode === 'later' || App.setup.mode === 'profile') && App.setup.step > 0 && role === 'owner') { root.innerHTML = Views.setup(); return; }
   let { view, params } = parseHash();
   const allowed = viewsFor(role).concat('inbox', canTokens() ? ['tokens'] : []); // everyone has the notifications inbox
@@ -126,12 +126,15 @@ const Actions = {
     let o = currentOrder(App.params);
     if (!o) {
       o = { id: uid('o'), no: nextBillNo(), table: App.params.t || 'Takeaway', items: [], status: 'open', createdAt: Date.now(), by: Session.user()?.name || Session.role(), byId: Session.user()?.id || null };
+      const sg = App.ui.seatGuest; // seated from the waitlist: the guest comes with the order
+      if (sg && sg.t === o.table) { o.guest = { name: sg.name, ...(sg.phone ? { phone: sg.phone } : {}) }; App.ui.seatGuest = null; }
       S.orders.push(o);
     }
     if (o.status !== 'open') return toast('This bill is already paid');
     // Same item without special instructions → just one more; items with instructions stay separate lines
-    const l = o.items.find((x) => x.menuId === m.id && !x.note);
-    if (l) l.qty += 1; else o.items.push({ id: uid('l'), menuId: m.id, name: m.name, price: m.price, qty: 1, sent: 0, note: '' });
+    const hold = !!App.ui.holdNext;
+    const l = o.items.find((x) => x.menuId === m.id && !x.note && !!x.hold === hold && (!hold || x.sent === 0));
+    if (l) l.qty += 1; else o.items.push({ id: uid('l'), menuId: m.id, name: m.name, price: m.price, qty: 1, sent: 0, note: '', ...(hold ? { hold: true } : {}) });
     save();
   },
   incLine(el) { const r = line(el.dataset.id); if (r?.l) { r.l.qty += 1; save(); } },
@@ -167,7 +170,7 @@ const Actions = {
   },
   sendKitchen() {
     const o = currentOrder(App.params); if (!o) return;
-    const lines = o.items.filter((l) => l.qty > l.sent);
+    const lines = o.items.filter((l) => l.qty > l.sent && !l.hold); // held items wait for "Fire"
     if (!lines.length) return;
     const me = Session.user();
     const waiting = openKot(o);
@@ -182,8 +185,9 @@ const Actions = {
     } else {
       S.kots.push({ id: uid('k'), orderId: o.id, table: o.table, no: o.no, items: lines.map((l) => ({ lineId: l.id, menuId: l.menuId, name: l.name, qty: l.qty - l.sent, note: l.note || '' })), status: 'new', createdAt: Date.now(), updatedAt: Date.now(), byId: me?.id || o.byId || null, by: me?.name || '' });
     }
-    o.items.forEach((l) => { l.sent = l.qty; });
-    persist(); toast(`${waiting ? 'Kitchen ticket updated' : 'Sent to kitchen'} ✓ ${orderLabel(o)}`);
+    o.items.forEach((l) => { if (!l.hold) l.sent = l.qty; });
+    const held = sum(o.items.filter((l) => l.hold), (l) => l.qty - l.sent);
+    persist(); toast(`${waiting ? 'Kitchen ticket updated' : 'Sent to kitchen'} ✓ ${orderLabel(o)}${held ? ` — ${held} held for later` : ''}`);
     if (o.table === 'Takeaway') render(); else go('orders');
   },
   toBill(el) { go('billing', { o: el.dataset.id }); },
@@ -195,6 +199,7 @@ const Actions = {
     // Cooking and "ready" belong to the kitchen (and the owner); serving ready food is the floor staff's job
     if (k.status !== 'ready' && !KITCHEN_ROLES.includes(role)) return toast('Only the kitchen can change cooking status.');
     k.status = { new: 'cooking', cooking: 'ready', ready: 'served' }[k.status] || 'served';
+    if (k.status === 'ready') k.readyAt = Date.now(); // day summary: time to ready
     k.updatedAt = Date.now();
     if (k.status === 'served') useStockFor(k); // ingredients come off the stock
     if (KITCHEN_ROLES.includes(role)) S.kots = S.kots.filter((x) => x.status !== 'served' || Date.now() - x.updatedAt < 864e5); // keep one day
@@ -369,7 +374,7 @@ const Forms = {
     // Guests have paid and will leave: the table needs cleaning (alerts housekeeping, captain, waiters…)
     if (o.table && o.table !== 'Takeaway' && tableNames().includes(o.table) && !openOrders().some((x) => x.table === o.table && x !== o)) {
       S.tableState = S.tableState || {};
-      if (S.tableState[o.table]?.status !== 'blocked') S.tableState[o.table] = { status: 'cleaning', note: 'Bill paid — guests leaving', by: 'Auto (bill paid)', at: Date.now() };
+      [o.table, ...(o.joined || [])].forEach((t) => { if (S.tableState[t]?.status !== 'blocked') S.tableState[t] = { status: 'cleaning', note: 'Bill paid — guests leaving', by: 'Auto (bill paid)', at: Date.now() }; });
     }
     save(); toast(pay.method === 'credit' ? `Saved on credit — ${money(t.total)} to collect from ${pay.extra.credit.name}` : pay.method === 'comp' ? 'Free bill saved' : token ? `Paid ${money(t.total)} ✓ Token ${token}` : `Paid ${money(t.total)} ✓`);
     if (token) openSheet(tokenSheet(o));

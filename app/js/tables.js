@@ -36,7 +36,7 @@ const canMarkClean = () => ['owner', 'manager', 'waiter', 'captain', 'housekeepi
 function cleaningView() {
   const dirty = Object.entries(S.tableState || {}).filter(([, s]) => s && s.status === 'cleaning').sort((a, b) => (a[1].at || 0) - (b[1].at || 0));
   const others = tableNames().filter((t) => !dirty.some(([d]) => d === t));
-  return `${pageHead('Housekeeping', 'Tables to clean')}
+  return `${pageHead('Housekeeping', 'Tables to clean', btn('Today', 'daySheetOpen', { cls: 'ghost sm', ic: 'chart' }))}
     ${'Notification' in window && Notification.permission === 'default' ? `<div class="banner info">${icon('bell')}<span>Turn on alerts so your phone rings when a table needs cleaning.</span>${btn('Turn on alerts', 'enableAlerts', { cls: 'primary sm' })}</div>` : ''}
     ${dirty.length ? `<section class="card">${eyebrow(`${pl(dirty.length, 'table')} waiting`)}
       ${dirty.map(([t, s]) => `<div class="line-row clean-row"><span><b>${esc(tableTitle(t))}</b><small class="muted"> · ${esc(ago(s.at || Date.now()))}${s.note ? ` · ${esc(s.note)}` : ''}</small></span>${btn('Cleaned', 'markClean', { cls: 'primary', ic: 'check', data: `data-t="${t}"` })}</div>`).join('')}</section>`
@@ -49,13 +49,15 @@ function tablesView() {
   if (isHousekeeping()) return cleaningView();
   const open = openOrders();
   const tile = (t, area) => {
-    const o = open.find((x) => x.table === t);
+    const o = orderAt(t, open), joinedTo = o && o.table !== t ? o.table : null;
+    const more = o && !joinedTo ? open.filter((x) => x.table === t).length - 1 : 0;
     const ms = (S.tableState || {})[t];
     const res = nextReservation(t);
     const pending = o && o.items.some((l) => l.qty > l.sent);
     const st = !o && ms ? TABLE_STATES[ms.status] : null;
-    const body = o
-      ? `<span>${money(orderSubtotal(o))}</span><small>${pl(sum(o.items, (l) => l.qty), 'item')} · ${elapsedMin(o.createdAt)}</small>`
+    const body = joinedTo ? `<span>With ${esc(joinedTo)}</span><small>Joined table</small>`
+      : o
+      ? `<span>${money(orderSubtotal(o))}${more ? ` <small>+${more} bill${more > 1 ? 's' : ''}</small>` : ''}</span><small>${pl(sum(o.items, (l) => l.qty), 'item')} · ${elapsedMin(o.createdAt)}</small>`
       : st ? `<em class="st-label">${icon(st.ic)} ${esc(st.label)}</em>${ms.note ? `<small>${esc(ms.note)}</small>` : ''}`
         : '<small>Free</small>';
     const w = waiterOf(t), mine = w && w.id === Session.user()?.id;
@@ -76,7 +78,7 @@ function tablesView() {
   const takeaways = open.filter((o) => o.table === 'Takeaway' && (o.items.length || Date.now() - o.createdAt < 10 * 60000));
   const withTables = feat('tables');
   const newLabel = withTables ? 'New takeaway' : feat('takeaway') ? 'New order' : 'New order';
-  const headBtns = withTables && canAssign() && tableNames().length ? `<div class="btn-row tight">${btn('Sections & waiters', 'sectionsOpen', { cls: 'ghost sm', ic: 'users' })}${btn(newLabel, 'newTakeaway', { cls: 'primary', ic: 'plus' })}</div>` : btn(newLabel, 'newTakeaway', { cls: 'primary', ic: 'plus' });
+  const headBtns = `<div class="btn-row tight">${btn('Today', 'daySheetOpen', { cls: 'ghost sm', ic: 'chart' })}${withTables && canAssign() && tableNames().length ? btn('Sections & waiters', 'sectionsOpen', { cls: 'ghost sm', ic: 'users' }) : ''}${btn(newLabel, 'newTakeaway', { cls: 'primary', ic: 'plus' })}</div>`;
   return `${pageHead('Orders', withTables ? 'Tables' : 'Counter', headBtns)}
     ${ordersTabs('tables')}
     ${rulesNotice()}
@@ -89,13 +91,15 @@ function tablesView() {
 }
 
 function tableSheet(t) {
-  const o = openOrders().find((x) => x.table === t);
+  const o = orderAt(t);
   const ms = (S.tableState || {})[t];
   const today = (S.reservations || []).filter((r) => r.table === t && r.date === dayKey() && r.status === 'booked').sort((a, b) => a.time.localeCompare(b.time));
   const choice = (k, label, ic, on) => `<button class="state-btn ${on ? 'on' : ''}" data-act="setTableStatus" data-t="${t}" data-s="${k}">${icon(ic)}<span>${esc(label)}</span></button>`;
   return `${sheetHead('Table status', tableTitle(t))}
     <p class="muted sm">${o ? `${icon('clock')} Running now — order #${o.no}, ${money(orderSubtotal(o))}. Free / Running is set automatically from orders.` : 'Free / Running is set automatically from orders. Set a status by hand when you need to:'}</p>
-    ${o && ['owner', 'manager', 'cashier', 'waiter', 'captain'].includes(Session.role()) ? `<div class="btn-row">${btn('Move to another table', 'moveOpen', { cls: 'primary', ic: 'right', data: `data-t="${esc(t)}"` })}</div>` : ''}
+    ${o && o.table === t && ['owner', 'manager', 'cashier', 'waiter', 'captain'].includes(Session.role()) ? `<div class="btn-row">${btn('Move to another table', 'moveOpen', { cls: 'primary', ic: 'right', data: `data-t="${esc(t)}"` })}${btn('Join tables', 'joinOpen', { cls: 'ghost', ic: 'plus', data: `data-t="${esc(t)}"` })}</div>
+      ${o.joined?.length ? `<p class="muted sm">Joined: ${o.joined.map((x) => `<b>${esc(x)}</b> <button class="link-btn" data-act="unjoin" data-t="${esc(t)}" data-x="${esc(x)}">Separate</button>`).join(' · ')}</p>` : ''}` : ''}
+    ${o && o.table !== t ? `<div class="banner info">${icon('users')}<span>Joined with <b>${esc(tableTitle(o.table))}</b> — one order, one bill.</span>${btn('Separate', 'unjoin', { cls: 'ghost sm', data: `data-t="${esc(o.table)}" data-x="${esc(t)}"` })}</div>` : ''}
     <div class="state-grid">
       ${choice('auto', 'Available (automatic)', 'check', !ms)}
       ${Object.entries(TABLE_STATES).map(([k, s]) => choice(k, s.label, s.ic, ms && ms.status === k)).join('')}
@@ -164,14 +168,16 @@ const origAddItem = Actions.addItem;
 Object.assign(Actions, {
   openTable(el) {
     const t = el.dataset.t, ms = (S.tableState || {})[t];
-    const running = openOrders().some((o) => o.table === t);
+    const at = orderAt(t);
+    if (at && at.table !== t) return go('orders', { t: at.table }); // a joined table opens the group's order
+    const running = !!at;
     if (!running && ms && ms.status === 'blocked' && !confirm(`${tableTitle(t)} is marked "Out of service"${ms.note ? ` (${ms.note})` : ''}. Open an order anyway?`)) return;
     origOpenTable(el);
   },
   addItem(el) {
     // Seating guests at a table clears "Needs cleaning" / "Reserved" (the automatic Running status takes over)
     const t = App.params.t;
-    if (t && !openOrders().some((o) => o.table === t)) {
+    if (t && !orderAt(t)) {
       const ms = (S.tableState || {})[t];
       if (ms && ms.status !== 'blocked') delete S.tableState[t];
     }

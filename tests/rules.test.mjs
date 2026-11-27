@@ -103,6 +103,14 @@ await each('give out sections & waiters', ['owner', 'manager', 'captain'], (db) 
 await each('read sections & waiters', ALL, (db) => getDoc(ref(db, 'meta', 'floor')));
 await each('ask for the bill on an open table', FLOOR, (db) => updateDoc(ref(db, 'orders', 'o_open'), { billReq: { at: now, by: 'x', byId: 'u' } }));
 
+await each('add a walk-in to the waitlist', FLOOR, (db) => setDoc(ref(db, 'waitlist', 'w1'), { id: 'w1', name: 'Rao', guests: 4, status: 'waiting', at: now, date: '2026-11-27' }));
+await each('tick the opening checklist', [...FLOOR, 'housekeeping'], (db) => setDoc(ref(db, 'checks', '2026-11-27'), { open: { 'Floor mopped': { by: 'x', at: now } } }));
+await each('ask for a discount (pending)', FLOOR, (db) => updateDoc(ref(db, 'orders', 'o_open'), { discReq: { amount: 10, what: '₹10 off', reason: 'late', by: 'x', byId: 'u', at: now, status: 'pending' } }));
+await each('APPROVE a discount', ['owner', 'manager'], (db) => updateDoc(ref(db, 'orders', 'o_open'), { discount: 10, discReq: { amount: 10, what: '₹10 off', reason: 'late', by: 'x', byId: 'u', at: now, status: 'approved', decidedBy: 'y' } }));
+await each('open a bill that is already "approved"', ['owner', 'manager'], (db) => setDoc(ref(db, 'orders', 'o_new2'), openOrder('o_new2', { discReq: { amount: 10, status: 'approved' } })));
+await each('rate a paid bill (guest feedback)', FLOOR, (db) => updateDoc(ref(db, 'orders', 'o_paid'), { rating: 4, feedback: '' }));
+await each('rate with 9 stars', ['owner'], (db) => updateDoc(ref(db, 'orders', 'o_paid'), { rating: 9 }));
+
 await env.cleanup();
 const byLabel = {};
 results.forEach((r) => { const label = r.slice(23).split(' — ')[0]; (byLabel[label] = byLabel[label] || []).push(r.startsWith('ok') ? '✓' : '✗'); });
