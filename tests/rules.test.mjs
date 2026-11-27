@@ -38,6 +38,7 @@ async function seed() {
     await setDoc(doc(db, 'cafes', C, 'audit', 'a1'), { id: 'a1', type: 'reprint', date: '2026-11-25', at: now });
     await setDoc(doc(db, 'cafes', C, 'expenses', 'e1'), { id: 'e1', amount: 10, date: '2026-11-25' });
     await setDoc(doc(db, 'cafes', C, 'staffPrivate', 'st1'), { salary: 15000 });
+    for (const r of [...ROLES, 'other']) await setDoc(doc(db, 'profiles', 'u_' + r), { cafeId: C });
     await setDoc(doc(db, 'cafes', C, 'menu', 'm1'), { id: 'm1', name: 'Tea', cat: 'Drinks', price: 20, available: true });
   });
 }
@@ -110,6 +111,16 @@ await each('APPROVE a discount', ['owner', 'manager'], (db) => updateDoc(ref(db,
 await each('open a bill that is already "approved"', ['owner', 'manager'], (db) => setDoc(ref(db, 'orders', 'o_new2'), openOrder('o_new2', { discReq: { amount: 10, status: 'approved' } })));
 await each('rate a paid bill (guest feedback)', FLOOR, (db) => updateDoc(ref(db, 'orders', 'o_paid'), { rating: 4, feedback: '' }));
 await each('rate with 9 stars', ['owner'], (db) => updateDoc(ref(db, 'orders', 'o_paid'), { rating: 9 }));
+
+await each('update the staff name list', ['owner'], (db) => setDoc(ref(db, 'meta', 'team'), { people: [{ id: 'u', name: 'x', role: 'waiter' }] }));
+await each('read the staff name list', ALL, (db) => getDoc(ref(db, 'meta', 'team')));
+
+await each('open / count the cash drawer', ['owner', 'manager', 'cashier'], (db) => setDoc(ref(db, 'drawer', '2026-11-27'), { open: { amt: 1000, by: 'x', at: now }, moves: [] }));
+await each('read the cash drawer', ['owner', 'manager', 'cashier'], (db) => getDoc(ref(db, 'drawer', '2026-11-27')));
+
+for (const r of ROLES) await check('add a branch to my own profile', r, true, (db) => updateDoc(doc(db, 'profiles', 'u_' + r), { branches: ['c9'] }));
+await each("change SOMEONE ELSE's profile", [], (db) => updateDoc(doc(db, 'profiles', 'u_other'), { branches: ['c9'] }));
+await each('move my profile to another café', [], (db) => updateDoc(doc(db, 'profiles', 'u_waiter'), { cafeId: 'c2' }));
 
 await env.cleanup();
 const byLabel = {};

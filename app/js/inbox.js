@@ -46,6 +46,9 @@ function notifications() {
     }));
   }
 
+  // Owner: things that look wrong today
+  if (role === 'owner') ownerAlerts().forEach((a) => out.push({ id: `own:${a.key}`, type: 'alert', ic: 'alert', at: a.at, link: a.link, title: a.title, body: a.body }));
+
   // Discounts / free items waiting for approval (manager / owner)
   if (isApprover()) pendingApprovals().forEach((o) => out.push({
     id: `appr:${o.id}:${o.discReq.at}`, type: 'approval', ic: 'key', at: o.discReq.at, link: '#/floor',

@@ -45,6 +45,8 @@ const SPEC = [
   // Running the floor: who is on duty today (each person their own line) and today's sections & waiters
   { key: 'duty', kind: 'map', coll: 'duty', read: ALL_ROLES, write: FLOOR_ROLES },
   { key: 'floor', kind: 'doc', path: ['meta', 'floor'], read: ALL_ROLES, write: ['owner', 'manager', 'captain'] },
+  { key: 'team', kind: 'doc', path: ['meta', 'team'], read: ALL_ROLES, write: ['owner'] }, // staff names + roles only
+  { key: 'drawer', kind: 'map', coll: 'drawer', read: ['owner', 'manager', 'cashier'], write: ['owner', 'manager', 'cashier'], days: WINDOW_DAYS }, // cash drawer, one doc per day
   { key: 'waitlist', kind: 'items', coll: 'waitlist', read: FLOOR_ROLES, write: FLOOR_ROLES, since: { field: 'date', days: 2 } },
   { key: 'checks', kind: 'map', coll: 'checks', read: [...FLOOR_ROLES, 'housekeeping'], write: [...FLOOR_ROLES, 'housekeeping'], days: 7 },
   { key: 'notices', kind: 'items', coll: 'notices', read: ALL_ROLES, write: ['owner', 'manager'], since: { field: 'at', days: 30, num: true } },
@@ -54,7 +56,7 @@ const SPEC = [
   // Leakage check: everyone adds events, only the owner / manager can read them
   { key: 'audit', kind: 'items', coll: 'audit', read: ['owner', 'manager'], write: ALL_ROLES, since: { field: 'date', days: WINDOW_DAYS } },
 ];
-const NEW_RULE_KEYS = ['tableState', 'reservations', 'notices', 'stockLog', 'audit', 'duty', 'floor', 'waitlist', 'checks']; // need the v3.3 security rules
+const NEW_RULE_KEYS = ['tableState', 'reservations', 'notices', 'stockLog', 'audit', 'duty', 'floor', 'waitlist', 'checks', 'team', 'drawer']; // need the v3.3 security rules
 
 /* ---------------- small helpers ---------------- */
 function canon(v) { // JSON with sorted keys, so the same data always gives the same text
@@ -326,7 +328,7 @@ function rebuildUsers() {
 }
 Cloud.changed = () => {
   if (!Cloud.attached) return;
-  if (Session.user()) { checkReady(); checkNotices(); checkLowStock(); checkCleaning(); checkBillReq(); checkApprovals(); }
+  if (Session.user()) { checkReady(); checkNotices(); checkLowStock(); checkCleaning(); checkBillReq(); checkApprovals(); syncTeam(); checkOwnerAlerts(); }
   if (!liveRender()) Cloud.pending = true;
 };
 Cloud.ensureMonth = async (mk, quiet) => {
@@ -758,7 +760,9 @@ function installOverrides() {
           const cred = await FB.signInWithEmailAndPassword(Cloud.auth, who, pw);
           const prof = await FB.getDoc(FB.doc(Cloud.db, 'profiles', cred.user.uid));
           if (!prof.exists()) { await FB.signOut(Cloud.auth); return formError('This email has no café yet — if sign-up stopped half-way, tap Sign up and use the same email and password to finish it. Staff: log in with your Employee ID.'); }
-          return await afterSignIn(prof.data().cafeId, cred.user);
+          const pd = prof.data(), mine = [pd.cafeId, ...(pd.branches || [])];
+          let last = ''; try { last = localStorage.getItem('cj.cafe') || ''; } catch (e) { /* ignore */ }
+          return await afterSignIn(mine.includes(last) ? last : pd.cafeId, cred.user);
         }
         if (!code) return formError('Enter your café code (ask the owner).');
         const loginId = who.toLowerCase();
