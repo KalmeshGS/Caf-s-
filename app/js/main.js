@@ -512,8 +512,43 @@ setInterval(() => {
     t.classList.toggle('warn', mins >= 10 && mins < 20); t.classList.toggle('late', mins >= 20);
   });
 }, 1000);
-// Keep every screen fresh (waiters, kitchen and counter): re-draw every 15 seconds when nobody is typing
-setInterval(() => { if (Session.user() && $('#sheet').hidden && !document.activeElement?.matches('input,textarea,select')) render(); }, 15000);
+/* ---------------- live updates on screen ----------------
+   Changes from other phones (a table cleaned, food ready, a new order…) used to wait while ANY box
+   had the cursor — on a laptop the cursor often stays in the search box, so the screen never
+   updated (e.g. the owner kept seeing "Needs cleaning" after the captain tapped "Cleaned").
+   Now an update waits only while someone is really typing (or just tapped into a box), then the
+   screen updates and the cursor and typed text stay where they were. */
+const TEXTY = 'textarea, select, input:not([type=checkbox]):not([type=radio]):not([type=button]):not([type=submit]):not([type=range]):not([type=file]):not([type=color])';
+App.typedAt = 0; App.focusAt = 0;
+['input', 'keydown'].forEach((ev) => document.addEventListener(ev, () => { App.typedAt = Date.now(); }, true));
+document.addEventListener('focusin', () => { App.focusAt = Date.now(); }, true);
+function busyTyping() {
+  const a = document.activeElement;
+  return !!(a && a.matches && a.matches(TEXTY) && Date.now() - Math.max(App.typedAt, App.focusAt) < 6000);
+}
+/** Re-draw now, keeping the cursor (and anything typed) in the same box */
+function renderKeepFocus() {
+  const a = document.activeElement; let key = null, val = null, s0 = null, s1 = null;
+  if (a && a.closest && a.closest('#app') && a.matches(TEXTY)) {
+    key = a.id ? `#${CSS.escape(a.id)}` : a.name ? `${a.tagName.toLowerCase()}[name="${CSS.escape(a.name)}"]`
+      : a.dataset.input ? `[data-input="${CSS.escape(a.dataset.input)}"]` : a.dataset.change ? `[data-change="${CSS.escape(a.dataset.change)}"]` : null;
+    val = a.value; try { s0 = a.selectionStart; s1 = a.selectionEnd; } catch (e) { /* not a text box */ }
+  }
+  render();
+  if (!key) return;
+  const n = $('#app').querySelector(key); if (!n) return;
+  if (/^(TEXTAREA|INPUT)$/.test(n.tagName) && /^(text|search|number|tel|email|url|password|textarea)$/.test(n.type || 'textarea') && n.value !== val) n.value = val;
+  n.focus({ preventScroll: true });
+  try { if (s0 != null) n.setSelectionRange(s0, s1); } catch (e) { /* not a text box */ }
+}
+/** A change arrived: show it now, or as soon as the person stops typing / closes the open sheet */
+function liveRender() {
+  if (!$('#sheet').hidden || busyTyping()) { App.renderPending = true; return false; }
+  App.renderPending = false; renderKeepFocus(); return true;
+}
+setInterval(() => { if (App.renderPending && Session.user()) liveRender(); }, 1500);
+// Keep every screen fresh (waiters, kitchen and counter): re-draw every 15 seconds
+setInterval(() => { if (Session.user()) liveRender(); }, 15000);
 
 // Auto-lock: any tap or key keeps the session alive; after LOCK_AFTER_MIN idle minutes, back to the PIN screen
 ['pointerdown', 'keydown'].forEach((ev) => document.addEventListener(ev, () => Session.touch(), { capture: true, passive: true }));
