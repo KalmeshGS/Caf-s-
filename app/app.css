@@ -1280,3 +1280,11 @@ input[type=month].rep-date { min-width: 11em; }
 .star { background: none; border: 0; font-size: 26px; line-height: 1; color: #c9ced6; cursor: pointer; min-width: 36px; min-height: 40px; }
 .star.on { color: #f5a623; }
 .fbk-note { flex: 1 1 180px; }
+
+.dash-acts { margin: 4px 0 12px; flex-wrap: wrap; }
+.owner-alerts.has { box-shadow: inset 0 0 0 2px #d97706; }
+.owner-alerts .list-btn { width: 100%; }
+.target-card .tgt { margin: 8px 0; }
+.tgt-bar { position: relative; height: 10px; border-radius: 999px; background: var(--surface-2); overflow: visible; margin-top: 4px; }
+.tgt-bar i { display: block; height: 100%; border-radius: 999px; background: var(--accent); }
+.tgt-bar em { position: absolute; top: -3px; width: 2px; height: 16px; background: var(--muted); }

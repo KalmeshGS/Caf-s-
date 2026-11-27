@@ -34,12 +34,15 @@ Views.dashboard = () => {
   return `${typeof homeHero === 'function' ? homeHero() : ''}${pageHead(Session.role() === 'owner' ? 'Owner dashboard' : 'Dashboard', `Today · ${fmtDate(new Date(), { weekday: 'short', day: 'numeric', month: 'short' })}`, live())}
   ${requestsCard()}
   ${typeof setupBanner === 'function' ? setupBanner() : ''}
+  <div class="btn-row dash-acts">${btn("Today's report on WhatsApp", 'dayReportShare', { cls: 'ghost sm', ic: 'send' })}${canDrawer() ? btn('Cash drawer', 'drawerOpenSheet', { cls: 'ghost sm', ic: 'cash' }) : ''}</div>
+  ${alertsCard()}
   <div class="kpis">
     ${kpi("Today's sales", money(sales), `${pl(paid.length, 'bill')}${diff !== null && sales ? ` · ${diff >= 0 ? '+' : ''}${diff}% vs yesterday` : ''}`)}
     ${kpi("Today's expenses", money(exp), `${expensesOn(today).length} ${expensesOn(today).length === 1 ? 'entry' : 'entries'}`, 'neg')}
     ${kpi("Today's profit", money(profit), 'Sales − expenses', profit >= 0 ? 'pos' : 'neg')}
     ${typeof feat !== 'function' || feat('tables') ? kpi('Running tables', String(open.length), open.length ? money(sum(open, orderSubtotal)) + ' on tables' : 'All clear') : kpi('Open orders', String(open.length), open.length ? money(sum(open, orderSubtotal)) + ' not paid yet' : 'All clear')}
   </div>
+  ${targetsCard()}
   ${moneyReceivedCard(paid)}
   <div class="grid-2 wide-left">
     <section class="card">
@@ -253,7 +256,7 @@ Views.billing = (p) => {
     : empty('No open bills. Orders from tables show up here.');
 
   const closing = S.journal[today]?.closing;
-  return `${pageHead('Billing', 'Bills', `<div class="btn-row tight">${btn('Today', 'daySheetOpen', { cls: 'ghost sm', ic: 'chart' })}${btn('Day summary', 'daySummary', { cls: 'ghost sm', ic: 'printer' })}</div>`)}
+  return `${pageHead('Billing', 'Bills', `<div class="btn-row tight">${btn('Today', 'daySheetOpen', { cls: 'ghost sm', ic: 'chart' })}${canDrawer() ? btn('Cash drawer', 'drawerOpenSheet', { cls: 'ghost sm', ic: 'cash' }) : ''}${btn('Day summary', 'daySummary', { cls: 'ghost sm', ic: 'printer' })}</div>`)}
   <div class="grid-2 wide-left">
     <div class="stack">
       ${bill}

@@ -114,6 +114,9 @@ await each('rate with 9 stars', ['owner'], (db) => updateDoc(ref(db, 'orders', '
 await each('update the staff name list', ['owner'], (db) => setDoc(ref(db, 'meta', 'team'), { people: [{ id: 'u', name: 'x', role: 'waiter' }] }));
 await each('read the staff name list', ALL, (db) => getDoc(ref(db, 'meta', 'team')));
 
+await each('open / count the cash drawer', ['owner', 'manager', 'cashier'], (db) => setDoc(ref(db, 'drawer', '2026-11-27'), { open: { amt: 1000, by: 'x', at: now }, moves: [] }));
+await each('read the cash drawer', ['owner', 'manager', 'cashier'], (db) => getDoc(ref(db, 'drawer', '2026-11-27')));
+
 await env.cleanup();
 const byLabel = {};
 results.forEach((r) => { const label = r.slice(23).split(' — ')[0]; (byLabel[label] = byLabel[label] || []).push(r.startsWith('ok') ? '✓' : '✗'); });

@@ -104,6 +104,8 @@ service cloud.firestore {
       match /meta/floor { allow read: if ok(cid); allow write: if can(cid, ['owner', 'manager', 'captain']); }
       // Staff names + roles for the captain's "Sections & waiters" (no phone, salary or login details)
       match /meta/team  { allow read: if ok(cid); allow write: if owner(cid); }
+      // Cash drawer: opening cash, cash in / out, count at closing (one document per day)
+      match /drawer/{day} { allow read, write: if can(cid, ['owner', 'manager', 'cashier']); }
       // Walk-in waitlist, and opening / closing checklists (one document per day)
       match /waitlist/{id} { allow read, write: if can(cid, ['owner', 'manager', 'cashier', 'waiter', 'captain']); }
       match /checks/{day}  { allow read, write: if can(cid, ['owner', 'manager', 'cashier', 'waiter', 'captain', 'housekeeping']); }
