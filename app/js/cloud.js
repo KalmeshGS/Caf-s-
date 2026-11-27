@@ -95,12 +95,30 @@ function startAppCheck(app) {
   } catch (e) { console.warn('App Check could not start', e); }
 }
 
-/* ---------------- start-up ---------------- */
-(function initCloud() {
+/* ---------------- one login per tab ----------------
+   The browser keeps ONE shared sign-in for every tab of the app. When a second person logged in
+   in another tab (same laptop / phone), the first tab's sign-in was swapped under it and it logged
+   out. Now: new tabs still open with the device's login, but a tab where someone logs in while
+   another open tab is using that login gets its own separate sign-in slot (kept for this tab only,
+   it survives a refresh). Logging out in one tab never logs out the other tabs. */
+const TAB_ID = Math.random().toString(36).slice(2, 10);
+const TABS = typeof BroadcastChannel === 'function' ? new BroadcastChannel('cj-tabs') : null;
+if (TABS) TABS.addEventListener('message', (e) => {
+  const m = e.data || {};
+  if (m.q && m.from !== TAB_ID && m.q === Cloud.slot && (Cloud.attached || Cloud.pendingUser || Cloud.auth?.currentUser)) TABS.postMessage({ a: m.n, from: TAB_ID });
+});
+/** Is another open tab using this tab's sign-in slot? */
+Cloud.slotBusy = () => new Promise((res) => {
+  if (!TABS) return res(false);
+  const n = Math.random(); let hit = false;
+  const h = (e) => { if (e.data && e.data.a === n) hit = true; };
+  TABS.addEventListener('message', h); TABS.postMessage({ q: Cloud.slot, n, from: TAB_ID });
+  setTimeout(() => { TABS.removeEventListener('message', h); res(hit); }, 300);
+});
+function startFirebase(slot) {
   const cfg = window.FIREBASE_CONFIG;
-  if (!cfg || !cfg.apiKey || !window.FB) return;
-  Cloud.on = true;
-  Cloud.app = FB.initializeApp(cfg);
+  Cloud.slot = slot;
+  Cloud.app = slot === '[DEFAULT]' ? FB.initializeApp(cfg) : FB.initializeApp(cfg, slot);
   startAppCheck(Cloud.app); // must run before Auth / Firestore are used
   // Sign-in is remembered on this device (only the login token — café data is never stored here)
   Cloud.auth = FB.initializeAuth(Cloud.app, { persistence: [FB.indexedDBLocalPersistence, FB.browserLocalPersistence] });
@@ -109,6 +127,26 @@ function startAppCheck(app) {
     FB.connectAuthEmulator(Cloud.auth, 'http://127.0.0.1:9099', { disableWarnings: true });
     FB.connectFirestoreEmulator(Cloud.db, '127.0.0.1', 8080);
   }
+}
+/** Give this tab its own sign-in slot (another tab keeps the device's login) */
+let slotN = 0;
+function ownSlot() {
+  const name = `tab-${TAB_ID}-${++slotN}`;
+  try { sessionStorage.setItem('cj.slot', name); sessionStorage.setItem('cj.cafe', Cloud.cafeCode || ''); sessionStorage.setItem('cj.cafeName', Cloud.cafeName || ''); } catch (e) { /* ignore */ }
+  startFirebase(name);
+}
+/** Before someone logs in here: if another open tab uses this login, take a separate one */
+Cloud.claimSlot = async () => { if (await Cloud.slotBusy()) ownSlot(); };
+/** This tab's café code / name (its own when it has a separate login) */
+const cafeStore = () => (Cloud.slot && Cloud.slot !== '[DEFAULT]' ? sessionStorage : localStorage);
+
+/* ---------------- start-up ---------------- */
+(function initCloud() {
+  const cfg = window.FIREBASE_CONFIG;
+  if (!cfg || !cfg.apiKey || !window.FB) return;
+  Cloud.on = true;
+  let slot = '[DEFAULT]'; try { slot = sessionStorage.getItem('cj.slot') || slot; } catch (e) { /* ignore */ }
+  startFirebase(slot);
   // Fresh start: online mode never uses data saved on the device by the old offline version.
   // When DATA_EPOCH changes (e.g. after the online database was reset), every device also
   // forgets its remembered café code, café name and sign-in once.
@@ -125,7 +163,7 @@ function startAppCheck(app) {
   if (freshDevice) Object.assign(Session, { _id: null, locked: false, fails: 0 });
   Cloud.legacy = null;
   S = emptyState();
-  try { Cloud.cafeCode = localStorage.getItem('cj.cafe') || ''; Cloud.cafeName = localStorage.getItem('cj.cafeName') || ''; } catch (e) { /* ignore */ }
+  try { Cloud.cafeCode = cafeStore().getItem('cj.cafe') || localStorage.getItem('cj.cafe') || ''; Cloud.cafeName = cafeStore().getItem('cj.cafeName') || localStorage.getItem('cj.cafeName') || ''; } catch (e) { /* ignore */ }
   installOverrides();
   // Re-open the café after a refresh if this device is still signed in
   Cloud.restoring = true;
@@ -134,7 +172,10 @@ function startAppCheck(app) {
     if (!first) return; first = false;
     if (user && Cloud.cafeCode && Session._id === user.uid) {
       try { await attach(Cloud.cafeCode, user, true); } catch (e) { await Cloud.signOut(friendly(e)); }
-    } else if (user) { try { await FB.signOut(Cloud.auth); } catch (e) { /* ignore */ } }
+    } else if (user) {
+      // signed in, but not as this tab's person: never sign out a login another tab is using
+      if (await Cloud.slotBusy()) ownSlot(); else { try { await FB.signOut(Cloud.auth); } catch (e) { /* ignore */ } }
+    }
     Cloud.restoring = false;
     if (!Cloud.attached) render();
   });
@@ -343,7 +384,7 @@ async function attach(cid, user, restoring) {
   // Older versions let stock go below 0 — owners / managers put those back to 0 once
   if (['owner', 'manager'].includes(role) && S.stock.some((s) => Number(s.qty) < 0)) { S.stock.forEach((s) => { if (Number(s.qty) < 0) s.qty = 0; }); persist(); }
   App.lowSeen = null;
-  try { localStorage.setItem('cj.cafe', cid); localStorage.setItem('cj.cafeName', S.settings.name); } catch (e) { /* ignore */ }
+  try { cafeStore().setItem('cj.cafe', cid); cafeStore().setItem('cj.cafeName', S.settings.name); } catch (e) { /* ignore */ }
   Cloud.cafeCode = cid; Cloud.cafeName = S.settings.name;
   FB.updateDoc(cref('members', user.uid), { lastLogin: Date.now() }).catch(() => {});
   closeSheet();
@@ -360,7 +401,9 @@ Cloud.signOut = async (msg) => {
   Session._id = null; Session.locked = false; Session.save(); App.kotSeen = null;
   document.body.classList.remove('is-offline');
   S = emptyState();
-  try { await FB.signOut(Cloud.auth); } catch (e) { /* ignore */ }
+  // another open tab still uses this login: leave it signed in there, this tab gets a fresh slot
+  if (await Cloud.slotBusy()) ownSlot();
+  else { try { await FB.signOut(Cloud.auth); } catch (e) { /* ignore */ } }
   closeSheet();
   App.cloudView = 'login';
   history.replaceState(null, '', location.pathname);
@@ -533,6 +576,7 @@ async function cloudSignup(fd, form) {
   if (!validPhone(d.phone)) return formError('Please enter a valid mobile number (10 digits, e.g. 98765 43210).');
   const err = passwordError(fd.get('pw1'), fd.get('pw2'), { name: d.owner, phone: d.phone }); if (err) return formError(err);
   busy(form, true);
+  await Cloud.claimSlot();
   let user = null, createdNow = false, profileSaved = false;
   try {
     try {
@@ -634,7 +678,7 @@ function installOverrides() {
     },
     legacyFresh() { App.legacyChoice = 'fresh'; App.setup = { step: 1, mode: 'signup', d: newDraft() }; render(); },
     setupBack(el) { if (App.setup.step <= 1 && App.setup.mode !== 'later') { App.cloudView = Cloud.cafeCode ? 'login' : ''; App.setup.step = 0; App.legacyChoice = null; return render(); } origSetupBack(el); },
-    changeCafe() { Cloud.cafeCode = ''; Cloud.cafeName = ''; try { localStorage.removeItem('cj.cafe'); localStorage.removeItem('cj.cafeName'); } catch (e) { /* ignore */ } render(); },
+    changeCafe() { Cloud.cafeCode = ''; Cloud.cafeName = ''; try { cafeStore().removeItem('cj.cafe'); cafeStore().removeItem('cj.cafeName'); } catch (e) { /* ignore */ } render(); },
     monthNav(el) { origMonthNav(el); Cloud.ensureMonth(App.ui.month); },
     async forgotFromLogin() {
       const form = $('form[data-form=login]');
@@ -705,6 +749,7 @@ function installOverrides() {
       App.loginWho = who;
       if (!who || !pw) return formError('Enter your Employee ID (or owner email) and password.');
       busy(form, true);
+      await Cloud.claimSlot();
       try {
         if (who.includes('@')) {
           const cred = await FB.signInWithEmailAndPassword(Cloud.auth, who, pw);

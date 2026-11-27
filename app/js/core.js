@@ -219,13 +219,16 @@ const IDLE_LOCK_MIN = 5;
 const LOCK_AFTER_MIN = IDLE_LOCK_MIN;
 const IDLE_ROLES = ['owner', 'manager', 'cashier'];
 const SESS_KEY = 'cj.session';
+/** Where this tab keeps its login: the device (shared by tabs) — or, for a tab with its own separate
+    login (a second person logged in on the same laptop), this tab only */
+function slotStore() { try { return sessionStorage.getItem('cj.slot') ? sessionStorage : localStorage; } catch (e) { return localStorage; } }
 const Session = {
   _id: null, _last: Date.now(), locked: false, fails: 0, _saved: 0,
   load() {
-    try { const s = JSON.parse(localStorage.getItem(SESS_KEY) || 'null'); if (s && s.id) Object.assign(this, { _id: s.id, _last: s.last || 0, locked: !!s.locked, fails: s.fails || 0 }); } catch (e) { /* ignore */ }
+    try { const s = JSON.parse(slotStore().getItem(SESS_KEY) || 'null'); if (s && s.id) Object.assign(this, { _id: s.id, _last: s.last || 0, locked: !!s.locked, fails: s.fails || 0 }); } catch (e) { /* ignore */ }
   },
   save() {
-    try { if (this._id) localStorage.setItem(SESS_KEY, JSON.stringify({ id: this._id, last: this._last, locked: this.locked, fails: this.fails })); else localStorage.removeItem(SESS_KEY); } catch (e) { /* ignore */ }
+    try { if (this._id) slotStore().setItem(SESS_KEY, JSON.stringify({ id: this._id, last: this._last, locked: this.locked, fails: this.fails })); else slotStore().removeItem(SESS_KEY); } catch (e) { /* ignore */ }
     this._saved = Date.now();
   },
   /** The signed-in person, even while the screen is locked */
