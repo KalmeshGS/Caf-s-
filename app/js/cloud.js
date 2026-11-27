@@ -322,9 +322,7 @@ function rebuildUsers() {
 Cloud.changed = () => {
   if (!Cloud.attached) return;
   if (Session.user()) { checkReady(); checkNotices(); checkLowStock(); checkCleaning(); }
-  const busyTyping = document.activeElement && document.activeElement.matches('input, textarea, select');
-  if (!$('#sheet').hidden || busyTyping) { Cloud.pending = true; return; }
-  render();
+  if (!liveRender()) Cloud.pending = true;
 };
 Cloud.ensureMonth = async (mk, quiet) => {
   if (!Cloud.attached || Cloud.loadedMonths.has(mk)) return;
