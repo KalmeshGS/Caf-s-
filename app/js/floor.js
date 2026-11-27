@@ -102,7 +102,7 @@ function floorSettings() {
 function moveSheet(t) {
   const o = openOrders().find((x) => x.table === t);
   if (!o) return `${sheetHead('Move table', tableTitle(t))}<p class="muted">This table has no running order.</p>`;
-  const busy = new Set(openOrders().map((x) => x.table));
+  const busy = busyTables();
   return `${sheetHead('Move table', `${tableTitle(t)} → ?`)}
     <p class="muted sm">The whole order (#${o.no}, ${money(orderSubtotal(o))}) and its kitchen tickets move to the new table.</p>
     ${tableAreas().map((a) => {
@@ -231,8 +231,8 @@ Object.assign(Actions, {
   moveTo(el) {
     const from = el.dataset.from, to = el.dataset.to;
     const o = openOrders().find((x) => x.table === from); if (!o) return closeSheet();
-    if (openOrders().some((x) => x.table === to)) return toast(`${tableTitle(to)} is not free any more.`);
-    o.table = to;
+    if (busyTables().has(to)) return toast(`${tableTitle(to)} is not free any more.`);
+    openOrders().filter((x) => x.table === from).forEach((x) => { x.table = to; }); // split bills move too
     S.kots.forEach((k) => { if (k.orderId === o.id && k.status !== 'served') { k.table = to; k.movedFrom = from; k.updatedAt = Date.now(); } });
     audit('moved', { no: o.no, from, to, amount: 0 });
     closeSheet(); save(); toast(`Moved to ${tableTitle(to)} ✓`);

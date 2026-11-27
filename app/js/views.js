@@ -91,7 +91,7 @@ function moneyReceivedCard(paid) {
 /* ---------------- 02 Orders ---------------- */
 function currentOrder(p) {
   if (p.o) return byId(S.orders, p.o);
-  if (p.t) return S.orders.find((o) => o.status === 'open' && o.table === p.t);
+  if (p.t) return orderAt(p.t);
   return null;
 }
 
@@ -130,7 +130,9 @@ function orderEditor(p) {
   const cats = ['All', ...(S.menu.some((m) => m.fav) ? ['★'] : []), ...new Set(S.menu.map((m) => m.cat))];
   if (!cats.includes(App.ui.cat)) App.ui.cat = 'All';
   const lines = o ? o.items : [];
-  const unsent = sum(lines, (l) => Math.max(0, l.qty - l.sent));
+  const unsent = sum(lines.filter((l) => !l.hold), (l) => Math.max(0, l.qty - l.sent));
+  const held = sum(lines.filter((l) => l.hold), (l) => Math.max(0, l.qty - l.sent));
+  const parts = o && o.table !== 'Takeaway' ? openOrders().filter((x) => x.table === o.table).sort((a, b) => (a.part || 1) - (b.part || 1)) : [];
   const sub = o ? orderSubtotal(o) : 0;
   const role = Session.role();
   const prepaid = isPrepaid(o || { table: p.t || 'Takeaway' });
@@ -144,15 +146,18 @@ function orderEditor(p) {
     </section>
     <aside class="card ticket">
       ${eyebrow(o ? `Order #${o.no} · ${fmtTime(o.createdAt)}` : 'New order')}
-      <h2>${esc(o && o.table === 'Takeaway' ? `Takeaway #${o.no}` : /^T\d+$/.test(label) ? 'Table ' + label.slice(1) : label)}</h2>
+      <h2>${esc(o && o.table === 'Takeaway' ? `Takeaway #${o.no}` : /^T\d+$/.test(o ? o.table : label) ? 'Table ' + (o ? o.table : label).slice(1) : (o ? o.table : label))}${o?.joined?.length ? ` <small class="muted">+ ${esc(o.joined.join(', '))}</small>` : ''}</h2>
+      ${parts.length > 1 ? `<div class="chip-row bill-parts">${parts.map((x) => `<a class="chip ${x.id === o.id ? 'on' : ''}" href="#/orders?o=${x.id}">Bill ${x.part || 1} · ${money(orderSubtotal(x))}</a>`).join('')}</div>` : ''}
+      ${!prepaid ? `<div class="seg hold-seg" role="group" aria-label="New items"><button type="button" class="seg-btn" data-act="holdMode" data-v="0" aria-pressed="${!App.ui.holdNext}"><span>Next items: send</span></button><button type="button" class="seg-btn" data-act="holdMode" data-v="1" aria-pressed="${!!App.ui.holdNext}"><span>Hold (next course)</span></button></div>` : ''}
       <div class="ticket-lines">
       ${lines.length ? lines.map((l) => {
         const st = lineState(o, l);
         return `<div class="tline ${st.locked >= l.qty ? 'locked' : ''}">
           <div class="tl-main"><strong>${esc(l.name)}</strong>
-            <small>${money(l.price)} × ${l.qty}${st.unsent ? ` <em class="new">+${st.unsent} not sent</em>` : ''}${st.queued ? ` <em class="queued">${st.queued} in kitchen queue · can change</em>` : ''}${st.locked ? ` <em class="lockd">${icon('lock')} ${st.locked} cooking</em>` : ''}</small>
+            <small>${money(l.price)} × ${l.qty}${st.unsent && l.hold ? ` <em class="held">${icon('clock')} ${st.unsent} held for later</em>` : st.unsent ? ` <em class="new">+${st.unsent} not sent</em>` : ''}${st.queued ? ` <em class="queued">${st.queued} in kitchen queue · can change</em>` : ''}${st.locked ? ` <em class="lockd">${icon('lock')} ${st.locked} cooking</em>` : ''}</small>
             ${l.note ? `<span class="tnote">${esc(l.note)}</span>` : ''}
             ${st.locked ? '' : `<button class="link-btn" data-act="lineNote" data-id="${l.id}">${l.note ? 'Edit instructions' : '+ Cooking instructions'}</button>`}
+            ${st.unsent && !prepaid ? `<button class="link-btn" data-act="lineHold" data-id="${l.id}">${l.hold ? 'Send with the next order' : 'Hold for later'}</button>` : ''}
           </div>
           <div class="qty"><button class="icon-btn sm" data-act="decLine" data-id="${l.id}" aria-label="Less" ${l.qty <= st.locked ? 'disabled' : ''}>${icon('minus')}</button><b>${l.qty}</b><button class="icon-btn sm" data-act="incLine" data-id="${l.id}" aria-label="More">${icon('plus')}</button>
             ${l.qty > st.locked ? `<button class="icon-btn sm ghosty" data-act="removeLine" data-id="${l.id}" aria-label="Remove ${esc(l.name)}">${icon('trash')}</button>` : ''}</div>
@@ -164,7 +169,11 @@ function orderEditor(p) {
       <div class="ticket-actions">
         ${prepaid
           ? `<button class="btn primary block" data-act="payFirst" ${o && lines.length ? '' : 'disabled'}>${icon('receipt')}<span>${can('billing') ? 'Take payment & get token' : 'Send to counter for payment'}</span></button>`
-          : `<button class="btn primary block" data-act="sendKitchen" ${unsent ? '' : 'disabled'}>${icon(unsent ? 'send' : 'check')}<span>${unsent ? `Send to kitchen (${unsent})` : o && lines.length ? 'Sent to kitchen' : 'Send to kitchen'}</span></button>
+          : `<button class="btn primary block" data-act="sendKitchen" ${unsent ? '' : 'disabled'}>${icon(unsent ? 'send' : 'check')}<span>${unsent ? `Send to kitchen (${unsent})` : o && lines.length ? (held ? 'Nothing else to send now' : 'Sent to kitchen') : 'Send to kitchen'}</span></button>
+        ${held ? `<button class="btn block fire-btn" data-act="fireHeld">${icon('flame')}<span>Fire held items (${held}) — next course</span></button>` : ''}
+        ${o && lines.length && sum(lines, (l) => l.qty) > 1 && ORDER_TAKERS.includes(Session.role()) ? btn('Split bill', 'splitOpen', { cls: 'ghost block', ic: 'receipt', data: `data-id="${o.id}"` }) : ''}
+        ${o && lines.length && ORDER_TAKERS.includes(Session.role()) ? `<div class="row-2">${btn(o.guest?.name ? `Guest: ${o.guest.name}` : 'Guest details', 'guestOpen', { cls: 'ghost', ic: 'users', data: `data-id="${o.id}"` })}${btn(isApprover() ? 'Give discount' : 'Ask for discount', 'discAskOpen', { cls: 'ghost', ic: 'key', data: `data-id="${o.id}"` })}</div>` : ''}
+        ${o?.discReq ? `<p class="sm disc-st ${o.discReq.status}">${o.discReq.status === 'pending' ? `${icon('clock')} Waiting for approval: ${esc(o.discReq.what)}` : o.discReq.status === 'approved' ? `${icon('check')} Approved: ${esc(o.discReq.what)} (${money(o.discReq.amount)} off)${o.discReq.decidedBy ? ` by ${esc(o.discReq.decidedBy)}` : ''}` : `${icon('x')} Not approved: ${esc(o.discReq.what)}`}</p>` : ''}
         ${o && can('billing') && lines.length ? btn('Go to bill', 'toBill', { cls: 'ghost block', ic: 'receipt', data: `data-id="${o.id}"` }) : ''}
         ${o && !can('billing') && lines.length ? `<div class="row-2">${btn(billAsked(o) ? 'Bill asked ✓ (undo)' : 'Request bill', 'billRequest', { cls: billAsked(o) ? 'ghost' : 'ghost', ic: 'receipt', data: `data-id="${o.id}"` })}${btn('Print bill', 'printBillFloor', { cls: 'ghost', ic: 'printer', data: `data-id="${o.id}"` })}</div>
         ${billAsked(o) ? `<p class="muted sm">${icon('clock')} Bill asked ${esc(ago(o.billReq.at))}${o.billReq.by ? ` by ${esc(o.billReq.by)}` : ''} — the cashier is alerted.</p>` : ''}` : ''}`}
@@ -173,7 +182,7 @@ function orderEditor(p) {
   </div>
   <div class="mobile-bar"><span>${pl(sum(lines, (l) => l.qty), 'item')} · <b>${money(sub)}</b></span>
     ${prepaid ? `<button class="btn primary" data-act="payFirst" ${o && lines.length ? '' : 'disabled'}>${can('billing') ? 'Pay & token' : 'To counter'}</button>`
-      : `<button class="btn primary" data-act="sendKitchen" ${unsent ? '' : 'disabled'}>${unsent ? `Send (${unsent})` : 'Sent'}</button>`}</div>`;
+      : held && !unsent ? `<button class="btn primary" data-act="fireHeld">Fire (${held})</button>` : `<button class="btn primary" data-act="sendKitchen" ${unsent ? '' : 'disabled'}>${unsent ? `Send (${unsent})` : 'Sent'}</button>`}</div>`;
 }
 
 /* ---------------- Kitchen screen ---------------- */
@@ -189,7 +198,7 @@ Views.kitchen = () => {
         ${status === 'ready' && typeof canFoodFate === 'function' && canFoodFate() ? `<button class="link-btn" data-act="kotUnclaimed" data-id="${k.id}">Not collected</button>` : ''}<button class="btn ${status === 'ready' ? 'ghost' : 'primary'} sm" data-act="kotNext" data-id="${k.id}">${esc(status === 'ready' && k.token ? 'Collected' : next)}</button></div>
       </article>`).join('') : `<p class="muted k-empty">—</p>`}</section>`;
   };
-  return `${pageHead('Kitchen', 'Kitchen screen', `<div class="btn-row tight">${canSoldOut() ? btn('Finished today', 'soldOutOpen', { cls: 'ghost sm', ic: 'x' }) : ''}${['owner', 'manager', 'kitchen'].includes(Session.role()) && S.stock.length ? btn('Wastage', 'wasteOpen', { cls: 'ghost sm', ic: 'trash' }) : ''}${btn('Token TV screen', 'openTokens', { cls: 'ghost sm', ic: 'grid' })}${live()}</div>`)}
+  return `${pageHead('Kitchen', 'Kitchen screen', `<div class="btn-row tight">${btn('Today', 'daySheetOpen', { cls: 'ghost sm', ic: 'chart' })}${canSoldOut() ? btn('Finished today', 'soldOutOpen', { cls: 'ghost sm', ic: 'x' }) : ''}${['owner', 'manager', 'kitchen'].includes(Session.role()) && S.stock.length ? btn('Wastage', 'wasteOpen', { cls: 'ghost sm', ic: 'trash' }) : ''}${btn('Token TV screen', 'openTokens', { cls: 'ghost sm', ic: 'grid' })}${live()}</div>`)}
     <div class="kitchen">${col('new', 'New', 'Start cooking')}${col('cooking', 'Cooking', 'Mark ready')}${col('ready', 'Ready to serve', 'Served')}</div>
     <p class="fine">Tip: open this screen on the kitchen tablet. New tickets ping and the timer turns amber after 10 min, red after 20.</p>`;
 };
@@ -211,6 +220,7 @@ Views.billing = (p) => {
       <h2 id="bill-total">Total ${money(t.total)}</h2>
       <div class="bill-lines">${sel.items.map((l) => `<div class="line-row"><span>${esc(l.name)} × ${l.qty}</span><span>${money(l.qty * l.price)}</span></div>`).join('')}</div>
       <div class="line-row"><span>Subtotal</span><span>${money(t.sub)}</span></div>
+      ${sel.discReq?.status === 'approved' ? `<p class="sm disc-st approved">${icon('check')} Approved discount: ${esc(sel.discReq.what)} — ${esc(sel.discReq.reason)} (${esc(sel.discReq.decidedBy || '')})</p>` : sel.discReq?.status === 'pending' ? `<p class="sm disc-st pending">${icon('clock')} Discount asked: ${esc(sel.discReq.what)} — waiting for approval</p>` : ''}
       <label class="line-row"><span>Discount</span><input class="inline-input" name="discount" type="number" min="0" max="${t.sub}" step="any" value="${sel.discount || ''}" placeholder="0" data-input="billDiscount"></label>
       <div id="bill-tax">${billTaxRowsHtml(t)}</div>
       <p class="neg sm" id="form-err" role="alert"></p>
@@ -233,6 +243,7 @@ Views.billing = (p) => {
       <div class="line-row"><b>Total</b><b>${money(sel.total)}</b></div>
       <div class="line-row"><span>Paid by</span><b>${esc(paidByText(sel))} · ${fmtTime(sel.paidAt)}</b></div>
       ${typeof billProfitLine === 'function' ? billProfitLine(sel) : ''}
+      ${feedbackHtml(sel)}
       <div class="row-2">${btn('Print receipt', 'printReceipt', { cls: 'ghost', ic: 'printer', data: `data-id="${sel.id}"` })}${btn('Done', 'closeBill', { cls: 'primary' })}</div>
     </div>`;
   }
@@ -242,7 +253,7 @@ Views.billing = (p) => {
     : empty('No open bills. Orders from tables show up here.');
 
   const closing = S.journal[today]?.closing;
-  return `${pageHead('Billing', 'Bills', btn('Day summary', 'daySummary', { cls: 'ghost sm', ic: 'printer' }))}
+  return `${pageHead('Billing', 'Bills', `<div class="btn-row tight">${btn('Today', 'daySheetOpen', { cls: 'ghost sm', ic: 'chart' })}${btn('Day summary', 'daySummary', { cls: 'ghost sm', ic: 'printer' })}</div>`)}
   <div class="grid-2 wide-left">
     <div class="stack">
       ${bill}

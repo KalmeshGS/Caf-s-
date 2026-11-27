@@ -46,6 +46,12 @@ function notifications() {
     }));
   }
 
+  // Discounts / free items waiting for approval (manager / owner)
+  if (isApprover()) pendingApprovals().forEach((o) => out.push({
+    id: `appr:${o.id}:${o.discReq.at}`, type: 'approval', ic: 'key', at: o.discReq.at, link: '#/floor',
+    title: `Approve? ${money(o.discReq.amount)} off · ${orderLabel(o)}`, body: `${o.discReq.what} — ${o.discReq.reason} (asked by ${o.discReq.by})`,
+  }));
+
   // Tables asking for the bill (cashier / manager / owner)
   if (can('billing')) {
     openOrders().filter(billAsked).forEach((o) => out.push({

@@ -45,6 +45,8 @@ const SPEC = [
   // Running the floor: who is on duty today (each person their own line) and today's sections & waiters
   { key: 'duty', kind: 'map', coll: 'duty', read: ALL_ROLES, write: FLOOR_ROLES },
   { key: 'floor', kind: 'doc', path: ['meta', 'floor'], read: ALL_ROLES, write: ['owner', 'manager', 'captain'] },
+  { key: 'waitlist', kind: 'items', coll: 'waitlist', read: FLOOR_ROLES, write: FLOOR_ROLES, since: { field: 'date', days: 2 } },
+  { key: 'checks', kind: 'map', coll: 'checks', read: [...FLOOR_ROLES, 'housekeeping'], write: [...FLOOR_ROLES, 'housekeeping'], days: 7 },
   { key: 'notices', kind: 'items', coll: 'notices', read: ALL_ROLES, write: ['owner', 'manager'], since: { field: 'at', days: 30, num: true } },
   { key: 'reservations', kind: 'items', coll: 'reservations', read: [...FLOOR_ROLES, 'housekeeping'], write: FLOOR_ROLES, since: { field: 'date', days: 7 } },
   // Stock & profit: purchases, wastage, corrections (kitchen may only add wastage — see firestore.rules)
@@ -52,7 +54,7 @@ const SPEC = [
   // Leakage check: everyone adds events, only the owner / manager can read them
   { key: 'audit', kind: 'items', coll: 'audit', read: ['owner', 'manager'], write: ALL_ROLES, since: { field: 'date', days: WINDOW_DAYS } },
 ];
-const NEW_RULE_KEYS = ['tableState', 'reservations', 'notices', 'stockLog', 'audit', 'duty', 'floor']; // need the v3.3 security rules
+const NEW_RULE_KEYS = ['tableState', 'reservations', 'notices', 'stockLog', 'audit', 'duty', 'floor', 'waitlist', 'checks']; // need the v3.3 security rules
 
 /* ---------------- small helpers ---------------- */
 function canon(v) { // JSON with sorted keys, so the same data always gives the same text
@@ -324,7 +326,7 @@ function rebuildUsers() {
 }
 Cloud.changed = () => {
   if (!Cloud.attached) return;
-  if (Session.user()) { checkReady(); checkNotices(); checkLowStock(); checkCleaning(); checkBillReq(); }
+  if (Session.user()) { checkReady(); checkNotices(); checkLowStock(); checkCleaning(); checkBillReq(); checkApprovals(); }
   if (!liveRender()) Cloud.pending = true;
 };
 Cloud.ensureMonth = async (mk, quiet) => {

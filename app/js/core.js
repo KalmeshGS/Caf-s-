@@ -157,7 +157,7 @@ function emptyState() {
     v: 1,
     settings: null,
     menu: [], orders: [], kots: [], stock: [], expenses: [],
-    vendors: [], vendorTx: [], staff: [], attendance: {}, journal: {}, tableState: {}, reservations: [], notices: [], stockLog: [], audit: [], duty: {}, floor: null,
+    vendors: [], vendorTx: [], staff: [], attendance: {}, journal: {}, tableState: {}, reservations: [], notices: [], stockLog: [], audit: [], duty: {}, floor: null, waitlist: [], checks: {},
     users: [], requests: [], recovery: null,
     seq: { day: '', n: 0, emp: 0 },
   };
@@ -283,7 +283,14 @@ const expensesOn = (dk) => S.expenses.filter((e) => e.date === dk);
 const expensesInMonth = (mk) => S.expenses.filter((e) => e.date.startsWith(mk));
 const openOrders = () => S.orders.filter((o) => o.status === 'open');
 const orderSubtotal = (o) => sum(o.items, (l) => l.qty * l.price);
-const orderLabel = (o) => (o.token ? `Token ${o.token}${o.parcel ? ' · Parcel' : ''}${o.custName ? ' · ' + o.custName : ''}` : o.table === 'Takeaway' ? `Takeaway #${o.no}` : o.table);
+const orderLabel = (o) => (o.token ? `Token ${o.token}${o.parcel ? ' · Parcel' : ''}${o.custName ? ' · ' + o.custName : ''}` : o.table === 'Takeaway' ? `Takeaway #${o.no}` : `${o.table}${o.part ? ` · Bill ${o.part}` : ''}`);
+/** The running order at a table: its own (first bill first), or the table it is joined to */
+function orderAt(t, list = S.orders.filter((o) => o.status === 'open')) {
+  const own = list.filter((x) => x.table === t).sort((a, b) => (a.part || 1) - (b.part || 1))[0];
+  return own || list.find((x) => (x.joined || []).includes(t)) || null;
+}
+/** Tables taken by running orders (joined tables count too) */
+const busyTables = () => new Set(S.orders.filter((o) => o.status === 'open').flatMap((o) => [o.table, ...(o.joined || [])]));
 const isLow = (s) => Number(s.qty) <= Number(s.low);
 /** Table areas (AC, Garden, Party hall…). Without areas: one list T1…Tn from the "Tables" number */
 const tableAreas = () => {

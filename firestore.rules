@@ -102,6 +102,9 @@ service cloud.firestore {
       }
       // Today's sections & waiters — given out by the captain, manager or owner
       match /meta/floor { allow read: if ok(cid); allow write: if can(cid, ['owner', 'manager', 'captain']); }
+      // Walk-in waitlist, and opening / closing checklists (one document per day)
+      match /waitlist/{id} { allow read, write: if can(cid, ['owner', 'manager', 'cashier', 'waiter', 'captain']); }
+      match /checks/{day}  { allow read, write: if can(cid, ['owner', 'manager', 'cashier', 'waiter', 'captain', 'housekeeping']); }
       // Bills. Floor staff open and edit them; only cashier / manager / owner take payment;
       // once paid, a bill can be changed or deleted by the owner only.
       match /orders/{id} {
@@ -119,17 +122,28 @@ service cloud.firestore {
             && (d.method != 'comp' || d.discount == d.subtotal)
             && math.abs(d.total - (d.subtotal - d.discount + d.tax + d.get('charges', 0))) < 0.01;
         }
+        // a discount request changes to "approved" (or an approved one is changed)
+        function discountApproved() {
+          return request.resource.data.get('discReq', null) != resource.data.get('discReq', null)
+            && request.resource.data.get('discReq', null) != null
+            && request.resource.data.discReq.get('status', '') == 'approved';
+        }
         allow read: if ok(cid);
         // New bills always start open (the owner may also upload old paid bills, e.g. moving an offline café online)
-        allow create: if owner(cid) || (floor() && request.resource.data.status == 'open');
+        allow create: if owner(cid) || (floor() && request.resource.data.status == 'open'
+          && (can(cid, ['manager']) || request.resource.data.get('discReq', null) == null || request.resource.data.discReq.get('status', '') != 'approved'));
         allow update: if owner(cid)
-          // open bill stays open: add / change items, notes, table
-          || (floor() && resource.data.status == 'open' && request.resource.data.status == 'open')
+          // open bill stays open: add / change items, notes, table — but only a manager / owner approves a discount
+          || (floor() && resource.data.status == 'open' && request.resource.data.status == 'open'
+              && (can(cid, ['manager']) || !discountApproved()))
           // open bill gets paid: billing roles only, with valid amounts
           || (can(cid, ['manager', 'cashier']) && resource.data.status == 'open' && validPayment(request.resource.data))
           // cancel an open bill (kept, with a reason, for the owner's leakage check)
           || (can(cid, ['manager', 'cashier']) && resource.data.status == 'open' && request.resource.data.status == 'cancelled'
               && request.resource.data.cancelReason is string && request.resource.data.cancelReason.size() > 0)
+          // guest feedback after the bill (stars + a note), by anyone on the floor
+          || (floor() && resource.data.status == 'paid' && onlyKeys(['rating', 'feedback'])
+              && request.resource.data.rating is int && request.resource.data.rating >= 1 && request.resource.data.rating <= 5)
           // credit bill: the money is collected later
           || (can(cid, ['manager', 'cashier']) && resource.data.status == 'paid' && resource.data.method == 'credit'
               && !('creditPaid' in resource.data) && onlyKeys(['creditPaid']));
