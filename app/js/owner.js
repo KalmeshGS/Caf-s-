@@ -64,6 +64,7 @@ function ownerAlerts(dk = dayKey()) {
     .forEach((o) => out.push({ key: `d:${o.id}`, title: `Big discount · ${orderLabel(o)} #${o.no}`, body: `${money(o.discount)} off ${money(o.subtotal || orderSubtotal(o))}${o.discReq?.decidedBy ? ` (approved by ${o.discReq.decidedBy})` : ''} — by ${o.by || '—'}`, at: o.paidAt, link: `#/billing?o=${o.id}` }));
   const d = drawerOf(dk);
   if (d?.close && d.close.diff <= -c.shortMin) out.push({ key: `c:${dk}`, title: `Cash short by ${money(-d.close.diff)}`, body: `Counted ${money(d.close.counted)}, should be ${money(d.close.expected)} — closed by ${d.close.by}`, at: d.close.at, link: '#/billing' });
+  priceRises(10).filter((r) => r.to.date === dk).forEach((r) => out.push({ key: `p:${r.s.id}:${r.to.at}`, title: `${r.s.name} costs ${r.pct}% more`, body: `${money(r.from.unit)} → ${money(r.to.unit)} per ${r.s.unit} from ${r.to.vendor}`, at: r.to.at, link: '#/stock' }));
   const drop = salesDrop(dk);
   if (drop) out.push({ key: `s:${dk}`, title: `Sales down ${drop.pct}% today`, body: `${money(drop.now)} so far vs ${money(drop.then)} by this time last ${fmtDate(keyToDate(dk), { weekday: 'long' })}`, at: drop.at, link: '#/dashboard' });
   return out.sort((a, b) => b.at - a.at);
@@ -192,4 +193,141 @@ Object.assign(Forms, {
     S.settings.targets = { day: Math.max(0, Number(fd.get('day')) || 0), month: Math.max(0, Number(fd.get('month')) || 0) };
     closeSheet(); save(); toast('Targets saved');
   },
+});
+
+/* =========================================================
+   For the owner (batch B)
+   · GST report for the CA (GSTR-1 ready Excel) + accounting export
+   · Profit & loss with prime cost
+   · Menu engineering (stars, workhorses, puzzles, dogs)
+   · Supplier price watch
+   ========================================================= */
+const GST_RATES = [0, 5, 12, 18, 28];
+const STATE_CODES = { '01': 'Jammu and Kashmir', '02': 'Himachal Pradesh', '03': 'Punjab', '04': 'Chandigarh', '05': 'Uttarakhand', '06': 'Haryana', '07': 'Delhi', '08': 'Rajasthan', '09': 'Uttar Pradesh', 10: 'Bihar', 11: 'Sikkim', 12: 'Arunachal Pradesh', 13: 'Nagaland', 14: 'Manipur', 15: 'Mizoram', 16: 'Tripura', 17: 'Meghalaya', 18: 'Assam', 19: 'West Bengal', 20: 'Jharkhand', 21: 'Odisha', 22: 'Chhattisgarh', 23: 'Madhya Pradesh', 24: 'Gujarat', 26: 'Dadra and Nagar Haveli and Daman and Diu', 27: 'Maharashtra', 29: 'Karnataka', 30: 'Goa', 31: 'Lakshadweep', 32: 'Kerala', 33: 'Tamil Nadu', 34: 'Puducherry', 35: 'Andaman and Nicobar Islands', 36: 'Telangana', 37: 'Andhra Pradesh', 38: 'Ladakh' };
+/** One bill's GST parts: taxable value, tax, the rate it was billed at */
+function gstOf(o) {
+  const taxable = round2((o.subtotal ?? orderSubtotal(o)) - (o.discount || 0) + (o.packingAmt || 0) + (o.serviceAmt || 0));
+  const tax = round2(o.tax || 0);
+  const raw = taxable > 0 ? (tax / taxable) * 100 : 0;
+  const rate = GST_RATES.reduce((b, r) => (Math.abs(r - raw) < Math.abs(b - raw) ? r : b), 0);
+  return { taxable, tax, rate };
+}
+function gstData(R) {
+  const paid = paidInRange(R).filter((o) => o.method !== 'comp');
+  const cancelled = S.orders.filter((o) => o.status === 'cancelled' && inR(dayKey(o.cancelledAt || o.createdAt), R));
+  const byRate = {}; const days = {};
+  paid.forEach((o) => {
+    const g = gstOf(o), r = byRate[g.rate] = byRate[g.rate] || { rate: g.rate, bills: 0, taxable: 0, tax: 0 };
+    r.bills++; r.taxable = round2(r.taxable + g.taxable); r.tax = round2(r.tax + g.tax);
+    const k = dayKey(o.paidAt), d = days[k] = days[k] || { date: k, bills: 0, taxable: 0, tax: 0, total: 0, cash: 0, upi: 0, card: 0, credit: 0 };
+    d.bills++; d.taxable = round2(d.taxable + g.taxable); d.tax = round2(d.tax + g.tax); d.total = round2(d.total + o.total);
+    const bm = byMethod([o]); ['cash', 'upi', 'card', 'credit'].forEach((m) => { d[m] = round2(d[m] + (bm[m] || 0)); });
+  });
+  const nos = paid.map((o) => Number(o.no)).filter((n) => n > 0).sort((a, b) => a - b);
+  const gstin = String(S.settings?.gstin || '').toUpperCase(), sc = gstin.slice(0, 2);
+  return { paid, cancelled, rates: Object.values(byRate).sort((a, b) => a.rate - b.rate), days: Object.values(days).sort((a, b) => a.date.localeCompare(b.date)), nos, gstin, pos: STATE_CODES[sc] || STATE_CODES[Number(sc)] ? `${sc}-${STATE_CODES[sc] || STATE_CODES[Number(sc)]}` : '', taxable: round2(sum(paid, (o) => gstOf(o).taxable)), tax: round2(sum(paid, (o) => gstOf(o).tax)) };
+}
+function gstCard(R) {
+  const g = gstData(R), half = (t) => round2(t / 2);
+  return `<section class="card"><div class="card-head">${eyebrow(`GST · ${R.label}`)}${btn('Excel for your CA', 'gstDl', { cls: 'ghost sm', ic: 'download' })}</div>
+    ${g.paid.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Rate</th><th>Bills</th><th>Taxable</th><th>CGST</th><th>SGST</th></tr></thead><tbody>${g.rates.map((r) => `<tr><td>${r.rate}%</td><td>${r.bills}</td><td>${money(r.taxable, true)}</td><td>${money(half(r.tax), true)}</td><td>${money(round2(r.tax - half(r.tax)), true)}</td></tr>`).join('')}
+      <tr class="b"><td>Total</td><td>${g.paid.length}</td><td>${money(g.taxable, true)}</td><td>${money(half(g.tax), true)}</td><td>${money(round2(g.tax - half(g.tax)), true)}</td></tr></tbody></table></div>
+      <p class="muted sm">${g.gstin ? `GSTIN ${esc(g.gstin)}${g.pos ? ` · ${esc(g.pos)}` : ''}` : 'Add your GSTIN in Settings → Business setup.'} · Bills ${g.nos.length ? `${g.nos[0]}–${g.nos[g.nos.length - 1]}` : '—'} · ${g.cancelled.length} cancelled. The Excel has the B2C summary, HSN/SAC summary and documents list for GSTR-1, plus a day-wise sheet for your accounts.</p>`
+      : '<p class="muted sm">No bills in this period.</p>'}</section>`;
+}
+function gstWorkbook(R) {
+  const g = gstData(R), half = (t) => round2(t / 2);
+  return writeXlsx([
+    { name: 'Summary', header: false, rows: [[`${S.settings?.name || ''} — GST summary`], [R.label], [g.gstin ? `GSTIN: ${g.gstin}` : 'GSTIN: (not set)'], [], ['Rate', 'Bills', 'Taxable value', 'CGST', 'SGST', 'Total tax'], ...g.rates.map((r) => [`${r.rate}%`, r.bills, r.taxable, half(r.tax), round2(r.tax - half(r.tax)), r.tax]), ['Total', g.paid.length, g.taxable, half(g.tax), round2(g.tax - half(g.tax)), g.tax], [], ['Made with Cafe Journal — check the figures with your CA before filing.']] },
+    { name: 'b2cs', rows: [['Type', 'Place Of Supply', 'Rate', 'Applicable % of Tax Rate', 'Taxable Value', 'Cess Amount', 'E-Commerce GSTIN'], ...g.rates.map((r) => ['OE', g.pos, r.rate, '', r.taxable, 0, ''])] },
+    { name: 'hsn', rows: [['HSN', 'Description', 'UQC', 'Total Quantity', 'Total Value', 'Rate', 'Taxable Value', 'Integrated Tax Amount', 'Central Tax Amount', 'State/UT Tax Amount', 'Cess Amount'], ...g.rates.map((r) => ['996331', 'Restaurant service', 'NA', r.bills, round2(r.taxable + r.tax), r.rate, r.taxable, 0, half(r.tax), round2(r.tax - half(r.tax)), 0])] },
+    { name: 'docs', rows: [['Nature of Document', 'Sr. No. From', 'Sr. No. To', 'Total Number', 'Cancelled'], ['Invoices for outward supply', g.nos[0] || '', g.nos[g.nos.length - 1] || '', g.paid.length + g.cancelled.length, g.cancelled.length]] },
+    { name: 'Day-wise (accounts)', rows: [['Date', 'Bills', 'Taxable value', 'CGST', 'SGST', 'Bill total', 'Cash', 'UPI', 'Card', 'Credit'], ...g.days.map((d) => [d.date, d.bills, d.taxable, half(d.tax), round2(d.tax - half(d.tax)), d.total, d.cash, d.upi, d.card, d.credit])] },
+  ]);
+}
+
+/** Profit & loss for a period, with prime cost (food + staff) */
+function pnlData(R) {
+  const paid = paidInRange(R).filter((o) => o.method !== 'comp'), exps = expensesInRange(R);
+  const sales = round2(sum(paid, (o) => gstOf(o).taxable));
+  const byCat = (c) => round2(sum(exps.filter((e) => e.cat === c), (e) => e.amount));
+  const purchases = round2(sum((S.stockLog || []).filter((x) => x.type === 'purchase' && inR(x.date, R)), (x) => x.total || 0));
+  const food = round2(purchases + byCat('Kitchen') + byCat('Vendor'));
+  const recipeFood = round2(sum(paid, typeof billFoodCost === 'function' ? billFoodCost : () => 0));
+  let labour = byCat('Salary'), labourEst = false;
+  if (!labour) { const monthly = sum((S.staff || []).filter((p) => p.active !== false), (p) => Number(p.salary) || 0); if (monthly) { labour = round2(monthly * Math.min(R.days, 31) / 30); labourEst = true; } }
+  const others = ['Rent', 'Utilities', 'Maintenance', 'Marketing', 'Other'].map((c) => [c, byCat(c)]).filter(([, v]) => v);
+  const other = round2(sum(others, ([, v]) => v));
+  const profit = round2(sales - food - labour - other);
+  const p = (v) => (sales ? Math.round((v / sales) * 1000) / 10 : 0);
+  return { sales, tax: round2(sum(paid, (o) => o.tax || 0)), purchases, food, recipeFood, labour, labourEst, others, other, profit, foodPct: p(food), labourPct: p(labour), primePct: p(food + labour), profitPct: p(profit) };
+}
+function pnlCard(R) {
+  const d = pnlData(R);
+  const row = (l, v, s = '', cls = '') => `<div class="line-row ${cls}"><span>${l}${s ? ` <small class="muted">${s}</small>` : ''}</span><b>${money(v)}</b></div>`;
+  const tone = (v, ok, warn) => (v <= ok ? 'pos' : v <= warn ? '' : 'neg');
+  return `<section class="card"><div class="card-head">${eyebrow(`Profit & loss · ${R.label}`)}</div>
+    ${row('Sales (before tax)', d.sales, d.tax ? `+ ${money(d.tax)} tax collected (not yours)` : '')}
+    ${row('− Food & ingredients', d.food, `${d.foodPct}% of sales${d.recipeFood ? ` · recipes say ${money(d.recipeFood)}` : ''}`)}
+    ${row('− Staff salaries', d.labour, `${d.labourPct}%${d.labourEst ? ' · estimated from monthly salaries' : ''}`)}
+    ${d.others.map(([c, v]) => row(`− ${c}`, v)).join('')}
+    ${row('Profit', d.profit, `${d.profitPct}% of sales`, 'total')}
+    <div class="pnl-kpis"><span class="${tone(d.foodPct, 35, 40)}">Food cost <b>${d.foodPct}%</b><small>healthy 28–35%</small></span><span class="${tone(d.primePct, 65, 70)}">Prime cost <b>${d.primePct}%</b><small>food + staff · aim ≤ 65%</small></span></div>
+    ${d.foodPct > 35 && d.sales ? `<p class="sm neg">${icon('alert')} Food cost is high — check wastage, portion sizes and supplier prices (Stock → Prices), or raise prices on low-profit dishes (menu engineering below).</p>` : ''}
+  </section>`;
+}
+
+/** Menu engineering for a period: popularity × profit per plate */
+function menuEng(R) {
+  const qty = {}; paidInRange(R).forEach((o) => o.items.forEach((l) => { if (l.menuId) qty[l.menuId] = (qty[l.menuId] || 0) + l.qty; }));
+  const rows = S.menu.filter((m) => qty[m.id] && m.price > 0).map((m) => { const c = typeof dishCost === 'function' ? dishCost(m) : { cost: 0, known: false }; return { m, qty: qty[m.id], margin: round2(m.price - (c.cost || 0)), known: c.known && c.cost > 0 }; });
+  const known = rows.filter((r) => r.known);
+  if (!known.length) return { rows: [], unknown: rows.length };
+  const total = sum(known, (r) => r.qty), avgQty = total / known.length;
+  const avgMargin = sum(known, (r) => r.margin * r.qty) / total;
+  known.forEach((r) => { const pop = r.qty >= 0.7 * avgQty, prof = r.margin >= avgMargin; r.k = pop && prof ? 'star' : pop ? 'horse' : prof ? 'puzzle' : 'dog'; });
+  return { rows: known, unknown: rows.length - known.length, avgMargin };
+}
+const ME = {
+  star: { label: 'Stars', tip: 'Popular and profitable — keep them, show them first, never run out.', cls: 'pos' },
+  horse: { label: 'Workhorses', tip: 'Popular but low profit — raise the price a little, or make the portion / recipe cheaper.', cls: '' },
+  puzzle: { label: 'Puzzles', tip: 'Profitable but rarely ordered — move them up the menu, let waiters suggest them, add a photo.', cls: '' },
+  dog: { label: 'Dogs', tip: 'Neither popular nor profitable — rework or drop them.', cls: 'neg' },
+};
+function menuEngCard(R) {
+  const e = menuEng(R);
+  if (!e.rows.length) return `<section class="card">${eyebrow('Menu engineering')}<p class="muted sm">Add recipes with ingredient prices (Menu & recipes) to see which dishes are Stars, Workhorses, Puzzles and Dogs.</p></section>`;
+  return `<section class="card me-card">${eyebrow(`Menu engineering · ${R.label}`)}<div class="me-grid">${Object.entries(ME).map(([k, v]) => { const list = e.rows.filter((r) => r.k === k).sort((a, b) => b.qty - a.qty); return `<div class="me-box ${k}"><p class="eyebrow ${v.cls}">${v.label} (${list.length})</p><p class="muted sm">${v.tip}</p>${list.slice(0, 6).map((r) => `<div class="line-row sm"><span>${esc(r.m.name)}</span><small>${r.qty} sold · ${money(r.margin)}/plate</small></div>`).join('') || '<p class="muted sm">—</p>'}</div>`; }).join('')}</div>
+    <p class="fine">Popular = sold at least 70% of the average dish. Profitable = earns at least the average ${money(e.avgMargin)} per plate (price − recipe cost).${e.unknown ? ` ${pl(e.unknown, 'dish')} without recipe cost not included.` : ''}</p></section>`;
+}
+
+/** Supplier prices: price per unit from every purchase */
+function priceHistory(stockId) {
+  const out = [];
+  (S.stockLog || []).filter((x) => x.type === 'purchase').forEach((p) => (p.lines || []).forEach((l) => { if (l.stockId === stockId && l.qty > 0 && l.amount > 0) out.push({ date: p.date, at: p.at || keyToDate(p.date).getTime(), vendor: p.vendorName || 'Market', unit: round2(l.amount / l.qty), qty: l.qty }); }));
+  return out.sort((a, b) => a.at - b.at);
+}
+/** Items whose latest purchase price went up (vs the purchase before) */
+function priceRises(minPct = 5) {
+  return S.stock.map((s) => { const h = priceHistory(s.id); if (h.length < 2) return null; const a = h[h.length - 2], b = h[h.length - 1]; const pct = Math.round(((b.unit - a.unit) / a.unit) * 100); return pct >= minPct ? { s, from: a, to: b, pct } : null; }).filter(Boolean);
+}
+function priceWatchCard() {
+  const items = S.stock.map((s) => ({ s, h: priceHistory(s.id) })).filter((x) => x.h.length);
+  const rises = priceRises();
+  return `<section class="card"><div class="card-head">${eyebrow('Supplier prices')}</div>
+    ${rises.length ? `<div class="banner warn">${icon('alert')}<span>Price went up: ${rises.map((r) => `<b>${esc(r.s.name)}</b> +${r.pct}% (${money(r.from.unit)} → ${money(r.to.unit)}/${esc(r.s.unit)}, ${esc(r.to.vendor)})`).join(' · ')}</span></div>` : ''}
+    ${items.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Item</th><th>Last price</th><th>Before</th><th>Change</th><th>Supplier</th></tr></thead><tbody>${items.sort((a, b) => a.s.name.localeCompare(b.s.name)).map(({ s, h }) => { const b = h[h.length - 1], a = h[h.length - 2]; const pct = a ? Math.round(((b.unit - a.unit) / a.unit) * 100) : null; return `<tr><td><button class="link-btn" data-act="priceHist" data-id="${s.id}">${esc(s.name)}</button></td><td>${money(b.unit)}/${esc(s.unit)}</td><td>${a ? money(a.unit) : '—'}</td><td class="${pct > 0 ? 'neg' : pct < 0 ? 'pos' : ''}">${pct == null ? '—' : `${pct > 0 ? '+' : ''}${pct}%`}</td><td>${esc(b.vendor)}</td></tr>`; }).join('')}</tbody></table></div>`
+      : '<p class="muted sm">Record purchases (Stock → Bought stock) to see price changes here.</p>'}</section>`;
+}
+function priceHistSheet(s) {
+  const h = priceHistory(s.id);
+  const byV = {}; h.forEach((x) => { (byV[x.vendor] = byV[x.vendor] || []).push(x.unit); });
+  return `${sheetHead('Price history', `${s.name} (per ${s.unit})`)}
+    ${Object.keys(byV).length > 1 ? `<p class="muted sm">Cheapest supplier lately: <b>${esc(Object.entries(byV).map(([v, l]) => [v, l[l.length - 1]]).sort((a, b) => a[1] - b[1])[0][0])}</b></p>` : ''}
+    ${h.slice().reverse().map((x, i, arr) => { const prev = arr[i + 1]; const pct = prev ? Math.round(((x.unit - prev.unit) / prev.unit) * 100) : null; return `<div class="line-row"><span>${esc(fmtDate(keyToDate(x.date), { day: 'numeric', month: 'short', year: 'numeric' }))} · ${esc(x.vendor)}<small class="muted"> · ${esc(+x.qty.toFixed(2))} ${esc(s.unit)}</small></span><b>${money(x.unit)}${pct ? ` <small class="${pct > 0 ? 'neg' : 'pos'}">${pct > 0 ? '+' : ''}${pct}%</small>` : ''}</b></div>`; }).join('') || '<p class="muted">No purchases yet.</p>'}`;
+}
+
+Object.assign(Actions, {
+  gstDl() { if (!seesCost()) return; const R = periodRange(App.ui.rep || { mode: 'month', anchor: dayKey() }); saveBlob(`${slug(S.settings?.name)}-gst-${R.short}.xlsx`, gstWorkbook(R)); toast('GST Excel saved — share it with your CA'); },
+  priceHist(el) { const s = byId(S.stock, el.dataset.id); if (s) openSheet(priceHistSheet(s)); },
 });

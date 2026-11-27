@@ -161,7 +161,7 @@ Views.reports = () => {
       ${cats.length ? cats.map((x) => `<div class="meter-row"><span>${esc(x.c)}</span>${meter((x.v / spend) * 100, x.color)}<b>${money(x.v)}</b></div>`).join('') : empty('No expenses in this period.')}
     </section>
   </div>
-  ${typeof seesCost === 'function' && seesCost() ? `<div class="grid-2">${foodCostCard(R)}${leakageCard(R)}</div>` : ''}
+  ${typeof seesCost === 'function' && seesCost() ? `<div class="grid-2">${foodCostCard(R)}${leakageCard(R)}</div><div class="grid-2">${pnlCard(R)}${gstCard(R)}</div>${menuEngCard(R)}` : ''}
   <section class="card">${eyebrow('How customers paid')}
     ${[...Object.entries(pm), ...(bm.credit ? [['credit', { label: 'Credit (to collect)', color: '#a86a12' }]] : [])].map(([k, m]) => `<div class="meter-row"><span>${esc(m.label)}</span>${meter(sales ? ((bm[k] || 0) / sales) * 100 : 0, m.color)}<b>${money(bm[k] || 0)}</b></div>`).join('')}
   </section>`;

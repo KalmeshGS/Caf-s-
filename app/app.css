@@ -1288,3 +1288,13 @@ input[type=month].rep-date { min-width: 11em; }
 .tgt-bar { position: relative; height: 10px; border-radius: 999px; background: var(--surface-2); overflow: visible; margin-top: 4px; }
 .tgt-bar i { display: block; height: 100%; border-radius: 999px; background: var(--accent); }
 .tgt-bar em { position: absolute; top: -3px; width: 2px; height: 16px; background: var(--muted); }
+
+.pnl-kpis { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+.pnl-kpis span { flex: 1 1 140px; border-radius: 12px; background: var(--surface-2); padding: 8px 12px; display: flex; flex-direction: column; }
+.pnl-kpis span b { font-size: 20px; }
+.pnl-kpis span small { color: var(--muted); font-size: 12px; }
+.pnl-kpis .neg b { color: #c0392b; } .pnl-kpis .pos b { color: #1a7f4b; }
+.tbl tr.b td { font-weight: 700; }
+.me-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-top: 8px; }
+.me-box { border-radius: 12px; background: var(--surface-2); padding: 10px 12px; }
+.grid-2 > * { min-width: 0; }
