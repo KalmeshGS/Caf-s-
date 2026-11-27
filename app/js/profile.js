@@ -206,6 +206,7 @@ function viewsFor(role) {
   const f = features();
   let v = r.views.filter((x) => {
     if (x === 'kitchen') return f.kitchen !== 'none';
+    if (x === 'floor') return !!f.tables;
     if (x === 'stock') return f.stock_level !== 'none';
     return true;
   });

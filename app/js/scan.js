@@ -249,7 +249,7 @@ const onView = (v) => (location.hash.replace(/^#\/?/, '').split('?')[0] || 'dash
 
 /** Add one menu item to an open bill (same rules as tapping it on the menu) */
 function sellAdd(o, m) {
-  if (m.available === false) return toast(`${m.name} is switched off (not available today).`);
+  if (!isAvail(m)) return toast(`${m.name} is ${soldOutToday(m) ? 'finished for today' : 'switched off (not available today)'}.`);
   const l = o.items.find((x) => x.menuId === m.id && !x.note);
   if (l) l.qty += 1; else o.items.push({ id: uid('l'), menuId: m.id, name: m.name, price: m.price, qty: 1, sent: 0, note: '' });
   save(); try { beep(); } catch (e) { /* ignore */ }

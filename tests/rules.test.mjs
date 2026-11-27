@@ -38,6 +38,7 @@ async function seed() {
     await setDoc(doc(db, 'cafes', C, 'audit', 'a1'), { id: 'a1', type: 'reprint', date: '2026-11-25', at: now });
     await setDoc(doc(db, 'cafes', C, 'expenses', 'e1'), { id: 'e1', amount: 10, date: '2026-11-25' });
     await setDoc(doc(db, 'cafes', C, 'staffPrivate', 'st1'), { salary: 15000 });
+    await setDoc(doc(db, 'cafes', C, 'menu', 'm1'), { id: 'm1', name: 'Tea', cat: 'Drinks', price: 20, available: true });
   });
 }
 
@@ -89,6 +90,18 @@ await each('read salary / KYC', ['owner'], (db) => getDoc(ref(db, 'staffPrivate'
 await each('change café settings', ['owner'], (db) => setDoc(ref(db, 'meta', 'settings'), { name: 'Hacked' }));
 await each('list all logins', ['owner'], (db) => getDocs(collection(db, 'cafes', C, 'logins')));
 await each('make themself owner', ['owner'], (db) => updateDoc(ref(db, 'members', 'u_waiter'), { role: 'owner' }));
+
+// Running the floor
+await each('mark a dish "finished today"', [...FLOOR, 'kitchen'], (db) => updateDoc(ref(db, 'menu', 'm1'), { soldOut: '2026-11-27' }));
+await each('change a dish price', ['owner', 'manager', 'kitchen'], (db) => updateDoc(ref(db, 'menu', 'm1'), { price: 1 }));
+await each('price + "finished" together', ['owner', 'manager', 'kitchen'], (db) => updateDoc(ref(db, 'menu', 'm1'), { price: 1, soldOut: '2026-11-27' }));
+for (const r of [...ROLES, 'locked', 'outsider']) await check('put themself on duty today', r, FLOOR.includes(r), (db) => setDoc(ref(db, 'duty', 'u_' + r), { name: r, role: r, day: '2026-11-27', at: now }));
+await each('put SOMEONE ELSE on duty', ['owner', 'manager', 'captain'], (db) => setDoc(ref(db, 'duty', 'u_other'), { name: 'x', role: 'waiter', day: '2026-11-27', at: now }));
+await each('add extra fields to a duty line', [], (db) => setDoc(ref(db, 'duty', 'u_owner'), { name: 'x', role: 'owner', day: '2026-11-27', at: now, salary: 1 }));
+await each('read who is on duty', ALL, (db) => getDoc(ref(db, 'duty', 'u_waiter')));
+await each('give out sections & waiters', ['owner', 'manager', 'captain'], (db) => setDoc(ref(db, 'meta', 'floor'), { day: '2026-11-27', area: { main: 'u_waiter' }, table: {} }));
+await each('read sections & waiters', ALL, (db) => getDoc(ref(db, 'meta', 'floor')));
+await each('ask for the bill on an open table', FLOOR, (db) => updateDoc(ref(db, 'orders', 'o_open'), { billReq: { at: now, by: 'x', byId: 'u' } }));
 
 await env.cleanup();
 const byLabel = {};

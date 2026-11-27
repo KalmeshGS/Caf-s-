@@ -87,7 +87,21 @@ service cloud.firestore {
       match /meta/settings { allow read: if ok(cid); allow write: if owner(cid); }
       match /meta/seq { allow read: if ok(cid); allow write: if can(cid, ['owner', 'manager', 'cashier', 'waiter', 'captain']); }
 
-      match /menu/{id}       { allow read: if ok(cid); allow write: if can(cid, ['owner', 'manager', 'kitchen']); }
+      match /menu/{id}       {
+        allow read: if ok(cid);
+        allow write: if can(cid, ['owner', 'manager', 'kitchen']);
+        // floor staff may only mark a dish "finished today" (or back on)
+        allow update: if can(cid, ['cashier', 'waiter', 'captain']) && onlyKeys(['soldOut']) && request.resource.data.soldOut is string;
+      }
+      // Running the floor: who is on duty today (each person writes only their own line)
+      match /duty/{uid} {
+        allow read: if ok(cid);
+        allow write: if can(cid, ['owner', 'manager', 'cashier', 'waiter', 'captain'])
+          && (uid == request.auth.uid || can(cid, ['owner', 'manager', 'captain']))
+          && (request.method == 'delete' || request.resource.data.keys().hasOnly(['name', 'role', 'day', 'at']));
+      }
+      // Today's sections & waiters — given out by the captain, manager or owner
+      match /meta/floor { allow read: if ok(cid); allow write: if can(cid, ['owner', 'manager', 'captain']); }
       // Bills. Floor staff open and edit them; only cashier / manager / owner take payment;
       // once paid, a bill can be changed or deleted by the owner only.
       match /orders/{id} {

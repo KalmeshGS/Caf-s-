@@ -46,6 +46,14 @@ function notifications() {
     }));
   }
 
+  // Tables asking for the bill (cashier / manager / owner)
+  if (can('billing')) {
+    openOrders().filter(billAsked).forEach((o) => out.push({
+      id: `bill:${o.id}:${o.billReq.at}`, type: 'bill', ic: 'receipt', at: o.billReq.at, link: `#/billing?o=${o.id}`,
+      title: `Bill asked · ${orderLabel(o)}`, body: `${money(orderTotals(o).total)}${o.billReq.by ? ` · by ${o.billReq.by}` : ''}${o.printed ? ' · bill printed' : ''}`,
+    }));
+  }
+
   // Reservations in the next 90 minutes
   if (role !== 'kitchen' && role !== 'housekeeping') {
     (S.reservations || []).filter((r) => r.status === 'booked' && r.date === dayKey() && resWhen(r) - now < 90 * 60000 && resWhen(r) - now > -30 * 60000).forEach((r) => out.push({
