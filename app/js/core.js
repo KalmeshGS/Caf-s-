@@ -72,12 +72,12 @@ const ATT = { present: { label: 'Present', short: 'P' }, late: { label: 'Late', 
 
 const ROLES = {
   owner:   { label: 'Owner',   desc: 'Everything',            color: '#1f7a4d', views: ['dashboard', 'orders', 'floor', 'kitchen', 'billing', 'menu', 'stock', 'expenses', 'vendors', 'staff', 'reports', 'journal', 'team', 'settings'] },
-  manager: { label: 'Manager', desc: 'Orders · billing · menu & recipes · stock · expenses · vendors · staff', color: '#4f46e5', views: ['dashboard', 'orders', 'floor', 'billing', 'menu', 'stock', 'expenses', 'vendors', 'staff', 'journal'] },
-  cashier: { label: 'Cashier', desc: 'Billing · orders · day closing', color: '#c2783c', views: ['billing', 'orders', 'journal'] },
-  waiter:  { label: 'Waiter',  desc: 'Orders · tables & cleaning · reservations · serving', color: '#0f766e', views: ['orders'] },
-  kitchen: { label: 'Kitchen', desc: 'Kitchen screen · menu & recipes', color: '#d97706', views: ['kitchen', 'menu'] },
-  captain: { label: 'Captain', desc: 'Floor board · sections & waiters · tables & orders · bills · kitchen screen · reservations · cleaning', color: '#0e7490', views: ['floor', 'orders', 'kitchen'] },
-  housekeeping: { label: 'Housekeeping', desc: 'Tables to clean — gets an alert, taps "Cleaned"', color: '#64748b', views: ['orders'] },
+  manager: { label: 'Manager', desc: 'Orders · billing · menu & recipes · stock · expenses · vendors · staff', color: '#4f46e5', views: ['dashboard', 'orders', 'floor', 'billing', 'menu', 'stock', 'expenses', 'vendors', 'staff', 'journal', 'me'] },
+  cashier: { label: 'Cashier', desc: 'Billing · orders · day closing', color: '#c2783c', views: ['billing', 'orders', 'journal', 'me'] },
+  waiter:  { label: 'Waiter',  desc: 'Orders · tables & cleaning · reservations · serving', color: '#0f766e', views: ['orders', 'me'] },
+  kitchen: { label: 'Kitchen', desc: 'Kitchen screen · menu & recipes', color: '#d97706', views: ['kitchen', 'menu', 'me'] },
+  captain: { label: 'Captain', desc: 'Floor board · sections & waiters · tables & orders · bills · kitchen screen · reservations · cleaning', color: '#0e7490', views: ['floor', 'orders', 'kitchen', 'me'] },
+  housekeeping: { label: 'Housekeeping', desc: 'Tables to clean — gets an alert, taps "Cleaned"', color: '#64748b', views: ['orders', 'me'] },
 };
 
 /** Only these roles may start cooking / mark food ready (everyone may mark ready food as served) */
@@ -86,6 +86,7 @@ const VIEWS = {
   dashboard: { label: 'Dashboard', icon: 'grid' },
   orders:    { label: 'Orders',    icon: 'clipboard' },
   floor:     { label: 'Floor',     icon: 'users' },
+  me:        { label: 'My work',   icon: 'idcard' },
   kitchen:   { label: 'Kitchen',   icon: 'flame' },
   billing:   { label: 'Billing',   icon: 'receipt' },
   menu:      { label: 'Menu & recipes', icon: 'cup' },
@@ -157,7 +158,7 @@ function emptyState() {
     v: 1,
     settings: null,
     menu: [], orders: [], kots: [], stock: [], expenses: [],
-    vendors: [], vendorTx: [], staff: [], attendance: {}, journal: {}, tableState: {}, reservations: [], notices: [], stockLog: [], audit: [], duty: {}, floor: null, waitlist: [], checks: {}, team: null, drawer: {},
+    vendors: [], vendorTx: [], staff: [], attendance: {}, journal: {}, tableState: {}, reservations: [], notices: [], stockLog: [], audit: [], duty: {}, floor: null, waitlist: [], checks: {}, team: null, drawer: {}, roster: {}, leaves: [], clock: [], pos: [], repairs: [], incidents: [], taskDefs: [], taskLog: {}, guides: [], guideReads: {},
     users: [], requests: [], recovery: null,
     seq: { day: '', n: 0, emp: 0 },
   };

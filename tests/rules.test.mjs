@@ -122,6 +122,23 @@ for (const r of ROLES) await check('add a branch to my own profile', r, true, (d
 await each("change SOMEONE ELSE's profile", [], (db) => updateDoc(doc(db, 'profiles', 'u_other'), { branches: ['c9'] }));
 await each('move my profile to another café', [], (db) => updateDoc(doc(db, 'profiles', 'u_waiter'), { cafeId: 'c2' }));
 
+// Manager tools and "My work"
+await each('plan the shift roster', ['owner', 'manager'], (db) => setDoc(ref(db, 'roster', '2026-11-23'), { plan: {} }));
+await each('read the roster', ALL, (db) => getDoc(ref(db, 'roster', '2026-11-23')));
+for (const r of ROLES) await check('ask leave for myself', r, true, (db) => setDoc(ref(db, 'leaves', 'lv_' + r), { id: 'lv_' + r, uid: 'u_' + r, pk: 'x', name: r, from: '2026-12-01', to: '2026-12-01', status: 'pending', at: now }));
+await each('ask leave for SOMEONE ELSE', [], (db) => setDoc(ref(db, 'leaves', 'lv_x'), { id: 'lv_x', uid: 'u_nobody', status: 'pending', at: now }));
+await each('ask leave already "approved"', [], (db) => setDoc(ref(db, 'leaves', 'lv_y'), { id: 'lv_y', uid: 'u_owner', status: 'approved', at: now }));
+for (const r of ROLES) await check('check in for myself', r, true, (db) => setDoc(ref(db, 'clock', 'c_' + r), { id: 'c_' + r, uid: 'u_' + r, pk: 'x', day: '2026-11-28', in: now, out: null }));
+await each('check in for SOMEONE ELSE', [], (db) => setDoc(ref(db, 'clock', 'c_x'), { id: 'c_x', uid: 'u_nobody', day: '2026-11-28', in: now }));
+await each('make a purchase order', ['owner', 'manager'], (db) => setDoc(ref(db, 'pos', 'po1'), { id: 'po1', no: 1, lines: [], status: 'sent' }));
+await each('report a repair', ALL, (db) => setDoc(ref(db, 'repairs', 'rp1'), { id: 'rp1', what: 'Fridge', status: 'open', at: now }));
+await each('log a complaint', ALL, (db) => setDoc(ref(db, 'incidents', 'in1'), { id: 'in1', text: 'x', status: 'open', at: now }));
+await each('READ complaints', ['owner', 'manager'], (db) => getDocs(collection(db, 'cafes', C, 'incidents')));
+await each('add a staff task', ['owner', 'manager'], (db) => setDoc(ref(db, 'taskDefs', 't1'), { id: 't1', title: 'x', who: 'all', daily: true }));
+await each('tick a task', ALL, (db) => setDoc(ref(db, 'taskLog', '2026-11-28'), { t1: { by: 'x', at: now } }));
+await each('add a training page', ['owner', 'manager'], (db) => setDoc(ref(db, 'guides', 'g1'), { id: 'g1', title: 'x', body: 'y' }));
+await each('mark training as read', ALL, (db) => setDoc(ref(db, 'guideReads', 'g1'), { x: { name: 'x', at: now } }));
+
 await env.cleanup();
 const byLabel = {};
 results.forEach((r) => { const label = r.slice(23).split(' — ')[0]; (byLabel[label] = byLabel[label] || []).push(r.startsWith('ok') ? '✓' : '✗'); });

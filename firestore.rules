@@ -106,6 +106,31 @@ service cloud.firestore {
       match /meta/team  { allow read: if ok(cid); allow write: if owner(cid); }
       // Cash drawer: opening cash, cash in / out, count at closing (one document per day)
       match /drawer/{day} { allow read, write: if can(cid, ['owner', 'manager', 'cashier']); }
+      // Manager tools and "My work"
+      match /roster/{week}     { allow read: if ok(cid); allow write: if can(cid, ['owner', 'manager']); }
+      // leave: staff ask for themselves (pending) or cancel their own; the manager / owner decides
+      match /leaves/{id} {
+        allow read: if ok(cid);
+        allow create: if ok(cid) && request.resource.data.uid == request.auth.uid && request.resource.data.status == 'pending';
+        allow update: if can(cid, ['owner', 'manager'])
+          || (ok(cid) && resource.data.uid == request.auth.uid && resource.data.status == 'pending' && request.resource.data.status == 'cancelled' && onlyKeys(['status']));
+        allow delete: if can(cid, ['owner', 'manager']);
+      }
+      // check in / out: each person their own, once a day (the manager / owner may correct)
+      match /clock/{id} {
+        allow read: if ok(cid);
+        allow create: if ok(cid) && request.resource.data.uid == request.auth.uid;
+        allow update: if can(cid, ['owner', 'manager'])
+          || (ok(cid) && resource.data.uid == request.auth.uid && onlyKeys(['out']) && resource.data.out == null);
+        allow delete: if can(cid, ['owner', 'manager']);
+      }
+      match /pos/{id}          { allow read, write: if can(cid, ['owner', 'manager']); }
+      match /repairs/{id}      { allow read, create, update: if ok(cid); allow delete: if can(cid, ['owner', 'manager']); }
+      match /incidents/{id}    { allow create: if ok(cid); allow read, update, delete: if can(cid, ['owner', 'manager']); }
+      match /taskDefs/{id}     { allow read: if ok(cid); allow write: if can(cid, ['owner', 'manager']); }
+      match /taskLog/{day}     { allow read, write: if ok(cid); }
+      match /guides/{id}       { allow read: if ok(cid); allow write: if can(cid, ['owner', 'manager']); }
+      match /guideReads/{gid}  { allow read, write: if ok(cid); }
       // Walk-in waitlist, and opening / closing checklists (one document per day)
       match /waitlist/{id} { allow read, write: if can(cid, ['owner', 'manager', 'cashier', 'waiter', 'captain']); }
       match /checks/{day}  { allow read, write: if can(cid, ['owner', 'manager', 'cashier', 'waiter', 'captain', 'housekeeping']); }

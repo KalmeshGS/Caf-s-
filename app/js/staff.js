@@ -21,7 +21,7 @@ const fmtD = (k) => (k ? fmtDate(keyToDate(k), { day: 'numeric', month: 'short',
 /* ---------------- list + attendance ---------------- */
 Views.staff = () => {
   const dk = dayKey();
-  const att = S.attendance[dk] || {};
+  const att = { ...(typeof autoAtt === 'function' ? autoAtt(dk) : {}), ...(S.attendance[dk] || {}) }; // check-ins and approved leave fill in by themselves
   const active = S.staff.filter((p) => p.active !== false);
   const former = S.staff.filter((p) => p.active === false);
   const present = active.filter((p) => att[p.id] === 'present' || att[p.id] === 'late').length;
@@ -37,6 +37,7 @@ Views.staff = () => {
     </div>`;
   };
   return `${pageHead('Staff · today', 'Team & attendance', canManageStaff() ? btn('Add staff', 'staffAdd', { cls: 'primary', ic: 'plus' }) : '')}
+  ${typeof mgrToolsHtml === 'function' ? mgrToolsHtml() : ''}
   <div class="kpis two">${kpi('Present today', `${present} / ${active.length}`, fmtDate(new Date(), { weekday: 'long', day: 'numeric', month: 'short' }), 'pos')}
     ${isOwner() ? kpi('Monthly salaries', money(sum(active, (p) => p.salary)), `${pl(active.length, 'person', 'people')}`) : kpi('Team', String(active.length), 'active staff')}</div>
   <section class="card">

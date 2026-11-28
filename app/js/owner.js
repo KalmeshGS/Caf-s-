@@ -380,7 +380,8 @@ function payrollRows(mk) {
   const dim = new Date(Number(mk.slice(0, 4)), Number(mk.slice(5, 7)), 0).getDate();
   return (S.staff || []).filter((p) => p.active !== false && Number(p.salary) > 0).map((p) => {
     const c = { P: 0, L: 0, Lv: 0, A: 0 };
-    Object.entries(S.attendance || {}).forEach(([dk, day]) => { if (dk.startsWith(mk) && day && day[p.id]) c[day[p.id]] = (c[day[p.id]] || 0) + 1; });
+    // marked attendance (present / late / leave / absent), check-ins and approved leave
+    for (let dk = `${mk}-01`; dk.startsWith(mk) && dk <= dayKey(); dk = shiftDay(dk, 1)) { const a = attOf(dk, p.id); if (a) c[a] = (c[a] || 0) + 1; }
     const salary = Number(p.salary) || 0, perDay = salary / dim;
     const deduct = round2(perDay * c.A);
     const exp = (S.expenses || []).filter((e) => e.staffId === p.id && e.forMonth === mk);
