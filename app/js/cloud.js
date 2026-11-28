@@ -47,6 +47,17 @@ const SPEC = [
   { key: 'floor', kind: 'doc', path: ['meta', 'floor'], read: ALL_ROLES, write: ['owner', 'manager', 'captain'] },
   { key: 'team', kind: 'doc', path: ['meta', 'team'], read: ALL_ROLES, write: ['owner'] }, // staff names + roles only
   { key: 'drawer', kind: 'map', coll: 'drawer', read: ['owner', 'manager', 'cashier'], write: ['owner', 'manager', 'cashier'], days: WINDOW_DAYS }, // cash drawer, one doc per day
+  // Manager tools + "My work"
+  { key: 'roster', kind: 'map', coll: 'roster', read: ALL_ROLES, write: ['owner', 'manager'], days: 21 },
+  { key: 'leaves', kind: 'items', coll: 'leaves', read: ALL_ROLES, write: ALL_ROLES, since: { field: 'at', days: 120, num: true } },
+  { key: 'clock', kind: 'items', coll: 'clock', read: ALL_ROLES, write: ALL_ROLES, since: { field: 'day', days: WINDOW_DAYS } },
+  { key: 'pos', kind: 'items', coll: 'pos', read: ['owner', 'manager'], write: ['owner', 'manager'], since: { field: 'date', days: 120 } },
+  { key: 'repairs', kind: 'items', coll: 'repairs', read: ALL_ROLES, write: ALL_ROLES, since: { field: 'at', days: 90, num: true } },
+  { key: 'incidents', kind: 'items', coll: 'incidents', read: ['owner', 'manager'], write: ALL_ROLES, since: { field: 'at', days: 90, num: true } },
+  { key: 'taskDefs', kind: 'items', coll: 'taskDefs', read: ALL_ROLES, write: ['owner', 'manager'] },
+  { key: 'taskLog', kind: 'map', coll: 'taskLog', read: ALL_ROLES, write: ALL_ROLES, days: 40 },
+  { key: 'guides', kind: 'items', coll: 'guides', read: ALL_ROLES, write: ['owner', 'manager'] },
+  { key: 'guideReads', kind: 'map', coll: 'guideReads', read: ALL_ROLES, write: ALL_ROLES },
   { key: 'waitlist', kind: 'items', coll: 'waitlist', read: FLOOR_ROLES, write: FLOOR_ROLES, since: { field: 'date', days: 2 } },
   { key: 'checks', kind: 'map', coll: 'checks', read: [...FLOOR_ROLES, 'housekeeping'], write: [...FLOOR_ROLES, 'housekeeping'], days: 7 },
   { key: 'notices', kind: 'items', coll: 'notices', read: ALL_ROLES, write: ['owner', 'manager'], since: { field: 'at', days: 30, num: true } },
@@ -56,7 +67,7 @@ const SPEC = [
   // Leakage check: everyone adds events, only the owner / manager can read them
   { key: 'audit', kind: 'items', coll: 'audit', read: ['owner', 'manager'], write: ALL_ROLES, since: { field: 'date', days: WINDOW_DAYS } },
 ];
-const NEW_RULE_KEYS = ['tableState', 'reservations', 'notices', 'stockLog', 'audit', 'duty', 'floor', 'waitlist', 'checks', 'team', 'drawer']; // need the v3.3 security rules
+const NEW_RULE_KEYS = ['tableState', 'reservations', 'notices', 'stockLog', 'audit', 'duty', 'floor', 'waitlist', 'checks', 'team', 'drawer', 'roster', 'leaves', 'clock', 'pos', 'repairs', 'incidents', 'taskDefs', 'taskLog', 'guides', 'guideReads']; // need the v3.3 security rules
 
 /* ---------------- small helpers ---------------- */
 function canon(v) { // JSON with sorted keys, so the same data always gives the same text
@@ -328,7 +339,7 @@ function rebuildUsers() {
 }
 Cloud.changed = () => {
   if (!Cloud.attached) return;
-  if (Session.user()) { checkReady(); checkNotices(); checkLowStock(); checkCleaning(); checkBillReq(); checkApprovals(); syncTeam(); checkOwnerAlerts(); }
+  if (Session.user()) { checkReady(); checkNotices(); checkLowStock(); checkCleaning(); checkBillReq(); checkApprovals(); syncTeam(); checkOwnerAlerts(); checkTeamAlerts(); }
   if (!liveRender()) Cloud.pending = true;
 };
 Cloud.ensureMonth = async (mk, quiet) => {

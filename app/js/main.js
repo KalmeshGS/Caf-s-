@@ -66,7 +66,7 @@ function render() {
   }
   const role = Session.role();
   if (!role) { root.innerHTML = Session.locked && Session.account() ? Views.lockScreen() : Views.login(); return; }
-  checkReady(); checkNotices(); checkDuty(); checkBillReq(); checkApprovals(); syncTeam(); checkOwnerAlerts();
+  checkReady(); checkNotices(); checkDuty(); checkBillReq(); checkApprovals(); syncTeam(); checkOwnerAlerts(); checkTeamAlerts();
   if ((App.setup.mode === 'later' || App.setup.mode === 'profile') && App.setup.step > 0 && role === 'owner') { root.innerHTML = Views.setup(); return; }
   let { view, params } = parseHash();
   const allowed = viewsFor(role).concat('inbox', canTokens() ? ['tokens'] : []); // everyone has the notifications inbox

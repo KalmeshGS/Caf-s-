@@ -44,6 +44,7 @@ Views.dashboard = () => {
   </div>
   ${targetsCard()}
   ${typeof branchCard === 'function' ? branchCard() : ''}
+  ${typeof issuesCard === 'function' ? issuesCard() : ''}
   ${licenceCard()}
   ${moneyReceivedCard(paid)}
   <div class="grid-2 wide-left">
@@ -288,7 +289,7 @@ Views.stock = () => {
   const low = S.stock.filter(isLow);
   const list = (f === 'low' ? low : S.stock).slice().sort((a, b) => (isLow(b) - isLow(a)) || a.name.localeCompare(b.name));
   const costs = typeof seesCost === 'function' && seesCost();
-  const head = pageHead('Stock · live', 'Inventory', `<div class="btn-row tight">${costs ? btn('Scan', 'stockScanOpen', { cls: 'ghost sm', ic: 'camera' }) : ''}${costs ? btn('Wastage', 'wasteOpen', { cls: 'ghost sm', ic: 'trash' }) : ''}${btn('Add item', 'stockAdd', { cls: 'ghost sm', ic: 'plus' })}${costs ? btn('Purchase', 'purchaseOpen', { cls: 'primary', ic: 'download' }) : ''}</div>`);
+  const head = pageHead('Stock · live', 'Inventory', `<div class="btn-row tight">${costs ? btn('Scan', 'stockScanOpen', { cls: 'ghost sm', ic: 'camera' }) + btn('Purchase orders', 'poOpen', { cls: 'ghost sm', ic: 'send' }) : ''}${costs ? btn('Wastage', 'wasteOpen', { cls: 'ghost sm', ic: 'trash' }) : ''}${btn('Add item', 'stockAdd', { cls: 'ghost sm', ic: 'plus' })}${costs ? btn('Purchase', 'purchaseOpen', { cls: 'primary', ic: 'download' }) : ''}</div>`);
   const chips = `<div class="chip-row"><button class="chip ${f === 'all' ? 'on' : ''}" data-act="stockFilter" data-f="all">All (${S.stock.length})</button><button class="chip ${f === 'low' ? 'on' : ''}" data-act="stockFilter" data-f="low">Low (${low.length})</button>${costs ? `<button class="chip ${f === 'move' ? 'on' : ''}" data-act="stockFilter" data-f="move">Movement & value</button><button class="chip ${f === 'prices' ? 'on' : ''}" data-act="stockFilter" data-f="prices">Prices${priceRises().length ? ` (${priceRises().length}↑)` : ''}</button>` : ''}</div>`;
   if (f === 'move' && costs) return `${head}${stockKpis()}${chips}${movementCard(App.ui.month)}`;
   if (f === 'prices' && costs) return `${head}${chips}${priceWatchCard()}`;
